@@ -3,26 +3,159 @@
 {% block title %}Post Details - REDSTRAP{% endblock %}
 
 {% block content %}
-<h1>Post Details</h1>
-
-<div class="card">
-    {% if post.image_url %}
-        <img src="{{ post.image_url }}" class="card-img-top" alt="Post image">
-    {% endif %}
-    <div class="card-body">
-        <h5 class="card-title">
-            {% if post.is_reel %}🎬 Reel{% elif post.is_video %}🎥 Video{% else %}📷 Post{% endif %}
-        </h5>
-        <p class="card-text">{{ post.caption }}</p>
-        <p class="text-muted">Posted: {{ post.taken_at|date:"M d, Y H:i" }}</p>
-        <p>
-            ❤️ {{ post.like_count }} likes | 
-            💬 {{ post.comment_count }} comments
-            {% if post.is_reel or post.is_video %} | ▶️ {{ post.play_count }} plays{% endif %}
-        </p>
-        {% if post.instagram_url %}
-            <a href="{{ post.instagram_url }}" target="_blank" class="btn btn-primary">View on Instagram</a>
-        {% endif %}
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <div class="card">
+            <!-- Post Header with Username -->
+            <div class="card-header" style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">
+                            <strong style="color: var(--accent-primary);">@{{ post.account.username }}</strong>
+                        </h5>
+                        <small class="text-muted">{{ post.taken_at|date:"M d, Y H:i" }}</small>
+                    </div>
+                    <div>
+                        {% if post.is_reel %}
+                            <span class="badge bg-danger"><i class="bi bi-play-fill"></i> Reel</span>
+                        {% elif post.is_video %}
+                            <span class="badge bg-primary"><i class="bi bi-camera-video"></i> Video</span>
+                        {% else %}
+                            <span class="badge bg-secondary"><i class="bi bi-image"></i> Post</span>
+                        {% endif %}
+                        {% if post.is_carousel %}
+                            <span class="badge bg-info"><i class="bi bi-images"></i> Carousel</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Media Section -->
+            <div style="position: relative; background: var(--bg-primary);">
+                {% if post.is_carousel and carousel_items %}
+                    <!-- Carousel -->
+                    <div id="postCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="false">
+                        <div class="carousel-inner">
+                            {% for item in carousel_items %}
+                                <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                                    {% if item.is_video and item.video_url %}
+                                        <video class="d-block w-100" style="max-height: 600px; object-fit: contain; background: var(--bg-primary);" controls {% if forloop.first %}autoplay{% endif %} muted loop>
+                                            <source src="{{ item.video_url }}" type="video/mp4">
+                                            Your browser does not support the video tag.
+                                        </video>
+                                    {% elif item.image_url %}
+                                        <img src="{{ item.image_url }}" class="d-block w-100" style="max-height: 600px; object-fit: contain;" alt="Carousel image {{ forloop.counter }}">
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                        {% if carousel_items|length > 1 %}
+                            <button class="carousel-control-prev" type="button" data-bs-target="#postCarousel" data-bs-slide="prev">
+                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Previous</span>
+                            </button>
+                            <button class="carousel-control-next" type="button" data-bs-target="#postCarousel" data-bs-slide="next">
+                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Next</span>
+                            </button>
+                            <div class="carousel-indicators" style="position: absolute; bottom: 10px;">
+                                {% for item in carousel_items %}
+                                    <button type="button" data-bs-target="#postCarousel" data-bs-slide-to="{{ forloop.counter0 }}" {% if forloop.first %}class="active"{% endif %} aria-label="Slide {{ forloop.counter }}"></button>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% elif post.is_carousel and post.image_url %}
+                    <!-- Carousel marked but no items saved yet - show main image -->
+                    <img src="{{ post.image_url }}" class="card-img-top w-100" alt="Post image" style="max-height: 600px; object-fit: contain;">
+                    <div class="text-center mt-2">
+                        <small class="text-muted">Carousel post ({{ post.carousel_media_count }} items) - additional items will be available after re-fetching</small>
+                    </div>
+                {% elif post.is_video and post.video_url %}
+                    <!-- Single Video with Autoplay -->
+                    <video class="w-100" style="max-height: 600px; object-fit: contain; background: var(--bg-primary);" controls autoplay muted loop>
+                        <source src="{{ post.video_url }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                {% elif post.image_url %}
+                    <!-- Single Image -->
+                    <img src="{{ post.image_url }}" class="card-img-top w-100" alt="Post image" style="max-height: 600px; object-fit: contain;">
+                {% else %}
+                    <!-- No Media -->
+                    <div class="d-flex align-items-center justify-content-center" style="height: 400px; background: var(--bg-tertiary);">
+                        <i class="bi bi-image" style="font-size: 4rem; color: var(--text-muted);"></i>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- Post Body -->
+            <div class="card-body">
+                <!-- Engagement Stats -->
+                <div class="d-flex gap-4 mb-4" style="border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                    <div>
+                        <i class="bi bi-heart-fill" style="color: #ef4444;"></i> 
+                        <strong>{{ post.like_count|floatformat:0 }}</strong> likes
+                    </div>
+                    <div>
+                        <i class="bi bi-chat-fill" style="color: #06b6d4;"></i> 
+                        <strong>{{ post.comment_count|floatformat:0 }}</strong> comments
+                    </div>
+                    {% if post.is_reel or post.is_video %}
+                        <div>
+                            <i class="bi bi-play-fill" style="color: #8b5cf6;"></i> 
+                            <strong>{{ post.play_count|floatformat:0 }}</strong> plays
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Caption -->
+                {% if post.caption %}
+                    <div class="mb-4">
+                        <p class="card-text" style="color: var(--text-primary); white-space: pre-wrap; line-height: 1.6;">{{ post.caption }}</p>
+                    </div>
+                {% else %}
+                    <div class="mb-4">
+                        <p class="text-muted">No caption available.</p>
+                    </div>
+                {% endif %}
+                
+                <!-- Actions -->
+                <div class="d-flex gap-2">
+                    {% if post.instagram_url %}
+                        <a href="{{ post.instagram_url }}" target="_blank" class="btn btn-primary">
+                            <i class="bi bi-instagram"></i> View on Instagram
+                        </a>
+                    {% endif %}
+                    <a href="{% url 'account_analytics' post.account.id %}" class="btn btn-outline-primary">
+                        <i class="bi bi-graph-up"></i> View Account Analytics
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
+<style>
+    .carousel-control-prev-icon,
+    .carousel-control-next-icon {
+        background-color: rgba(0, 0, 0, 0.5);
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+    }
+    
+    .carousel-indicators button {
+        background-color: rgba(255, 255, 255, 0.5);
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin: 0 4px;
+    }
+    
+    .carousel-indicators button.active {
+        background-color: var(--accent-primary);
+        border-color: var(--accent-primary);
+    }
+</style>
 {% endblock %}

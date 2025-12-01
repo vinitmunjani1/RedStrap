@@ -37,7 +37,9 @@ def register_view(request):
 
 @login_required
 def dashboard_view(request):
-    """Main dashboard showing recent posts and reels."""
+    """Main dashboard showing recent posts and reels grouped by username."""
+    from collections import defaultdict
+    
     # Get user's Instagram accounts
     accounts = InstagramAccount.objects.filter(user=request.user)
     
@@ -58,12 +60,35 @@ def dashboard_view(request):
     ).select_related('account').order_by('-taken_at')[:50]
     
     # Combine and sort
-    posts = list(regular_posts) + list(recent_reels)
-    posts.sort(key=lambda x: x.taken_at, reverse=True)
+    all_posts = list(regular_posts) + list(recent_reels)
+    all_posts.sort(key=lambda x: x.taken_at, reverse=True)
+    
+    # Group posts by username
+    posts_by_username = defaultdict(list)
+    for post in all_posts[:50]:  # Limit to 50 most recent
+        posts_by_username[post.account.username].append(post)
+    
+    # Sort usernames by most recent post and create list of tuples
+    username_posts_list = []
+    for username, posts in posts_by_username.items():
+        # Sort posts by taken_at for each username
+        posts.sort(key=lambda x: x.taken_at, reverse=True)
+        username_posts_list.append({
+            'username': username,
+            'account_id': posts[0].account.id,
+            'posts': posts,
+            'count': len(posts)
+        })
+    
+    # Sort by most recent post across all usernames
+    username_posts_list.sort(
+        key=lambda x: max(p.taken_at for p in x['posts']),
+        reverse=True
+    )
     
     context = {
         'accounts': accounts,
-        'posts': posts[:50],  # Limit to 50 most recent
+        'username_posts_list': username_posts_list,
         'regular_posts_count': regular_posts.count(),
         'reels_count': recent_reels.count(),
     }
@@ -153,6 +178,21 @@ def scrape_instagram_view(request):
                         'play_count': post_data.get('play_count', 0),
                     }
                 )
+                
+                # Save carousel items if this is a carousel post
+                if post.is_carousel and 'carousel_items' in post_data:
+                    # Delete existing carousel items
+                    post.carousel_items.all().delete()
+                    # Create new carousel items
+                    for idx, item_data in enumerate(post_data.get('carousel_items', [])):
+                        InstagramCarouselItem.objects.create(
+                            post=post,
+                            item_index=idx,
+                            image_url=item_data.get('image_url', ''),
+                            video_url=item_data.get('video_url', ''),
+                            is_video=item_data.get('is_video', False),
+                        )
+                
                 if created:
                     saved_count += 1
             
@@ -231,6 +271,21 @@ def scrape_reels_view(request):
                         'play_count': reel_data.get('play_count', 0),
                     }
                 )
+                
+                # Save carousel items if this is a carousel reel
+                if post.is_carousel and 'carousel_items' in reel_data:
+                    # Delete existing carousel items
+                    post.carousel_items.all().delete()
+                    # Create new carousel items
+                    for idx, item_data in enumerate(reel_data.get('carousel_items', [])):
+                        InstagramCarouselItem.objects.create(
+                            post=post,
+                            item_index=idx,
+                            image_url=item_data.get('image_url', ''),
+                            video_url=item_data.get('video_url', ''),
+                            is_video=item_data.get('is_video', False),
+                        )
+                
                 if created:
                     saved_count += 1
             
@@ -281,10 +336,13 @@ def analytics_view(request):
 @login_required
 def account_analytics_view(request, account_id):
     """Analytics for a specific Instagram account (regular posts only)."""
+    import json
+    from collections import defaultdict
+    
     account = get_object_or_404(InstagramAccount, id=account_id, user=request.user)
     
     # Filter for regular posts only (not reels)
-    posts = InstagramPost.objects.filter(account=account, is_reel=False)
+    posts = InstagramPost.objects.filter(account=account, is_reel=False).order_by('taken_at')
     
     # Calculate metrics
     total_posts = posts.count()
@@ -292,6 +350,70 @@ def account_analytics_view(request, account_id):
     total_comments = posts.aggregate(Sum('comment_count'))['comment_count__sum'] or 0
     avg_likes = posts.aggregate(Avg('like_count'))['like_count__avg'] or 0
     avg_comments = posts.aggregate(Avg('comment_count'))['comment_count__avg'] or 0
+    
+    # Calculate average likes/comments per hour
+    # Get the oldest and newest post timestamps
+    oldest_post = posts.order_by('taken_at').first()
+    newest_post = posts.order_by('-taken_at').first()
+    
+    avg_likes_per_hour = 0
+    avg_comments_per_hour = 0
+    
+    if oldest_post and newest_post and total_posts > 0:
+        # Calculate time span from oldest post to now (or newest post)
+        time_span = timezone.now() - oldest_post.taken_at
+        total_hours = time_span.total_seconds() / 3600
+        
+        if total_hours > 0:
+            # Average likes/comments per hour across all posts
+            avg_likes_per_hour = total_likes / total_hours
+            avg_comments_per_hour = total_comments / total_hours
+    
+    # Prepare histogram data - group posts by day
+    histogram_data = defaultdict(lambda: {'likes': 0, 'comments': 0, 'count': 0, 'hours': 0})
+    
+    if total_posts > 0:
+        # Group posts by date (day)
+        for post in posts:
+            # Get the date key (YYYY-MM-DD)
+            date_key = post.taken_at.date().isoformat()
+            
+            # Calculate hours since post was created
+            hours_since_post = (timezone.now() - post.taken_at).total_seconds() / 3600
+            if hours_since_post < 1:
+                hours_since_post = 1  # Minimum 1 hour to avoid division by zero
+            
+            histogram_data[date_key]['likes'] += post.like_count
+            histogram_data[date_key]['comments'] += post.comment_count
+            histogram_data[date_key]['count'] += 1
+            # Use the maximum hours for this day (most recent post's hours)
+            if hours_since_post > histogram_data[date_key]['hours']:
+                histogram_data[date_key]['hours'] = hours_since_post
+        
+        # Sort by date
+        sorted_dates = sorted(histogram_data.keys())
+        
+        # Prepare chart data
+        chart_labels = []
+        avg_likes_per_hour_data = []
+        posts_per_day_data = []
+        
+        for date_key in sorted_dates:
+            data = histogram_data[date_key]
+            chart_labels.append(date_key)
+            
+            # Calculate average likes per hour for this day
+            if data['hours'] > 0:
+                avg_likes_per_hour_for_day = data['likes'] / data['hours']
+            else:
+                avg_likes_per_hour_for_day = 0
+            
+            avg_likes_per_hour_data.append(round(avg_likes_per_hour_for_day, 2))
+            posts_per_day_data.append(data['count'])
+    else:
+        chart_labels = []
+        avg_likes_per_hour_data = []
+        posts_per_day_data = []
     
     # Top posts by likes
     top_posts = posts.order_by('-like_count')[:10]
@@ -303,8 +425,13 @@ def account_analytics_view(request, account_id):
         'total_comments': total_comments,
         'avg_likes': avg_likes,
         'avg_comments': avg_comments,
+        'avg_likes_per_hour': avg_likes_per_hour,
+        'avg_comments_per_hour': avg_comments_per_hour,
         'top_posts': top_posts,
         'is_reels': False,
+        'chart_labels': json.dumps(chart_labels),
+        'avg_likes_per_hour_data': json.dumps(avg_likes_per_hour_data),
+        'posts_per_day_data': json.dumps(posts_per_day_data),
     }
     return render(request, 'core/account_analytics.html', context)
 
@@ -312,10 +439,13 @@ def account_analytics_view(request, account_id):
 @login_required
 def account_reels_analytics_view(request, account_id):
     """Analytics for a specific Instagram account (reels only)."""
+    import json
+    from collections import defaultdict
+    
     account = get_object_or_404(InstagramAccount, id=account_id, user=request.user)
     
     # Filter for reels only
-    reels = InstagramPost.objects.filter(account=account, is_reel=True)
+    reels = InstagramPost.objects.filter(account=account, is_reel=True).order_by('taken_at')
     
     # Calculate metrics
     total_reels = reels.count()
@@ -325,6 +455,73 @@ def account_reels_analytics_view(request, account_id):
     avg_plays = reels.aggregate(Avg('play_count'))['play_count__avg'] or 0
     avg_likes = reels.aggregate(Avg('like_count'))['like_count__avg'] or 0
     avg_comments = reels.aggregate(Avg('comment_count'))['comment_count__avg'] or 0
+    
+    # Calculate average likes/comments/plays per hour
+    # Get the oldest and newest reel timestamps
+    oldest_reel = reels.order_by('taken_at').first()
+    newest_reel = reels.order_by('-taken_at').first()
+    
+    avg_likes_per_hour = 0
+    avg_comments_per_hour = 0
+    avg_plays_per_hour = 0
+    
+    if oldest_reel and newest_reel and total_reels > 0:
+        # Calculate time span from oldest reel to now (or newest reel)
+        time_span = timezone.now() - oldest_reel.taken_at
+        total_hours = time_span.total_seconds() / 3600
+        
+        if total_hours > 0:
+            # Average likes/comments/plays per hour across all reels
+            avg_likes_per_hour = total_likes / total_hours
+            avg_comments_per_hour = total_comments / total_hours
+            avg_plays_per_hour = total_plays / total_hours
+    
+    # Prepare histogram data - group reels by day
+    histogram_data = defaultdict(lambda: {'plays': 0, 'likes': 0, 'comments': 0, 'count': 0, 'hours': 0})
+    
+    if total_reels > 0:
+        # Group reels by date (day)
+        for reel in reels:
+            # Get the date key (YYYY-MM-DD)
+            date_key = reel.taken_at.date().isoformat()
+            
+            # Calculate hours since reel was created
+            hours_since_reel = (timezone.now() - reel.taken_at).total_seconds() / 3600
+            if hours_since_reel < 1:
+                hours_since_reel = 1  # Minimum 1 hour to avoid division by zero
+            
+            histogram_data[date_key]['plays'] += reel.play_count
+            histogram_data[date_key]['likes'] += reel.like_count
+            histogram_data[date_key]['comments'] += reel.comment_count
+            histogram_data[date_key]['count'] += 1
+            # Use the maximum hours for this day (most recent reel's hours)
+            if hours_since_reel > histogram_data[date_key]['hours']:
+                histogram_data[date_key]['hours'] = hours_since_reel
+        
+        # Sort by date
+        sorted_dates = sorted(histogram_data.keys())
+        
+        # Prepare chart data
+        chart_labels = []
+        avg_plays_per_hour_data = []
+        reels_per_day_data = []
+        
+        for date_key in sorted_dates:
+            data = histogram_data[date_key]
+            chart_labels.append(date_key)
+            
+            # Calculate average plays per hour for this day
+            if data['hours'] > 0:
+                avg_plays_per_hour_for_day = data['plays'] / data['hours']
+            else:
+                avg_plays_per_hour_for_day = 0
+            
+            avg_plays_per_hour_data.append(round(avg_plays_per_hour_for_day, 2))
+            reels_per_day_data.append(data['count'])
+    else:
+        chart_labels = []
+        avg_plays_per_hour_data = []
+        reels_per_day_data = []
     
     # Top reels by plays
     top_reels = reels.order_by('-play_count')[:5]
@@ -338,8 +535,14 @@ def account_reels_analytics_view(request, account_id):
         'avg_plays': avg_plays,
         'avg_likes': avg_likes,
         'avg_comments': avg_comments,
+        'avg_likes_per_hour': avg_likes_per_hour,
+        'avg_comments_per_hour': avg_comments_per_hour,
+        'avg_plays_per_hour': avg_plays_per_hour,
         'top_posts': top_reels,
         'is_reels': True,
+        'chart_labels': json.dumps(chart_labels),
+        'avg_plays_per_hour_data': json.dumps(avg_plays_per_hour_data),
+        'reels_per_day_data': json.dumps(reels_per_day_data),
     }
     return render(request, 'core/account_analytics.html', context)
 

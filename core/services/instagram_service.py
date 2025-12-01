@@ -231,12 +231,20 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
         # Handle nested media structure (for reels endpoint)
         # Some endpoints return node.media, others return post data directly in node
         # For reels, taken_at can be in node, node.media, or both
+        # IMPORTANT: For reels endpoint, play_count is in node.media.play_count
         media_data = {}
         if "media" in post_node and isinstance(post_node.get("media"), dict):
             # Extract data from nested media object
             media_data = post_node.get("media", {})
-            # Merge media data with node data (node takes precedence for overlapping fields)
-            actual_post_data = {**media_data, **post_node}
+            # Merge media data with node data (media_data takes precedence for overlapping fields)
+            # This ensures play_count from media is available in actual_post_data
+            actual_post_data = {**post_node, **media_data}
+            
+            # Debug: Log play_count extraction for reels
+            if media_data.get("product_type") == "clips" or post_node.get("product_type") == "clips":
+                logger.info(f"Reel parsing DEBUG: media_data keys: {list(media_data.keys())[:20]}")
+                logger.info(f"Reel parsing DEBUG: media_data.play_count = {media_data.get('play_count')}")
+                logger.info(f"Reel parsing DEBUG: actual_post_data.play_count = {actual_post_data.get('play_count')}")
         else:
             # Use node directly (standard posts endpoint structure)
             actual_post_data = post_node
@@ -513,8 +521,13 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
                 if is_reel_check:
                     logger.warning(f"Using current time as fallback for reel {post_id}: {taken_at}")
         
-        # Determine if this is a reel
-        is_reel = actual_post_data.get("product_type") == "clips" or post_node.get("product_type") == "clips"
+        # Determine if this is a reel (check before extracting play_count so we can log properly)
+        # Check both in actual_post_data (merged) and post_node (original)
+        is_reel = (
+            actual_post_data.get("product_type") == "clips" or 
+            post_node.get("product_type") == "clips" or
+            (media_data and media_data.get("product_type") == "clips")
+        )
         
         # Extract media URLs
         image_url = ""
@@ -554,7 +567,109 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
         
         like_count = safe_int(actual_post_data.get("like_count"), 0)
         comment_count = safe_int(actual_post_data.get("comment_count"), 0)
-        play_count = safe_int(actual_post_data.get("play_count") or actual_post_data.get("view_count"), 0)
+        
+        # For reels, extract play_count from various possible locations
+        # Based on the API response structure: play_count is in node.media.play_count
+        # After merging media_data with post_node, it should be in actual_post_data
+        play_count_value = None
+        
+        # Check in order of likelihood - prioritize media_data first (where play_count actually is)
+        # Based on JSON structure: play_count is in node.media.play_count
+        # After merging, it should be in both media_data and actual_post_data
+        
+        # Direct check of media_data first (most reliable for reels endpoint)
+        # Based on JSON: play_count is in node.media.play_count
+        # CRITICAL: Always check post_node.media.play_count directly for reels
+        # Check in this order: 1) media_data, 2) post_node.media directly, 3) actual_post_data
+        
+        # Priority 1: Check media_data if it was extracted
+        if media_data and "play_count" in media_data:
+            play_count_in_media = media_data.get("play_count")
+            if play_count_in_media is not None:
+                play_count_value = play_count_in_media
+                logger.info(f"{'Reel' if is_reel else 'Post'} {post_id}: ✓ Found play_count in media_data: {play_count_value}")
+        
+        # Priority 2: Check post_node.media directly (most reliable - this is where it actually is)
+        if play_count_value is None and isinstance(post_node.get("media"), dict):
+            media_obj = post_node.get("media", {})
+            if "play_count" in media_obj:
+                play_count_in_node_media = media_obj.get("play_count")
+                if play_count_in_node_media is not None:
+                    play_count_value = play_count_in_node_media
+                    logger.info(f"{'Reel' if is_reel else 'Post'} {post_id}: ✓ Found play_count in post_node.media: {play_count_value}")
+        
+        # Priority 3: Check actual_post_data (after merging) if not found
+        if play_count_value is None and "play_count" in actual_post_data:
+            play_count_in_actual = actual_post_data.get("play_count")
+            if play_count_in_actual is not None:
+                play_count_value = play_count_in_actual
+                logger.info(f"{'Reel' if is_reel else 'Post'} {post_id}: ✓ Found play_count in actual_post_data: {play_count_value}")
+        else:
+            # Try other possible locations
+            check_locations = [
+                ("actual_post_data.video_play_count", lambda: actual_post_data.get("video_play_count")),
+                ("actual_post_data.reel_play_count", lambda: actual_post_data.get("reel_play_count")),
+                ("post_node.play_count", lambda: post_node.get("play_count")),
+                ("actual_post_data.clips_metadata.play_count", lambda: actual_post_data.get("clips_metadata", {}).get("play_count") if isinstance(actual_post_data.get("clips_metadata"), dict) else None),
+            ]
+            
+            for location_name, getter_func in check_locations:
+                try:
+                    value = getter_func()
+                    if value is not None:  # Accept 0 as valid (some reels might have 0 plays)
+                        play_count_value = value
+                        if is_reel:
+                            logger.info(f"Reel {post_id}: Found play_count in {location_name}: {value}")
+                        break
+                except Exception as e:
+                    logger.debug(f"Error checking {location_name} for reel {post_id}: {e}")
+        
+        # For reels, if play_count is not found, use view_count as fallback
+        # (Some APIs use view_count for reels even though the field name is view_count)
+        if is_reel and play_count_value is None:
+            # Try view_count as fallback (it exists in the API response structure)
+            view_count_fallback = (
+                media_data.get("view_count") if media_data else None
+            ) or actual_post_data.get("view_count") or post_node.get("view_count")
+            if view_count_fallback is not None:
+                play_count_value = view_count_fallback
+                logger.info(f"Reel {post_id}: Using view_count as play_count: {play_count_value}")
+        
+        play_count = safe_int(play_count_value, 0)
+        
+        # Enhanced debug logging for reels with missing play_count
+        if is_reel and play_count == 0:
+            logger.warning(
+                f"Reel {post_id}: play_count is 0 after extraction. "
+                f"media_data has play_count: {media_data.get('play_count') if media_data else 'N/A'}, "
+                f"actual_post_data has play_count: {actual_post_data.get('play_count')}, "
+                f"post_node.media has play_count: {post_node.get('media', {}).get('play_count') if isinstance(post_node.get('media'), dict) else 'N/A'}"
+            )
+        
+        # Debug logging for reels with missing play_count
+        if is_reel and play_count == 0:
+            # Check all numeric fields that might be play_count (focus on 'play' not 'view')
+            all_numeric_fields = {}
+            for key, value in actual_post_data.items():
+                if isinstance(value, (int, float)) and ('play' in key.lower() or ('count' in key.lower() and 'play' in key.lower())):
+                    all_numeric_fields[key] = value
+            
+            if media_data:
+                for key, value in media_data.items():
+                    if isinstance(value, (int, float)) and ('play' in key.lower() or ('count' in key.lower() and 'play' in key.lower())):
+                        all_numeric_fields[f"media.{key}"] = value
+            
+            # Also check nested structures
+            if isinstance(actual_post_data.get("clips_metadata"), dict):
+                for key, value in actual_post_data["clips_metadata"].items():
+                    if isinstance(value, (int, float)) and ('play' in key.lower() or ('count' in key.lower() and 'play' in key.lower())):
+                        all_numeric_fields[f"clips_metadata.{key}"] = value
+            
+            logger.warning(
+                f"Reel {post_id}: play_count is 0. "
+                f"Available numeric fields with 'play': {all_numeric_fields if all_numeric_fields else 'None found'}. "
+                f"Top actual_post_data keys: {list(actual_post_data.keys())[:30]}"
+            )
         
         # Extract post code (shortcode)
         post_code = actual_post_data.get("code") or ""
@@ -744,6 +859,9 @@ def fetch_instagram_reels(username: str) -> List[Dict]:
             url = "https://instagram120.p.rapidapi.com/api/instagram/posts"
             response_data = _make_api_request(url, payload, method="POST")
         
+        # Also try the reel detail endpoint to get view counts if available
+        # Note: This might require individual API calls per reel, which could be rate-limited
+        
         if not response_data:
             logger.error(f"Failed to fetch reels for {username}")
             break
@@ -771,10 +889,24 @@ def fetch_instagram_reels(username: str) -> List[Dict]:
                         if not isinstance(node, dict):
                             continue
                             
+                        # Log the node structure for debugging play_count
+                        if isinstance(node, dict):
+                            logger.debug(f"Reel node keys: {list(node.keys())[:30]}")
+                            # Check if play_count exists anywhere in the node
+                            if "play_count" in node:
+                                logger.info(f"Found play_count in reel node: play_count={node.get('play_count')}")
+                        
+                        # Debug: Log the node structure before parsing
+                        if isinstance(node, dict) and "media" in node:
+                            media_obj = node.get("media", {})
+                            logger.info(f"DEBUG: Reel node has media with play_count: {media_obj.get('play_count')}, product_type: {media_obj.get('product_type')}")
+                        
                         parsed_reel = parse_instagram_post(node)
                         if parsed_reel:
                             # Ensure is_reel is set to True
                             parsed_reel["is_reel"] = True
+                            # Debug: Log what play_count was extracted
+                            logger.info(f"DEBUG: Parsed reel {parsed_reel.get('post_id')} has play_count: {parsed_reel.get('play_count')}")
                             all_reels.append(parsed_reel)
                     
                     # Check for pagination - handle different pagination formats
