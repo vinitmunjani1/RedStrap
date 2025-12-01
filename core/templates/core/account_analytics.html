@@ -3,65 +3,66 @@
 {% block title %}{{ account.username }} Analytics - REDSTRAP{% endblock %}
 
 {% block content %}
-<h1>{{ account.username }} - {% if is_reels %}Reels{% else %}Posts{% endif %} Analytics</h1>
+<h1>@{{ account.username }} - {% if is_reels %}Reels{% else %}Posts{% endif %} Analytics</h1>
 
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-body">
-                <h5>Total {% if is_reels %}Reels{% else %}Posts{% endif %}</h5>
-                <h2>{{ total_posts }}</h2>
-            </div>
+<div class="row mb-5">
+    <div class="col-md-3 mb-4">
+        <div class="stat-card">
+            <h5>Total {% if is_reels %}Reels{% else %}Posts{% endif %}</h5>
+            <h2>{{ total_posts }}</h2>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-body">
-                <h5>Total Likes</h5>
-                <h2>{{ total_likes|floatformat:0 }}</h2>
-            </div>
+    <div class="col-md-3 mb-4">
+        <div class="stat-card">
+            <h5>Total Likes</h5>
+            <h2>{{ total_likes|floatformat:0 }}</h2>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-body">
-                <h5>Total Comments</h5>
-                <h2>{{ total_comments|floatformat:0 }}</h2>
-            </div>
+    <div class="col-md-3 mb-4">
+        <div class="stat-card">
+            <h5>Total Comments</h5>
+            <h2>{{ total_comments|floatformat:0 }}</h2>
         </div>
     </div>
     {% if is_reels %}
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-body">
-                <h5>Total Plays</h5>
-                <h2>{{ total_plays|floatformat:0 }}</h2>
-            </div>
+    <div class="col-md-3 mb-4">
+        <div class="stat-card">
+            <h5>Total Plays</h5>
+            <h2>{{ total_plays|floatformat:0 }}</h2>
         </div>
     </div>
     {% endif %}
 </div>
 
-<h3>Top {% if is_reels %}5 Most Played Reels{% else %}10 Posts by Likes{% endif %}</h3>
+<h3 class="mb-4">Top {% if is_reels %}5 Most Played Reels{% else %}10 Posts by Likes{% endif %}</h3>
 <div class="row">
     {% for post in top_posts %}
-        <div class="col-md-6 mb-3">
+        <div class="col-md-6 mb-4">
             <div class="card">
                 {% if post.image_url %}
-                    <img src="{{ post.image_url }}" class="card-img-top" alt="Post image">
+                    <img src="{{ post.image_url }}" class="card-img-top" alt="Post image" style="height: 200px; object-fit: cover;">
                 {% endif %}
                 <div class="card-body">
-                    <p class="card-text">{{ post.caption|truncatewords:15 }}</p>
-                    <p class="small">
-                        ❤️ {{ post.like_count }} | 💬 {{ post.comment_count }}
-                        {% if is_reels %} | ▶️ {{ post.play_count }}{% endif %}
-                    </p>
+                    <p class="card-text small">{{ post.caption|truncatewords:15|default:"No caption" }}</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="small">
+                            <i class="bi bi-heart"></i> {{ post.like_count }} | 
+                            <i class="bi bi-chat"></i> {{ post.comment_count }}
+                            {% if is_reels %} | <i class="bi bi-play-fill"></i> {{ post.play_count }}{% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     {% empty %}
-        <p>No {% if is_reels %}reels{% else %}posts{% endif %} found.</p>
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-info-circle" style="font-size: 3rem; color: var(--text-secondary);"></i>
+                    <p class="mt-3 text-muted">No {% if is_reels %}reels{% else %}posts{% endif %} found.</p>
+                </div>
+            </div>
+        </div>
     {% endfor %}
 </div>
 {% endblock %}
-

@@ -3,27 +3,46 @@
 {% block title %}Post Details - REDSTRAP{% endblock %}
 
 {% block content %}
-<h1>Post Details</h1>
-
-<div class="card">
-    {% if post.image_url %}
-        <img src="{{ post.image_url }}" class="card-img-top" alt="Post image">
-    {% endif %}
-    <div class="card-body">
-        <h5 class="card-title">
-            {% if post.is_reel %}🎬 Reel{% elif post.is_video %}🎥 Video{% else %}📷 Post{% endif %}
-        </h5>
-        <p class="card-text">{{ post.caption }}</p>
-        <p class="text-muted">Posted: {{ post.taken_at|date:"M d, Y H:i" }}</p>
-        <p>
-            ❤️ {{ post.like_count }} likes | 
-            💬 {{ post.comment_count }} comments
-            {% if post.is_reel or post.is_video %} | ▶️ {{ post.play_count }} plays{% endif %}
-        </p>
-        {% if post.instagram_url %}
-            <a href="{{ post.instagram_url }}" target="_blank" class="btn btn-primary">View on Instagram</a>
-        {% endif %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            {% if post.image_url %}
+                <img src="{{ post.image_url }}" class="card-img-top" alt="Post image" style="max-height: 500px; object-fit: cover;">
+            {% endif %}
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h5 class="card-title">
+                        {% if post.is_reel %}
+                            <span class="badge bg-danger"><i class="bi bi-play-fill"></i> Reel</span>
+                        {% elif post.is_video %}
+                            <span class="badge bg-primary"><i class="bi bi-camera-video"></i> Video</span>
+                        {% else %}
+                            <span class="badge bg-secondary"><i class="bi bi-image"></i> Post</span>
+                        {% endif %}
+                    </h5>
+                    <small class="text-muted">{{ post.taken_at|date:"M d, Y H:i" }}</small>
+                </div>
+                <p class="card-text mb-4">{{ post.caption|default:"No caption" }}</p>
+                <div class="d-flex gap-4 mb-4">
+                    <div>
+                        <i class="bi bi-heart"></i> <strong>{{ post.like_count }}</strong> likes
+                    </div>
+                    <div>
+                        <i class="bi bi-chat"></i> <strong>{{ post.comment_count }}</strong> comments
+                    </div>
+                    {% if post.is_reel or post.is_video %}
+                        <div>
+                            <i class="bi bi-play-fill"></i> <strong>{{ post.play_count }}</strong> plays
+                        </div>
+                    {% endif %}
+                </div>
+                {% if post.instagram_url %}
+                    <a href="{{ post.instagram_url }}" target="_blank" class="btn btn-primary">
+                        <i class="bi bi-instagram"></i> View on Instagram
+                    </a>
+                {% endif %}
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
-
