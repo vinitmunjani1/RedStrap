@@ -1,0 +1,26 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Analytics - REDSTRAP{% endblock %}
+
+{% block content %}
+<h1>Analytics</h1>
+
+{% if accounts %}
+    <div class="row">
+        {% for account in accounts %}
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ account.username }}</h5>
+                        <a href="{% url 'account_analytics' account.id %}" class="btn btn-primary">View Posts Analytics</a>
+                        <a href="{% url 'account_reels_analytics' account.id %}" class="btn btn-info">View Reels Analytics</a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>No Instagram accounts added yet. <a href="{% url 'add_instagram' %}">Add one here</a>.</p>
+{% endif %}
+{% endblock %}
+

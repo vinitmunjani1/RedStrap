@@ -1,0 +1,67 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{{ account.username }} Analytics - REDSTRAP{% endblock %}
+
+{% block content %}
+<h1>{{ account.username }} - {% if is_reels %}Reels{% else %}Posts{% endif %} Analytics</h1>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>Total {% if is_reels %}Reels{% else %}Posts{% endif %}</h5>
+                <h2>{{ total_posts }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>Total Likes</h5>
+                <h2>{{ total_likes|floatformat:0 }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>Total Comments</h5>
+                <h2>{{ total_comments|floatformat:0 }}</h2>
+            </div>
+        </div>
+    </div>
+    {% if is_reels %}
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5>Total Plays</h5>
+                <h2>{{ total_plays|floatformat:0 }}</h2>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<h3>Top {% if is_reels %}5 Most Played Reels{% else %}10 Posts by Likes{% endif %}</h3>
+<div class="row">
+    {% for post in top_posts %}
+        <div class="col-md-6 mb-3">
+            <div class="card">
+                {% if post.image_url %}
+                    <img src="{{ post.image_url }}" class="card-img-top" alt="Post image">
+                {% endif %}
+                <div class="card-body">
+                    <p class="card-text">{{ post.caption|truncatewords:15 }}</p>
+                    <p class="small">
+                        ❤️ {{ post.like_count }} | 💬 {{ post.comment_count }}
+                        {% if is_reels %} | ▶️ {{ post.play_count }}{% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <p>No {% if is_reels %}reels{% else %}posts{% endif %} found.</p>
+    {% endfor %}
+</div>
+{% endblock %}
+

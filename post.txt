@@ -1,0 +1,74 @@
+<article aria-label="Regarding Google Sitemap:" class="w-full m-0">
+<shreddit-post author="Glass_Badger_2082" author-id="t2_1u51s6h621" award-count="0" class="block relative cursor-pointer group bg-neutral-background focus-within:bg-neutral-background-hover hover:bg-neutral-background-hover xs:rounded-4 px-md py-2xs my-2xs nd:visible" comment-count="8" content-href="https://www.reddit.com/r/SEO/comments/1p7up2r/regarding_google_sitemap/" created-timestamp="2025-11-27T06:04:51.789000+0000" data-expected-lcp="" data-ks-item="" domain="self.SEO" feedindex="0" icon="https://www.redditstatic.com/avatars/defaults/v2/avatar_default_1.png" id="t3_1p7up2r" is-awardable="" is-desktop-viewport="" is-embeddable="" moderation-verdict="" pdp-target="_self" permalink="/r/SEO/comments/1p7up2r/regarding_google_sitemap/" post-title="Regarding Google Sitemap:" post-type="text" previous-actions-feature="" score="5" subreddit-id="t5_2qhbx" subreddit-name="SEO" subreddit-prefixed-name="r/SEO" view-context="SubredditFeed" view-type="cardView">
+<a class="absolute inset-0" data-ks-id="t3_1p7up2r" href="/r/SEO/comments/1p7up2r/regarding_google_sitemap/" slot="full-post-link" target="_self">
+<faceplate-screen-reader-content>
+    Regarding Google Sitemap:
+  </faceplate-screen-reader-content>
+</a>
+<span class="flex justify-between text-12 min-h-[32px] mb-2xs mt-[-4px]" slot="credit-bar">
+<span class="flex flex-wrap text-12 gap-2xs items-center min-w-0 relative" id="feed-post-credit-bar-t3_1p7up2r">
+<span class="flex" slot="authorName">
+<div class="inline-flex items-center max-w-full">
+<faceplate-hovercard close-on-track="" data-id="user-hover-card" enter-delay="500" label="Glass_Badger_2082 details" leave-delay="150" mouse-only="" position="bottom-start">
+<faceplate-tracker action="click" class="visible" noun="user_profile" source="post_credit_bar"><a aria-label="Author: u/Glass_Badger_2082" class="flex items-center text-neutral-content visited:text-neutral-content-weak font-bold a cursor-pointer no-visited no-underline hover:no-underline" href="/user/Glass_Badger_2082/" rpl=""><div class="flex items-center gap-2xs">
+<span avatar="" class="inline-flex items-center justify-center w-[1.5rem] h-[1.5rem] nd:visible nd:block nd:animate-pulse nd:bg-neutral-background-selected" rpl="">
+<span class="inline-block rounded-full relative [&amp;&gt;:first-child]:h-full [&amp;&gt;:first-child]:w-full [&amp;&gt;:first-child]:mb-0 [&amp;&gt;:first-child]:rounded-[inherit] h-full w-full [&amp;&gt;:first-child]:overflow-hidden [&amp;&gt;:first-child]:max-h-full" rpl="">
+<img alt="u/Glass_Badger_2082 avatar" class="h-full w-full" src="https://www.redditstatic.com/avatars/defaults/v2/avatar_default_1.png"/>       
+</span></span><span class="whitespace-nowrap">u/Glass_Badger_2082</span>
+</div></a></faceplate-tracker>
+<div slot="content">
+<faceplate-partial loading="programmatic" src="/svc/shreddit/user-hover-card/Glass_Badger_2082?subredditName=SEO">
+<div class="w-5xl h-4xl flex items-center justify-center">
+<faceplate-progress class="animate-spin" value="20"></faceplate-progress>
+</div>
+</faceplate-partial>
+</div>
+</faceplate-hovercard>
+</div>
+</span>
+<shreddit-async-loader bundlename="distinguished_post_tags" class="contents">
+<shreddit-distinguished-post-tags post-id="t3_1p7up2r">
+</shreddit-distinguished-post-tags>
+</shreddit-async-loader> <span aria-hidden="true" class="inline-block my-0 created-separator text-neutral-content-weak">•</span>
+<faceplate-timeago class="whitespace-nowrap text-neutral-content-weak" format="short" ts="2025-11-27T06:04:51.789000+0000"></faceplate-timeago> 
+</span>
+<span class="flex items-center pl-xs">
+<shreddit-async-loader bundlename="status_icons">
+<shreddit-status-icons class="nd:visible flex items-center gap-2xs isolate" thing-id="t3_1p7up2r">
+<rpl-tooltip appearance="inverted" class="nd:visible" content="Locked post" trigger="hover focus"><svg aria-label="Locked post" class="hidden lock-status fill-[color:var(--color-identity-coins)] shrink-0 px-2xs" fill="currentColor" height="12" icon-name="lock-fill" rpl="" viewbox="0 0 20 20" width="12" xmlns="http://www.w3.org/2000/svg">
+<path d="M15.993 8.168h-.429V6.61a5.572 5.572 0 00-5.566-5.566A5.572 5.572 0 004.432 6.61v1.558h-.429a2.005 2.005 0 00-2.005 2.005v3.692a5.054 5.054 0 005.054 5.054h5.892a5.054 5.054 0 005.054-5.054v-3.692a2.005 2.005 0 00-2.005-2.005zM10.998 15h-2v-3h2v3zm2.767-6.832H6.232V6.61A3.771 3.771 0 0110 2.844a3.77 3.77 0 013.767 3.766l-.001 1.558z"></path>
+</svg></rpl-tooltip>
+<rpl-tooltip appearance="inverted" class="nd:visible" content="Stickied post" trigger="hover focus"><svg aria-label="Stickied post" class="hidden stickied-status fill-[color:var(--color-identity-moderator)] shrink-0 px-2xs" fill="currentColor" height="12" icon-name="pin-fill" rpl="" viewbox="0 0 20 20" width="12" xmlns="http://www.w3.org/2000/svg">
+<path d="M18.163 6.191a4.194 4.194 0 00-1.237-2.986l-.167-.167a4.197 4.197 0 00-2.986-1.236 4.194 4.194 0 00-2.986 1.237L8.835 4.99a6.267 6.267 0 00-2.708.116 6.276 6.276 0 00-2.798 1.611.902.902 0 00-.001 1.274l3.724 3.723-4.955 4.955a.898.898 0 00.636 1.536c.23 0 .46-.088.636-.264l4.955-4.955 3.644 3.644a.897.897 0 001.273-.001 6.25 6.25 0 001.727-5.499l1.958-1.953a4.197 4.197 0 001.236-2.986h.001z"></path>
+</svg></rpl-tooltip>
+<rpl-tooltip appearance="inverted" class="nd:visible" content="Archived post" trigger="hover focus"><svg aria-label="Archived post" class="hidden archived-status fill-[color:var(--color-identity-coins)] shrink-0 px-2xs" fill="currentColor" height="12" icon-name="archive-fill" rpl="" viewbox="0 0 20 20" width="12" xmlns="http://www.w3.org/2000/svg">
+<path d="M15.7 1H4.3C2.48 1 1 2.48 1 4.3v2.76c0 .5.4.9.9.9H2v6.74C2 16.52 3.48 18 5.3 18h9.4c1.82 0 3.3-1.48 3.3-3.3V7.96h.1c.5 0 .9-.4.9-.9V4.3C19 2.48 17.52 1 15.7 1zM13 11.87H7v-1.8h6v1.8zm4.2-5.71H2.8V4.3c0-.83.67-1.5 1.5-1.5h11.4c.83 0 1.5.67 1.5 1.5v1.86z"></path>
+</svg></rpl-tooltip>
+</shreddit-status-icons>
+</shreddit-async-loader>
+<shreddit-async-loader bundlename="shreddit_post_overflow_menu" class="relative w-[32px] h-[32px] -mr-[7px]">
+<shreddit-post-overflow-menu ama-ends-at="" ama-starts-at="" ama-state="" author-id="t2_1u51s6h621" author-name="Glass_Badger_2082" class="nd:hidden" comment-count="8" feed-index="0" is-desktop-viewport="" language-links-urls="[]" permalink="/r/SEO/comments/1p7up2r/regarding_google_sitemap/" post-id="t3_1p7up2r" post-view-context="SubredditFeed" rec-context-bottom-sheet-variant="" recommendation-context-json="{}" should-render-follow-menu-item="" subreddit-id="t5_2qhbx" subreddit-prefixed-name="r/SEO" translation-state="">
+</shreddit-post-overflow-menu>
+</shreddit-async-loader>
+</span>
+</span>
+<a aria-describedby="feed-post-credit-bar-t3_1p7up2r" class="block text-neutral-content-strong m-0 visited:text-neutral-content-weak font-semibold text-16-scalable xs:text-18-scalable mb-2xs xs:mb-xs overflow-hidden" href="/r/SEO/comments/1p7up2r/regarding_google_sitemap/" id="post-title-t3_1p7up2r" slot="title">
+     Regarding Google Sitemap: <faceplate-perfmark name="first-post-meaningful-paint"></faceplate-perfmark>
+</a>
+<shreddit-post-flair flair-class=" relative top-[-0.25rem] xs:top-[-2px] my-2xs xs:mb-sm py-0 " post-id="t3_1p7up2r" slot="post-flair">
+</shreddit-post-flair>
+<shreddit-post-text-body feed-view-type="cardView" post-id="t3_1p7up2r" slot="text-body" subreddit-prefixed-name="r/SEO" view-context="SubredditFeed">
+<a class="hover:no-underline no-underline pointer-events-none text-neutral-content visited:text-neutral-content-weak" href="/r/SEO/comments/1p7up2r/regarding_google_sitemap/" slot="text-body">
+<div class="mb-xs overflow-hidden" data-post-click-location="text-body">
+<div about="t3_1p7up2r_" class="md feed-card-text-preview text-ellipsis line-clamp-3 xs:line-clamp-6 text-14-scalable pb-2xs" id="t3_1p7up2r-post-rtjson-content" property="schema:articleBody" style="--emote-size: 20px">
+<p>
+      Regarding Google Sitemap:A few months ago, I created a WordPress website with 5000 pages generated by AI. Initially, all of them were indexed by Google. Then, one day, Google stopped indexing all 5000 pages. I suspect it's because I used AI to create the articles. Later, I deleted all 5000 pages, leaving only 200 manually created pages, and resubmitted a sitemap for those 200 pages.
+    </p><p>
+      However, several months later, Google still hasn't indexed my website. What should I do? Thank you.
+    </p>
+</div>
+</div>
+</a>
+</shreddit-post-text-body>
+</shreddit-post>
+</article>

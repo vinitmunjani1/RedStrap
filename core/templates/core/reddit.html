@@ -1,0 +1,101 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Reddit - REDSTRAP{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-reddit"></i> Reddit Monitoring</h1>
+    <a href="{% url 'add_subreddit' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Add Subreddit
+    </a>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-arrow-down-circle"></i> Scrape Posts</h5>
+                <p class="card-text">Fetch latest posts from all your subreddits</p>
+                <form method="post" action="{% url 'scrape_reddit' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-download"></i> Scrape Reddit
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-key"></i> Extract Keywords</h5>
+                <p class="card-text">Extract keywords from scraped posts</p>
+                <form method="post" action="{% url 'extract_keywords' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-info">
+                        <i class="bi bi-tags"></i> Extract Keywords
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <h3><i class="bi bi-list-ul"></i> Your Subreddits</h3>
+        {% if subreddits %}
+            <div class="list-group">
+                {% for subreddit in subreddits %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <a href="{{ subreddit.reddit_url }}" target="_blank" class="text-decoration-none">
+                            <strong>r/{{ subreddit.name }}</strong>
+                        </a>
+                        <form method="post" action="{% url 'delete_subreddit' subreddit.id %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-danger">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> No subreddits added yet. <a href="{% url 'add_subreddit' %}">Add one</a> to get started.
+            </div>
+        {% endif %}
+    </div>
+    <div class="col-md-8">
+        <h3><i class="bi bi-newspaper"></i> Recent Posts</h3>
+        {% if posts %}
+            <div class="list-group">
+                {% for post in posts %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">
+                                    <a href="{{ post.url }}" target="_blank" class="text-decoration-none">{{ post.title }}</a>
+                                </h6>
+                                <p class="mb-1 text-muted small">{{ post.body|truncatewords:30 }}</p>
+                                <small class="text-muted">
+                                    <i class="bi bi-arrow-up"></i> {{ post.score }} | 
+                                    <i class="bi bi-calendar"></i> {{ post.scraped_at|date:"M d, Y" }}
+                                    {% if post.flair %}
+                                        | <span class="badge bg-secondary">{{ post.flair }}</span>
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> No posts scraped yet. Click "Scrape Reddit" to fetch posts.
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

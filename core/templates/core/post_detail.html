@@ -1,0 +1,29 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Post Details - REDSTRAP{% endblock %}
+
+{% block content %}
+<h1>Post Details</h1>
+
+<div class="card">
+    {% if post.image_url %}
+        <img src="{{ post.image_url }}" class="card-img-top" alt="Post image">
+    {% endif %}
+    <div class="card-body">
+        <h5 class="card-title">
+            {% if post.is_reel %}🎬 Reel{% elif post.is_video %}🎥 Video{% else %}📷 Post{% endif %}
+        </h5>
+        <p class="card-text">{{ post.caption }}</p>
+        <p class="text-muted">Posted: {{ post.taken_at|date:"M d, Y H:i" }}</p>
+        <p>
+            ❤️ {{ post.like_count }} likes | 
+            💬 {{ post.comment_count }} comments
+            {% if post.is_reel or post.is_video %} | ▶️ {{ post.play_count }} plays{% endif %}
+        </p>
+        {% if post.instagram_url %}
+            <a href="{{ post.instagram_url }}" target="_blank" class="btn btn-primary">View on Instagram</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

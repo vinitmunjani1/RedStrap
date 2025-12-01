@@ -1,0 +1,13 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Add Subreddit - REDSTRAP{% endblock %}
+
+{% block content %}
+<h2>Add Subreddit</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Add Subreddit</button>
+</form>
+{% endblock %}
+

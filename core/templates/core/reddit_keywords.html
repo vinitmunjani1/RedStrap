@@ -1,0 +1,21 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Reddit Keywords - REDSTRAP{% endblock %}
+
+{% block content %}
+<h1>Extracted Keywords</h1>
+{% if keywords %}
+    <ul class="list-group">
+        {% for keyword in keywords %}
+            <li class="list-group-item">
+                <strong>{{ keyword.keyword }}</strong> 
+                (similarity: {{ keyword.similarity|floatformat:2 }}) 
+                - <a href="{{ keyword.post.url }}" target="_blank">{{ keyword.post.title|truncatewords:10 }}</a>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>No keywords extracted yet.</p>
+{% endif %}
+{% endblock %}
+
