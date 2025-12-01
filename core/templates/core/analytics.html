@@ -3,34 +3,23 @@
 {% block title %}Analytics - REDSTRAP{% endblock %}
 
 {% block content %}
-<h1><i class="bi bi-bar-chart-fill"></i> Analytics</h1>
+<h1>Analytics</h1>
 
 {% if accounts %}
     <div class="row">
         {% for account in accounts %}
-            <div class="col-md-6 col-lg-4 mb-4">
+            <div class="col-md-6 mb-3">
                 <div class="card">
-                    <div class="card-body text-center">
-                        <h5 class="card-title mb-4">@{{ account.username }}</h5>
-                        <div class="d-flex gap-2 justify-content-center">
-                            <a href="{% url 'account_analytics' account.id %}" class="btn btn-primary">
-                                <i class="bi bi-graph-up"></i> Posts
-                            </a>
-                            <a href="{% url 'account_reels_analytics' account.id %}" class="btn btn-info">
-                                <i class="bi bi-play-circle"></i> Reels
-                            </a>
-                        </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ account.username }}</h5>
+                        <a href="{% url 'account_analytics' account.id %}" class="btn btn-primary">View Posts Analytics</a>
+                        <a href="{% url 'account_reels_analytics' account.id %}" class="btn btn-info">View Reels Analytics</a>
                     </div>
                 </div>
             </div>
         {% endfor %}
     </div>
 {% else %}
-    <div class="card">
-        <div class="card-body text-center py-5">
-            <i class="bi bi-info-circle" style="font-size: 3rem; color: var(--text-secondary);"></i>
-            <p class="mt-3 text-muted">No Instagram accounts added yet. <a href="{% url 'add_instagram' %}">Add one here</a>.</p>
-        </div>
-    </div>
+    <p>No Instagram accounts added yet. <a href="{% url 'add_instagram' %}">Add one here</a>.</p>
 {% endif %}
 {% endblock %}
