@@ -8,20 +8,25 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
         :root {
-            --bg-primary: #0f172a;
-            --bg-secondary: #1e293b;
-            --bg-tertiary: #334155;
-            --text-primary: #f1f5f9;
+            --bg-primary: #0a0e1a;
+            --bg-secondary: rgba(30, 41, 59, 0.4);
+            --bg-tertiary: rgba(51, 65, 85, 0.3);
+            --text-primary: #e2e8f0;
             --text-secondary: #cbd5e1;
             --text-muted: #94a3b8;
-            --accent-primary: #6366f1;
-            --accent-secondary: #8b5cf6;
-            --accent-success: #10b981;
-            --accent-info: #06b6d4;
-            --accent-danger: #ef4444;
-            --border-color: #334155;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+            --accent-primary: #818cf8;
+            --accent-secondary: #a78bfa;
+            --accent-success: #34d399;
+            --accent-info: #60a5fa;
+            --accent-danger: #f87171;
+            --accent-danger-muted: rgba(248, 113, 113, 0.7);
+            --accent-info-muted: rgba(96, 165, 250, 0.7);
+            --accent-secondary-muted: rgba(167, 139, 250, 0.7);
+            --border-color: rgba(148, 163, 184, 0.1);
+            --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            --shadow-lg: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+            --glass-bg: rgba(30, 41, 59, 0.25);
+            --glass-border: rgba(255, 255, 255, 0.1);
         }
         
         * {
@@ -36,9 +41,11 @@
         }
         
         .navbar {
-            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%) !important;
+            background: rgba(30, 41, 59, 0.3) !important;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             box-shadow: var(--shadow);
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--glass-border);
             padding: 1rem 0;
         }
         
@@ -63,14 +70,20 @@
             color: var(--text-primary) !important;
         }
         
-        .card {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
+        .card, .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
             box-shadow: var(--shadow);
             transition: all 0.3s ease;
             margin-bottom: 1.5rem;
             color: var(--text-primary);
+        }
+        
+        .glass-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.3) 0%, rgba(51, 65, 85, 0.2) 100%);
         }
         
         .card:hover {
@@ -107,43 +120,52 @@
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
-            color: white;
+            background: rgba(129, 140, 248, 0.2);
+            border: 1px solid rgba(129, 140, 248, 0.3);
+            color: var(--accent-primary);
+            backdrop-filter: blur(10px);
         }
         
         .btn-primary:hover {
-            background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
-            color: white;
+            background: rgba(129, 140, 248, 0.3);
+            border-color: rgba(129, 140, 248, 0.5);
+            color: var(--text-primary);
         }
         
         .btn-success {
-            background-color: var(--accent-success);
-            color: white;
+            background: rgba(52, 211, 153, 0.2);
+            border: 1px solid rgba(52, 211, 153, 0.3);
+            color: var(--accent-success);
+            backdrop-filter: blur(10px);
         }
         
         .btn-success:hover {
-            background-color: #059669;
-            color: white;
+            background: rgba(52, 211, 153, 0.3);
+            border-color: rgba(52, 211, 153, 0.5);
         }
         
         .btn-info {
-            background: linear-gradient(135deg, var(--accent-info) 0%, #3b82f6 100%);
-            color: white;
+            background: rgba(96, 165, 250, 0.2);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            color: var(--accent-info);
+            backdrop-filter: blur(10px);
         }
         
         .btn-info:hover {
-            background: linear-gradient(135deg, #0891b2 0%, #2563eb 100%);
-            color: white;
+            background: rgba(96, 165, 250, 0.3);
+            border-color: rgba(96, 165, 250, 0.5);
         }
         
         .btn-danger {
-            background-color: var(--accent-danger);
-            color: white;
+            background: rgba(248, 113, 113, 0.2);
+            border: 1px solid rgba(248, 113, 113, 0.3);
+            color: var(--accent-danger);
+            backdrop-filter: blur(10px);
         }
         
         .btn-danger:hover {
-            background-color: #dc2626;
-            color: white;
+            background: rgba(248, 113, 113, 0.3);
+            border-color: rgba(248, 113, 113, 0.5);
         }
         
         .btn-outline-primary {
@@ -207,19 +229,21 @@
         }
         
         .form-control {
-            background-color: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
+            background: rgba(30, 41, 59, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
             padding: 0.75rem 1rem;
             color: var(--text-primary);
             transition: all 0.2s ease;
         }
         
         .form-control:focus {
-            background-color: var(--bg-tertiary);
-            border-color: var(--accent-primary);
+            background: rgba(30, 41, 59, 0.4);
+            border-color: rgba(129, 140, 248, 0.5);
             color: var(--text-primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+            box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1);
+            outline: none;
         }
         
         .form-control::placeholder {
@@ -340,6 +364,284 @@
         .dropdown-divider {
             border-color: var(--border-color);
         }
+        
+        /* Engagement Icons Styling - Transparent with Borders */
+        .engagement-icon {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 12px;
+            background: transparent;
+            border: 2px solid;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 0.95rem;
+        }
+        
+        .engagement-icon:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+        }
+        
+        .engagement-icon i {
+            font-size: 1.15rem;
+            opacity: 0.9;
+            transition: opacity 0.3s ease;
+        }
+        
+        .engagement-icon:hover i {
+            opacity: 1;
+        }
+        
+        .engagement-icon.likes {
+            color: rgba(239, 154, 154, 0.8);
+            border-color: rgba(239, 154, 154, 0.5);
+        }
+        
+        .engagement-icon.likes:hover {
+            border-color: rgba(239, 154, 154, 0.8);
+            box-shadow: 0 6px 20px rgba(239, 154, 154, 0.2);
+        }
+        
+        .engagement-icon.likes i {
+            color: rgba(239, 154, 154, 0.8);
+        }
+        
+        .engagement-icon.comments {
+            color: rgba(129, 140, 248, 0.8);
+            border-color: rgba(129, 140, 248, 0.5);
+        }
+        
+        .engagement-icon.comments:hover {
+            border-color: rgba(129, 140, 248, 0.8);
+            box-shadow: 0 6px 20px rgba(129, 140, 248, 0.2);
+        }
+        
+        .engagement-icon.comments i {
+            color: rgba(129, 140, 248, 0.8);
+        }
+        
+        .engagement-icon.plays {
+            color: rgba(196, 181, 253, 0.8);
+            border-color: rgba(196, 181, 253, 0.5);
+        }
+        
+        .engagement-icon.plays:hover {
+            border-color: rgba(196, 181, 253, 0.8);
+            box-shadow: 0 6px 20px rgba(196, 181, 253, 0.2);
+        }
+        
+        .engagement-icon.plays i {
+            color: rgba(196, 181, 253, 0.8);
+        }
+        
+        /* Compact engagement icons for cards - Transparent with Borders */
+        .engagement-compact {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            background: transparent;
+            border: 1.5px solid;
+            transition: all 0.2s ease;
+        }
+        
+        .engagement-compact:hover {
+            transform: translateY(-1px);
+        }
+        
+        .engagement-compact i {
+            font-size: 0.95rem;
+            opacity: 0.85;
+        }
+        
+        .engagement-compact.likes {
+            color: rgba(239, 154, 154, 0.75);
+            border-color: rgba(239, 154, 154, 0.4);
+        }
+        
+        .engagement-compact.likes:hover {
+            border-color: rgba(239, 154, 154, 0.7);
+            box-shadow: 0 2px 8px rgba(239, 154, 154, 0.15);
+        }
+        
+        .engagement-compact.likes i {
+            color: rgba(239, 154, 154, 0.75);
+        }
+        
+        .engagement-compact.comments {
+            color: rgba(129, 140, 248, 0.75);
+            border-color: rgba(129, 140, 248, 0.4);
+        }
+        
+        .engagement-compact.comments:hover {
+            border-color: rgba(129, 140, 248, 0.7);
+            box-shadow: 0 2px 8px rgba(129, 140, 248, 0.15);
+        }
+        
+        .engagement-compact.comments i {
+            color: rgba(129, 140, 248, 0.75);
+        }
+        
+        .engagement-compact.plays {
+            color: rgba(196, 181, 253, 0.75);
+            border-color: rgba(196, 181, 253, 0.4);
+        }
+        
+        .engagement-compact.plays:hover {
+            border-color: rgba(196, 181, 253, 0.7);
+            box-shadow: 0 2px 8px rgba(196, 181, 253, 0.15);
+        }
+        
+        .engagement-compact.plays i {
+            color: rgba(196, 181, 253, 0.75);
+        }
+        
+        /* Stats display for analytics page - Transparent with Borders */
+        .stat-metric {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem 0.75rem;
+            border-radius: 14px;
+            background: transparent;
+            border: 2px solid;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            min-width: 95px;
+            position: relative;
+        }
+        
+        .stat-metric::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, currentColor, transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .stat-metric:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+        
+        .stat-metric:hover::before {
+            opacity: 0.4;
+        }
+        
+        .stat-metric .stat-icon {
+            font-size: 1.4rem;
+            margin-bottom: 0.6rem;
+            opacity: 0.85;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-metric:hover .stat-icon {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        
+        .stat-metric .stat-value {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+            letter-spacing: -0.5px;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-metric:hover .stat-value {
+            font-weight: 700;
+        }
+        
+        .stat-metric .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            font-weight: 500;
+            opacity: 0.7;
+        }
+        
+        .stat-metric.likes {
+            border-color: rgba(239, 154, 154, 0.4);
+        }
+        
+        .stat-metric.likes .stat-icon {
+            color: rgba(239, 154, 154, 0.8);
+        }
+        
+        .stat-metric.likes .stat-value {
+            color: rgba(239, 154, 154, 0.85);
+        }
+        
+        .stat-metric.likes:hover {
+            border-color: rgba(239, 154, 154, 0.7);
+            box-shadow: 0 8px 24px rgba(239, 154, 154, 0.25);
+        }
+        
+        .stat-metric.likes:hover .stat-icon {
+            color: rgba(239, 154, 154, 0.95);
+        }
+        
+        .stat-metric.likes:hover .stat-value {
+            color: rgba(239, 154, 154, 0.95);
+        }
+        
+        .stat-metric.comments {
+            border-color: rgba(129, 140, 248, 0.4);
+        }
+        
+        .stat-metric.comments .stat-icon {
+            color: rgba(129, 140, 248, 0.8);
+        }
+        
+        .stat-metric.comments .stat-value {
+            color: rgba(129, 140, 248, 0.85);
+        }
+        
+        .stat-metric.comments:hover {
+            border-color: rgba(129, 140, 248, 0.7);
+            box-shadow: 0 8px 24px rgba(129, 140, 248, 0.25);
+        }
+        
+        .stat-metric.comments:hover .stat-icon {
+            color: rgba(129, 140, 248, 0.95);
+        }
+        
+        .stat-metric.comments:hover .stat-value {
+            color: rgba(129, 140, 248, 0.95);
+        }
+        
+        .stat-metric.plays {
+            border-color: rgba(196, 181, 253, 0.4);
+        }
+        
+        .stat-metric.plays .stat-icon {
+            color: rgba(196, 181, 253, 0.8);
+        }
+        
+        .stat-metric.plays .stat-value {
+            color: rgba(196, 181, 253, 0.85);
+        }
+        
+        .stat-metric.plays:hover {
+            border-color: rgba(196, 181, 253, 0.7);
+            box-shadow: 0 8px 24px rgba(196, 181, 253, 0.25);
+        }
+        
+        .stat-metric.plays:hover .stat-icon {
+            color: rgba(196, 181, 253, 0.95);
+        }
+        
+        .stat-metric.plays:hover .stat-value {
+            color: rgba(196, 181, 253, 0.95);
+        }
     </style>
 </head>
 <body>
@@ -355,34 +657,11 @@
                 <div class="navbar-nav ms-auto">
                     {% if user.is_authenticated %}
                         <a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-house"></i> Dashboard</a>
-                        <a class="nav-link" href="{% url 'analytics' %}"><i class="bi bi-bar-chart"></i> Analytics</a>
+           
                         <a class="nav-link" href="{% url 'reddit' %}"><i class="bi bi-reddit"></i> Reddit</a>
                         
-                        <!-- Instagram Accounts Dropdown -->
-                        {% if user.instagram_accounts.exists %}
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" id="instagramDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="bi bi-instagram"></i> Instagram
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="instagramDropdown" style="background: var(--bg-secondary); border: 1px solid var(--border-color);">
-                                    {% for account in user.instagram_accounts.all %}
-                                        <li>
-                                            <a class="dropdown-item" href="{% url 'account_analytics' account.id %}" style="color: var(--text-primary);">
-                                                <i class="bi bi-person-circle"></i> @{{ account.username }}
-                                            </a>
-                                        </li>
-                                    {% endfor %}
-                                    <li><hr class="dropdown-divider" style="border-color: var(--border-color);"></li>
-                                    <li>
-                                        <a class="dropdown-item" href="{% url 'add_instagram' %}" style="color: var(--accent-primary);">
-                                            <i class="bi bi-plus-circle"></i> Add Account
-                                        </a>
-                                    </li>
-                                </ul>
-                            </li>
-                        {% else %}
-                            <a class="nav-link" href="{% url 'add_instagram' %}"><i class="bi bi-instagram"></i> Instagram</a>
-                        {% endif %}
+                        <!-- Instagram Accounts Link -->
+                        <a class="nav-link" href="{% url 'instagram_accounts' %}"><i class="bi bi-instagram"></i> Instagram</a>
                         
                         <a class="nav-link" href="{% url 'logout' %}"><i class="bi bi-box-arrow-right"></i> Logout</a>
                     {% else %}

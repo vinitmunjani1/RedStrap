@@ -96,6 +96,50 @@ def dashboard_view(request):
 
 
 @login_required
+def instagram_accounts_view(request):
+    """View all Instagram accounts with inline analytics in card layout."""
+    import json
+    from collections import defaultdict
+    
+    accounts = InstagramAccount.objects.filter(user=request.user).annotate(
+        posts_count=Count('posts', filter=Q(posts__is_reel=False)),
+        reels_count=Count('posts', filter=Q(posts__is_reel=True))
+    )
+    
+    # Prepare analytics data for each account
+    accounts_data = []
+    for account in accounts:
+        # Get posts and reels
+        posts = InstagramPost.objects.filter(account=account, is_reel=False)
+        reels = InstagramPost.objects.filter(account=account, is_reel=True)
+        
+        # Calculate basic metrics
+        total_posts = posts.count()
+        total_reels = reels.count()
+        total_likes = posts.aggregate(Sum('like_count'))['like_count__sum'] or 0
+        total_reel_likes = reels.aggregate(Sum('like_count'))['like_count__sum'] or 0
+        total_plays = reels.aggregate(Sum('play_count'))['play_count__sum'] or 0
+        
+        avg_likes = posts.aggregate(Avg('like_count'))['like_count__avg'] or 0 if total_posts > 0 else 0
+        avg_reel_likes = reels.aggregate(Avg('like_count'))['like_count__avg'] or 0 if total_reels > 0 else 0
+        avg_plays = reels.aggregate(Avg('play_count'))['play_count__avg'] or 0 if total_reels > 0 else 0
+        
+        accounts_data.append({
+            'account': account,
+            'total_posts': total_posts,
+            'total_reels': total_reels,
+            'total_likes': total_likes,
+            'total_reel_likes': total_reel_likes,
+            'total_plays': total_plays,
+            'avg_likes': avg_likes,
+            'avg_reel_likes': avg_reel_likes,
+            'avg_plays': avg_plays,
+        })
+    
+    return render(request, 'core/instagram_accounts.html', {'accounts_data': accounts_data})
+
+
+@login_required
 def add_instagram_account_view(request):
     """Add a new Instagram account to monitor."""
     if request.method == 'POST':
@@ -105,12 +149,11 @@ def add_instagram_account_view(request):
             account.user = request.user
             account.save()
             messages.success(request, f'Instagram account @{account.username} added successfully!')
-            return redirect('dashboard')
+            return redirect('instagram_accounts')
     else:
         form = InstagramAccountForm()
     
-    accounts = InstagramAccount.objects.filter(user=request.user)
-    return render(request, 'core/add_instagram.html', {'form': form, 'accounts': accounts})
+    return render(request, 'core/add_instagram.html', {'form': form})
 
 
 @login_required
@@ -121,7 +164,7 @@ def delete_instagram_account_view(request, account_id):
         username = account.username
         account.delete()
         messages.success(request, f'Instagram account @{username} deleted successfully!')
-    return redirect('add_instagram')
+    return redirect('instagram_accounts')
 
 
 @login_required
@@ -216,7 +259,7 @@ def scrape_instagram_view(request):
 
 @login_required
 def scrape_reels_view(request):
-    """Scrape Instagram reels for all user's accounts concurrently."""
+    """Scrape Instagram reels for all user's accounts with smart fetching."""
     if request.method != 'POST':
         return redirect('dashboard')
     
@@ -225,25 +268,24 @@ def scrape_reels_view(request):
         messages.warning(request, 'Please add an Instagram account first.')
         return redirect('add_instagram')
     
-    try:
-        # Fetch reels concurrently for all accounts
-        results = instagram_service.fetch_reels_for_accounts(list(accounts))
-        
-        total_reels = 0
-        total_errors = 0
-        
-        for account_id, result_data in results.items():
-            account = result_data['account']
-            reels = result_data['reels']
-            error = result_data.get('error')
+    total_reels = 0
+    total_errors = 0
+    
+    for account in accounts:
+        try:
+            # Check if account has existing reels to determine fetch mode
+            has_reels = account.posts.filter(is_reel=True).exists()
             
-            if error:
-                total_errors += 1
-                messages.error(request, f'Error fetching reels for @{account.username}: {error}')
-                continue
+            # If account has reels, fetch only last 48 hours; otherwise fetch all
+            if has_reels:
+                logger.info(f"Account {account.username} has existing reels, fetching last 48 hours only")
+                reels_data = instagram_service.get_all_reels_for_username(account.username, max_age_hours=48)
+            else:
+                logger.info(f"Account {account.username} has no reels, fetching all available reels")
+                reels_data = instagram_service.get_all_reels_for_username(account.username)
             
             saved_count = 0
-            for reel_data in reels:
+            for reel_data in reels_data:
                 # Use taken_at from API if available and valid, otherwise extract from post ID
                 taken_at = reel_data.get('taken_at')
                 if not taken_at:
@@ -296,15 +338,17 @@ def scrape_reels_view(request):
             if saved_count > 0:
                 messages.success(request, f'Fetched {saved_count} new reels for @{account.username}')
         
-        if total_reels > 0:
-            messages.success(request, f'Successfully fetched {total_reels} new reels total!')
-        elif total_errors == 0:
-            messages.info(request, 'No new reels found.')
-        if total_errors > 0:
-            messages.warning(request, f'Encountered {total_errors} errors during fetching.')
-            
-    except Exception as e:
-        messages.error(request, f'Error fetching reels: {str(e)}')
+        except Exception as e:
+            total_errors += 1
+            messages.error(request, f'Error fetching reels for @{account.username}: {str(e)}')
+            logger.error(f"Error fetching reels for {account.username}: {e}", exc_info=True)
+    
+    if total_reels > 0:
+        messages.success(request, f'Successfully fetched {total_reels} new reels total!')
+    elif total_errors == 0:
+        messages.info(request, 'No new reels found.')
+    if total_errors > 0:
+        messages.warning(request, f'Encountered {total_errors} errors during fetching.')
     
     return redirect('dashboard')
 
@@ -476,52 +520,81 @@ def account_reels_analytics_view(request, account_id):
             avg_comments_per_hour = total_comments / total_hours
             avg_plays_per_hour = total_plays / total_hours
     
-    # Prepare histogram data - group reels by day
-    histogram_data = defaultdict(lambda: {'plays': 0, 'likes': 0, 'comments': 0, 'count': 0, 'hours': 0})
+    # Prepare histogram data - group reels by hour of day (0-23)
+    # For average views per hour: group by hour posted, calculate average views per hour for each hour
+    histogram_data = defaultdict(lambda: {'plays': 0, 'likes': 0, 'comments': 0, 'count': 0, 'views_per_hour_sum': 0})
     
     if total_reels > 0:
-        # Group reels by date (day)
+        # Group reels by hour of day (0-23) when they were posted
         for reel in reels:
-            # Get the date key (YYYY-MM-DD)
-            date_key = reel.taken_at.date().isoformat()
+            # Get hour of day (0-23) when reel was posted
+            hour_of_day = reel.taken_at.hour
             
             # Calculate hours since reel was created
             hours_since_reel = (timezone.now() - reel.taken_at).total_seconds() / 3600
             if hours_since_reel < 1:
                 hours_since_reel = 1  # Minimum 1 hour to avoid division by zero
             
-            histogram_data[date_key]['plays'] += reel.play_count
-            histogram_data[date_key]['likes'] += reel.like_count
-            histogram_data[date_key]['comments'] += reel.comment_count
-            histogram_data[date_key]['count'] += 1
-            # Use the maximum hours for this day (most recent reel's hours)
-            if hours_since_reel > histogram_data[date_key]['hours']:
-                histogram_data[date_key]['hours'] = hours_since_reel
+            # Calculate views per hour for this individual reel
+            views_per_hour = reel.play_count / hours_since_reel if hours_since_reel > 0 else 0
+            
+            # Aggregate data for this hour
+            histogram_data[hour_of_day]['plays'] += reel.play_count
+            histogram_data[hour_of_day]['likes'] += reel.like_count
+            histogram_data[hour_of_day]['comments'] += reel.comment_count
+            histogram_data[hour_of_day]['count'] += 1
+            # Sum up views per hour for averaging (we'll average these values)
+            histogram_data[hour_of_day]['views_per_hour_sum'] += views_per_hour
         
-        # Sort by date
-        sorted_dates = sorted(histogram_data.keys())
-        
-        # Prepare chart data
+        # Prepare chart data - order by hour (0-23)
         chart_labels = []
         avg_plays_per_hour_data = []
-        reels_per_day_data = []
+        reels_per_weekday_data = []  # Keep this for the second chart (reels per weekday)
         
-        for date_key in sorted_dates:
-            data = histogram_data[date_key]
-            chart_labels.append(date_key)
-            
-            # Calculate average plays per hour for this day
-            if data['hours'] > 0:
-                avg_plays_per_hour_for_day = data['plays'] / data['hours']
+        for hour in range(24):  # 0 to 23
+            # Format hour label (e.g., "12 AM", "1 AM", "12 PM", "1 PM")
+            if hour == 0:
+                hour_label = "12 AM"
+            elif hour < 12:
+                hour_label = f"{hour} AM"
+            elif hour == 12:
+                hour_label = "12 PM"
             else:
-                avg_plays_per_hour_for_day = 0
+                hour_label = f"{hour - 12} PM"
             
-            avg_plays_per_hour_data.append(round(avg_plays_per_hour_for_day, 2))
-            reels_per_day_data.append(data['count'])
+            data = histogram_data[hour]
+            chart_labels.append(hour_label)
+            
+            # Calculate average plays per hour for this hour of day
+            # Formula: average of (views per hour) for each reel posted at this hour
+            # This gives us the average views per hour rate for reels posted at this hour
+            if data['count'] > 0:
+                avg_plays_per_hour_for_hour = data['views_per_hour_sum'] / data['count']
+            else:
+                avg_plays_per_hour_for_hour = 0
+            
+            avg_plays_per_hour_data.append(round(avg_plays_per_hour_for_hour, 2))
     else:
         chart_labels = []
         avg_plays_per_hour_data = []
-        reels_per_day_data = []
+    
+    # Also prepare reels per weekday data for the second chart
+    weekday_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    weekday_data = defaultdict(lambda: {'count': 0})
+    
+    if total_reels > 0:
+        for reel in reels:
+            weekday_num = reel.taken_at.weekday()
+            weekday_data[weekday_num]['count'] += 1
+        
+        weekday_labels = []
+        reels_per_weekday_data = []
+        for weekday_num in range(7):  # 0 (Monday) to 6 (Sunday)
+            weekday_labels.append(weekday_names[weekday_num])
+            reels_per_weekday_data.append(weekday_data[weekday_num]['count'])
+    else:
+        weekday_labels = []
+        reels_per_weekday_data = []
     
     # Top reels by plays
     top_reels = reels.order_by('-play_count')[:5]
@@ -540,9 +613,10 @@ def account_reels_analytics_view(request, account_id):
         'avg_plays_per_hour': avg_plays_per_hour,
         'top_posts': top_reels,
         'is_reels': True,
-        'chart_labels': json.dumps(chart_labels),
+        'chart_labels': json.dumps(chart_labels),  # Hour labels for first chart
         'avg_plays_per_hour_data': json.dumps(avg_plays_per_hour_data),
-        'reels_per_day_data': json.dumps(reels_per_day_data),
+        'weekday_labels': json.dumps(weekday_labels),  # Weekday labels for second chart
+        'reels_per_day_data': json.dumps(reels_per_weekday_data),
     }
     return render(request, 'core/account_analytics.html', context)
 

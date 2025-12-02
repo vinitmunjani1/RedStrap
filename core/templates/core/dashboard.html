@@ -3,18 +3,25 @@
 {% block title %}Dashboard - REDSTRAP{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1><i class="bi bi-house-fill"></i> Dashboard</h1>
-    <div class="d-flex gap-2">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <h1 class="mb-0"><i class="bi bi-house-fill"></i> Dashboard</h1>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+        <input type="text" id="searchDashboard" class="form-control form-control-sm" placeholder="Search usernames..." style="max-width: 250px;">
+    </div>
+</div>
+
+<!-- Fetch Buttons Section - Separated from search bar -->
+<div class="mb-4">
+    <div class="d-flex gap-2 flex-wrap">
         <form method="post" action="{% url 'scrape_instagram' %}" class="d-inline">
             {% csrf_token %}
-            <button type="submit" class="btn btn-success btn-sm">
+            <button type="submit" class="btn btn-success">
                 <i class="bi bi-download"></i> Fetch Posts
             </button>
         </form>
         <form method="post" action="{% url 'scrape_reels' %}" class="d-inline">
             {% csrf_token %}
-            <button type="submit" class="btn btn-info btn-sm">
+            <button type="submit" class="btn btn-info">
                 <i class="bi bi-play-circle"></i> Fetch Reels
             </button>
         </form>
@@ -23,8 +30,8 @@
 
 {% if username_posts_list %}
     {% for username_data in username_posts_list %}
-        <div class="card mb-4">
-            <div class="card-header" style="background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%); border-bottom: 2px solid var(--accent-primary);">
+        <div class="glass-card mb-4" data-username-section="{{ username_data.username|lower }}">
+            <div class="card-header" style="background: rgba(30, 41, 59, 0.2); backdrop-filter: blur(10px); border-bottom: 1px solid var(--glass-border);">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h4 class="mb-0" style="color: var(--accent-primary);">
@@ -40,19 +47,19 @@
             <div class="card-body">
                 <div class="post-grid">
                     {% for post in username_data.posts %}
-                            <div class="card post-card" style="border: 1px solid var(--border-color);">
+                            <div class="glass-card post-card post-card-item" style="border: 1px solid var(--glass-border); padding: 0; overflow: hidden;" data-caption="{{ post.caption|lower|default:'' }}" data-username="{{ username_data.username|lower }}">
                                 <a href="{% url 'instagram_post_detail' post.id %}" class="text-decoration-none">
                                     <div style="position: relative; overflow: hidden;">
                                         {% if post.image_url %}
                                             <img src="{{ post.image_url }}" class="card-img-top post-image" alt="Post image" style="height: 280px; object-fit: cover; transition: transform 0.3s ease;">
                                         {% elif post.video_url %}
-                                            <div style="height: 280px; background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%); display: flex; align-items: center; justify-content: center; position: relative;">
-                                                <i class="bi bi-play-circle-fill" style="font-size: 4rem; color: var(--accent-primary); z-index: 1;"></i>
-                                                <div class="position-absolute top-0 end-0 m-2">
-                                                    <span class="badge bg-danger">
-                                                        <i class="bi bi-play-fill"></i> Video
-                                                    </span>
-                                                </div>
+                                            <video class="post-video-thumbnail" data-video-url="{{ post.video_url }}" style="width: 100%; height: 280px; object-fit: cover; background: rgba(30, 41, 59, 0.3);" muted loop playsinline preload="metadata">
+                                                <source src="{{ post.video_url }}" type="video/mp4">
+                                            </video>
+                                            <div class="position-absolute top-0 end-0 m-2" style="z-index: 3;">
+                                                <span class="badge" style="background: rgba(248, 113, 113, 0.8); border: 1px solid rgba(248, 113, 113, 0.5);">
+                                                    <i class="bi bi-play-fill"></i> Video
+                                                </span>
                                             </div>
                                         {% else %}
                                             <div style="height: 280px; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center;">
@@ -61,7 +68,7 @@
                                         {% endif %}
                                         
                                         <!-- Hover Overlay -->
-                                        <div class="post-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(99, 102, 241, 0.9); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease; z-index: 2;">
+                                        <div class="post-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(129, 140, 248, 0.85); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease; z-index: 2;">
                                             <span style="color: white; font-weight: 600; font-size: 1.1rem;">
                                                 <i class="bi bi-eye"></i> View Details
                                             </span>
@@ -70,20 +77,20 @@
                                         <!-- Post Type Badge -->
                                         <div class="position-absolute top-0 start-0 m-2" style="z-index: 3;">
                                             {% if post.is_reel %}
-                                                <span class="badge bg-danger">
+                                                <span class="badge" style="background: rgba(248, 113, 113, 0.8); border: 1px solid rgba(248, 113, 113, 0.5);">
                                                     <i class="bi bi-play-fill"></i> Reel
                                                 </span>
                                             {% elif post.is_video %}
-                                                <span class="badge bg-primary">
+                                                <span class="badge" style="background: rgba(129, 140, 248, 0.8); border: 1px solid rgba(129, 140, 248, 0.5);">
                                                     <i class="bi bi-camera-video"></i> Video
                                                 </span>
                                             {% else %}
-                                                <span class="badge bg-secondary">
+                                                <span class="badge" style="background: rgba(148, 163, 184, 0.6); border: 1px solid rgba(148, 163, 184, 0.4);">
                                                     <i class="bi bi-image"></i> Post
                                                 </span>
                                             {% endif %}
                                             {% if post.is_carousel %}
-                                                <span class="badge bg-info">
+                                                <span class="badge" style="background: rgba(96, 165, 250, 0.8); border: 1px solid rgba(96, 165, 250, 0.5);">
                                                     <i class="bi bi-images"></i>
                                                 </span>
                                             {% endif %}
@@ -91,21 +98,27 @@
                                     </div>
                                 </a>
                                 
-                                <div class="card-body">
-                                    {% if post.caption %}
-                                        <p class="card-text small mb-2" style="color: var(--text-secondary); min-height: 40px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                                            {{ post.caption }}
-                                        </p>
-                                    {% else %}
-                                        <p class="card-text small mb-2 text-muted" style="min-height: 40px;">No caption</p>
-                                    {% endif %}
+                            <div class="card-body post-item" style="background: rgba(30, 41, 59, 0.1);" data-caption="{{ post.caption|lower|default:'' }}" data-username="{{ username_data.username|lower }}">
+                                {% if post.caption %}
+                                    <p class="card-text small mb-2" style="color: var(--text-secondary); min-height: 40px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                        {{ post.caption }}
+                                    </p>
+                                {% else %}
+                                    <p class="card-text small mb-2 text-muted" style="min-height: 40px;">No caption</p>
+                                {% endif %}
                                     
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <div class="small" style="color: var(--text-muted);">
-                                            <span style="color: #ef4444;"><i class="bi bi-heart-fill"></i> {{ post.like_count|floatformat:0 }}</span>
-                                            <span class="ms-2" style="color: #06b6d4;"><i class="bi bi-chat-fill"></i> {{ post.comment_count|floatformat:0 }}</span>
+                                        <div class="d-flex gap-2 flex-wrap">
+                                            <span class="engagement-compact likes">
+                                                <i class="bi bi-heart-fill"></i> {{ post.like_count|floatformat:0 }}
+                                            </span>
+                                            <span class="engagement-compact comments">
+                                                <i class="bi bi-chat-fill"></i> {{ post.comment_count|floatformat:0 }}
+                                            </span>
                                             {% if post.is_reel or post.is_video %}
-                                                <span class="ms-2" style="color: #8b5cf6;"><i class="bi bi-play-fill"></i> {{ post.play_count|floatformat:0 }}</span>
+                                                <span class="engagement-compact plays">
+                                                    <i class="bi bi-play-fill"></i> {{ post.play_count|floatformat:0 }}
+                                                </span>
                                             {% endif %}
                                         </div>
                                         <small class="text-muted">{{ post.taken_at|date:"M d" }}</small>
@@ -118,7 +131,7 @@
         </div>
     {% endfor %}
 {% else %}
-    <div class="card">
+    <div class="glass-card">
         <div class="card-body text-center py-5">
             <i class="bi bi-info-circle" style="font-size: 4rem; color: var(--text-muted);"></i>
             <h4 class="mt-3 mb-2" style="color: var(--text-primary);">No posts found</h4>
@@ -137,16 +150,28 @@
     
     .post-card:hover {
         transform: translateY(-5px);
-        box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
-        border-color: var(--accent-primary) !important;
+        box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+        border-color: rgba(129, 140, 248, 0.5) !important;
     }
     
     .post-card:hover .post-image {
-        transform: scale(1.1);
+        transform: scale(1.05);
+    }
+    
+    .post-card:hover .post-video-thumbnail {
+        transform: scale(1.05);
     }
     
     .post-card:hover .post-overlay {
         opacity: 1;
+    }
+    
+    .post-video-thumbnail {
+        transition: transform 0.3s ease;
+    }
+    
+    .post-card:hover .post-video-thumbnail {
+        filter: brightness(1.1);
     }
     
     .post-grid {
@@ -155,4 +180,46 @@
         gap: 1.5rem;
     }
 </style>
+
+<script>
+    // Search functionality for dashboard - search by username only
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('searchDashboard');
+        if (searchInput) {
+            searchInput.addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase().trim();
+                const usernameSections = document.querySelectorAll('[data-username-section]');
+                
+                // Show/hide username sections based on search term
+                usernameSections.forEach(section => {
+                    const username = section.getAttribute('data-username-section') || '';
+                    
+                    if (searchTerm === '' || username.includes(searchTerm)) {
+                        section.style.display = '';
+                    } else {
+                        section.style.display = 'none';
+                    }
+                });
+            });
+        }
+        
+        // Video thumbnail autoplay on hover
+        const videoThumbnails = document.querySelectorAll('.post-video-thumbnail');
+        videoThumbnails.forEach(video => {
+            const card = video.closest('.post-card');
+            if (card) {
+                card.addEventListener('mouseenter', function() {
+                    video.play().catch(function(error) {
+                        // Autoplay may be blocked, that's okay for thumbnails
+                        console.log('Video thumbnail autoplay prevented');
+                    });
+                });
+                card.addEventListener('mouseleave', function() {
+                    video.pause();
+                    video.currentTime = 0; // Reset to beginning
+                });
+            }
+        });
+    });
+</script>
 {% endblock %}

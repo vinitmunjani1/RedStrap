@@ -1,0 +1,182 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Instagram Accounts - REDSTRAP{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <h1 class="mb-0"><i class="bi bi-instagram"></i> Instagram Accounts</h1>
+        <div class="d-flex gap-2">
+            <input type="text" id="searchAccounts" class="form-control form-control-sm" placeholder="Search accounts..." style="max-width: 250px;">
+            <a href="{% url 'add_instagram' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Add Account
+            </a>
+        </div>
+    </div>
+
+    {% if accounts_data %}
+        <div class="row g-4">
+            {% for data in accounts_data %}
+                {% with account=data.account %}
+                <div class="col-md-6 col-lg-4 account-item" data-username="{{ account.username|lower }}">
+                    <div class="glass-card account-card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="account-avatar me-3">
+                                    <i class="bi bi-person-circle"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h5 class="mb-0">@{{ account.username }}</h5>
+                                    <small class="text-muted">Added {{ account.created_at|date:"M d, Y" }}</small>
+                                </div>
+                            </div>
+                            
+                            <!-- Posts Analytics -->
+                            <div class="analytics-section mb-3">
+                                <h6 class="mb-2" style="color: var(--accent-primary);">
+                                    <i class="bi bi-image"></i> Posts Analytics
+                                </h6>
+                                <div class="analytics-stats">
+                                    <div class="stat-row">
+                                        <span class="stat-label">Total Posts:</span>
+                                        <span class="stat-value">{{ data.total_posts }}</span>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span class="stat-label">Total Likes:</span>
+                                        <span class="stat-value">{{ data.total_likes|floatformat:0 }}</span>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span class="stat-label">Avg Likes:</span>
+                                        <span class="stat-value">{{ data.avg_likes|floatformat:1 }}</span>
+                                    </div>
+                                </div>
+                                <a href="{% url 'account_analytics' account.id %}" class="btn btn-sm btn-outline-primary w-100 mt-2">
+                                    <i class="bi bi-bar-chart"></i> View Full Analytics
+                                </a>
+                            </div>
+                            
+                            <!-- Reels Analytics -->
+                            <div class="analytics-section">
+                                <h6 class="mb-2" style="color: var(--accent-secondary);">
+                                    <i class="bi bi-play-circle"></i> Reels Analytics
+                                </h6>
+                                <div class="analytics-stats">
+                                    <div class="stat-row">
+                                        <span class="stat-label">Total Reels:</span>
+                                        <span class="stat-value">{{ data.total_reels }}</span>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span class="stat-label">Total Plays:</span>
+                                        <span class="stat-value">{{ data.total_plays|floatformat:0 }}</span>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span class="stat-label">Avg Plays:</span>
+                                        <span class="stat-value">{{ data.avg_plays|floatformat:1 }}</span>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span class="stat-label">Avg Likes:</span>
+                                        <span class="stat-value">{{ data.avg_reel_likes|floatformat:1 }}</span>
+                                    </div>
+                                </div>
+                                <a href="{% url 'account_reels_analytics' account.id %}" class="btn btn-sm btn-outline-info w-100 mt-2">
+                                    <i class="bi bi-play-circle"></i> View Full Analytics
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endwith %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="glass-card text-center py-5">
+            <i class="bi bi-instagram" style="font-size: 4rem; color: var(--text-muted);"></i>
+            <p class="mt-3 text-muted">No Instagram accounts added yet.</p>
+            <a href="{% url 'add_instagram' %}" class="btn btn-primary mt-3">
+                <i class="bi bi-plus-circle"></i> Add Your First Account
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.account-card {
+    height: 100%;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.account-card:hover {
+    transform: translateY(-5px);
+}
+
+.account-avatar {
+    font-size: 3rem;
+    color: var(--accent-primary);
+}
+
+.analytics-section {
+    padding: 1rem;
+    background: rgba(30, 41, 59, 0.2);
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    margin-bottom: 1rem;
+}
+
+.analytics-section:last-child {
+    margin-bottom: 0;
+}
+
+.analytics-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.stat-row:last-child {
+    border-bottom: none;
+}
+
+.stat-row .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.stat-row .stat-value {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+</style>
+
+<script>
+    // Search functionality for accounts
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('searchAccounts');
+        if (searchInput) {
+            searchInput.addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase().trim();
+                const accountItems = document.querySelectorAll('.account-item');
+                
+                accountItems.forEach(item => {
+                    const username = item.getAttribute('data-username') || '';
+                    
+                    if (searchTerm === '' || username.includes(searchTerm)) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}
+

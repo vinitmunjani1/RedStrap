@@ -18,6 +18,7 @@ urlpatterns = [
     path('analytics/', views.analytics_view, name='analytics'),
     
     # Instagram
+    path('instagram/', views.instagram_accounts_view, name='instagram_accounts'),
     path('instagram/add/', views.add_instagram_account_view, name='add_instagram'),
     path('instagram/delete/<int:account_id>/', views.delete_instagram_account_view, name='delete_instagram'),
     path('instagram/scrape/', views.scrape_instagram_view, name='scrape_instagram'),

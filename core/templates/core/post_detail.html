@@ -4,131 +4,163 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-md-10 col-lg-8">
-        <div class="card">
-            <!-- Post Header with Username -->
-            <div class="card-header" style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-color);">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="mb-0">
-                            <strong style="color: var(--accent-primary);">@{{ post.account.username }}</strong>
-                        </h5>
-                        <small class="text-muted">{{ post.taken_at|date:"M d, Y H:i" }}</small>
-                    </div>
-                    <div>
-                        {% if post.is_reel %}
-                            <span class="badge bg-danger"><i class="bi bi-play-fill"></i> Reel</span>
-                        {% elif post.is_video %}
-                            <span class="badge bg-primary"><i class="bi bi-camera-video"></i> Video</span>
-                        {% else %}
-                            <span class="badge bg-secondary"><i class="bi bi-image"></i> Post</span>
-                        {% endif %}
-                        {% if post.is_carousel %}
-                            <span class="badge bg-info"><i class="bi bi-images"></i> Carousel</span>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Media Section -->
-            <div style="position: relative; background: var(--bg-primary);">
-                {% if post.is_carousel and carousel_items %}
-                    <!-- Carousel -->
-                    <div id="postCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="false">
-                        <div class="carousel-inner">
-                            {% for item in carousel_items %}
-                                <div class="carousel-item {% if forloop.first %}active{% endif %}">
-                                    {% if item.is_video and item.video_url %}
-                                        <video class="d-block w-100" style="max-height: 600px; object-fit: contain; background: var(--bg-primary);" controls {% if forloop.first %}autoplay{% endif %} muted loop>
-                                            <source src="{{ item.video_url }}" type="video/mp4">
-                                            Your browser does not support the video tag.
-                                        </video>
-                                    {% elif item.image_url %}
-                                        <img src="{{ item.image_url }}" class="d-block w-100" style="max-height: 600px; object-fit: contain;" alt="Carousel image {{ forloop.counter }}">
-                                    {% endif %}
+    <div class="col-12 col-lg-10 col-xl-9">
+        <div class="instagram-post-container">
+            <!-- Instagram-style Post Layout -->
+            <div class="instagram-post-wrapper">
+                <!-- Media Section (Left Side) -->
+                <div class="instagram-media-section">
+                    {% if post.is_reel %}
+                        <!-- Reel - Priority check for reels to show video -->
+                        {% if post.video_url %}
+                            <!-- Reel with Video -->
+                            <div style="position: relative; width: 100%; height: 100%; background: var(--bg-primary);">
+                                <video id="reelVideo" class="w-100 h-100 reel-video" style="object-fit: contain; background: var(--bg-primary);" controls muted loop playsinline preload="auto">
+                                    <source src="{{ post.video_url }}" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>
+                                <!-- Play button overlay -->
+                                <div id="reelPlayOverlay" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; display: none; cursor: pointer; background: rgba(0, 0, 0, 0.6); border-radius: 50%; width: 80px; height: 80px; align-items: center; justify-content: center; backdrop-filter: blur(10px); border: 2px solid rgba(255, 255, 255, 0.3); transition: all 0.3s ease;">
+                                    <i class="bi bi-play-fill" style="font-size: 2.5rem; color: white; margin-left: 5px;"></i>
                                 </div>
-                            {% endfor %}
-                        </div>
-                        {% if carousel_items|length > 1 %}
-                            <button class="carousel-control-prev" type="button" data-bs-target="#postCarousel" data-bs-slide="prev">
-                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">Previous</span>
-                            </button>
-                            <button class="carousel-control-next" type="button" data-bs-target="#postCarousel" data-bs-slide="next">
-                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">Next</span>
-                            </button>
-                            <div class="carousel-indicators" style="position: absolute; bottom: 10px;">
-                                {% for item in carousel_items %}
-                                    <button type="button" data-bs-target="#postCarousel" data-bs-slide-to="{{ forloop.counter0 }}" {% if forloop.first %}class="active"{% endif %} aria-label="Slide {{ forloop.counter }}"></button>
-                                {% endfor %}
+                            </div>
+                        {% elif post.image_url %}
+                            <!-- Reel fallback to image if video_url is missing -->
+                            <div style="position: relative; width: 100%; height: 100%; background: var(--bg-primary);">
+                                <img src="{{ post.image_url }}" class="w-100 h-100" style="object-fit: contain; background: var(--bg-primary);" alt="Reel thumbnail">
+                                <div class="text-center p-3" style="background: rgba(30, 41, 59, 0.5); position: absolute; bottom: 0; left: 0; right: 0;">
+                                    <small class="text-muted">Reel video unavailable - showing thumbnail</small>
+                                </div>
+                            </div>
+                        {% else %}
+                            <!-- Reel with no media -->
+                            <div class="d-flex align-items-center justify-content-center w-100 h-100" style="background: var(--bg-tertiary); min-height: 400px;">
+                                <div class="text-center">
+                                    <i class="bi bi-play-circle" style="font-size: 4rem; color: var(--text-muted);"></i>
+                                    <p class="text-muted mt-2">Reel media unavailable</p>
+                                </div>
                             </div>
                         {% endif %}
-                    </div>
-                {% elif post.is_carousel and post.image_url %}
-                    <!-- Carousel marked but no items saved yet - show main image -->
-                    <img src="{{ post.image_url }}" class="card-img-top w-100" alt="Post image" style="max-height: 600px; object-fit: contain;">
-                    <div class="text-center mt-2">
-                        <small class="text-muted">Carousel post ({{ post.carousel_media_count }} items) - additional items will be available after re-fetching</small>
-                    </div>
-                {% elif post.is_video and post.video_url %}
-                    <!-- Single Video with Autoplay -->
-                    <video class="w-100" style="max-height: 600px; object-fit: contain; background: var(--bg-primary);" controls autoplay muted loop>
-                        <source src="{{ post.video_url }}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
-                {% elif post.image_url %}
-                    <!-- Single Image -->
-                    <img src="{{ post.image_url }}" class="card-img-top w-100" alt="Post image" style="max-height: 600px; object-fit: contain;">
-                {% else %}
-                    <!-- No Media -->
-                    <div class="d-flex align-items-center justify-content-center" style="height: 400px; background: var(--bg-tertiary);">
-                        <i class="bi bi-image" style="font-size: 4rem; color: var(--text-muted);"></i>
-                    </div>
-                {% endif %}
-            </div>
-            
-            <!-- Post Body -->
-            <div class="card-body">
-                <!-- Engagement Stats -->
-                <div class="d-flex gap-4 mb-4" style="border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
-                    <div>
-                        <i class="bi bi-heart-fill" style="color: #ef4444;"></i> 
-                        <strong>{{ post.like_count|floatformat:0 }}</strong> likes
-                    </div>
-                    <div>
-                        <i class="bi bi-chat-fill" style="color: #06b6d4;"></i> 
-                        <strong>{{ post.comment_count|floatformat:0 }}</strong> comments
-                    </div>
-                    {% if post.is_reel or post.is_video %}
-                        <div>
-                            <i class="bi bi-play-fill" style="color: #8b5cf6;"></i> 
-                            <strong>{{ post.play_count|floatformat:0 }}</strong> plays
+                    {% elif post.is_carousel and carousel_items %}
+                        <!-- Carousel -->
+                        <div id="postCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="false">
+                            <div class="carousel-inner">
+                                {% for item in carousel_items %}
+                                    <div class="carousel-item {% if forloop.first %}active{% endif %}" data-item-index="{{ forloop.counter0 }}">
+                                        {% if item.is_video and item.video_url %}
+                                            <video class="carousel-video d-block w-100" data-video-index="{{ forloop.counter0 }}" style="width: 100%; height: 100%; object-fit: contain; background: var(--bg-primary);" controls {% if forloop.first %}autoplay{% endif %} muted loop playsinline preload="auto">
+                                                <source src="{{ item.video_url }}" type="video/mp4">
+                                                Your browser does not support the video tag.
+                                            </video>
+                                        {% elif item.image_url %}
+                                            <img src="{{ item.image_url }}" class="d-block w-100" style="width: 100%; height: 100%; object-fit: contain;" alt="Carousel image {{ forloop.counter }}">
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% if carousel_items|length > 1 %}
+                                <button class="carousel-control-prev" type="button" data-bs-target="#postCarousel" data-bs-slide="prev">
+                                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Previous</span>
+                                </button>
+                                <button class="carousel-control-next" type="button" data-bs-target="#postCarousel" data-bs-slide="next">
+                                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Next</span>
+                                </button>
+                                <div class="carousel-indicators">
+                                    {% for item in carousel_items %}
+                                        <button type="button" data-bs-target="#postCarousel" data-bs-slide-to="{{ forloop.counter0 }}" {% if forloop.first %}class="active"{% endif %} aria-label="Slide {{ forloop.counter }}"></button>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% elif post.is_carousel and post.image_url %}
+                        <!-- Carousel marked but no items saved yet -->
+                        <img src="{{ post.image_url }}" class="w-100 h-100" style="object-fit: contain; background: var(--bg-primary);" alt="Post image">
+                        <div class="text-center mt-2 p-2" style="background: rgba(30, 41, 59, 0.3);">
+                            <small class="text-muted">Carousel post ({{ post.carousel_media_count }} items) - additional items will be available after re-fetching</small>
+                        </div>
+                    {% elif post.is_video and post.video_url %}
+                        <!-- Single Video (not a reel) -->
+                        <video id="mainVideo" class="w-100 h-100" style="object-fit: contain; background: var(--bg-primary);" controls autoplay muted loop playsinline preload="auto">
+                            <source src="{{ post.video_url }}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    {% elif post.image_url %}
+                        <!-- Single Image -->
+                        <img src="{{ post.image_url }}" class="w-100 h-100" style="object-fit: contain; background: var(--bg-primary);" alt="Post image">
+                    {% else %}
+                        <!-- No Media -->
+                        <div class="d-flex align-items-center justify-content-center w-100 h-100" style="background: var(--bg-tertiary); min-height: 400px;">
+                            <i class="bi bi-image" style="font-size: 4rem; color: var(--text-muted);"></i>
                         </div>
                     {% endif %}
                 </div>
                 
-                <!-- Caption -->
-                {% if post.caption %}
-                    <div class="mb-4">
-                        <p class="card-text" style="color: var(--text-primary); white-space: pre-wrap; line-height: 1.6;">{{ post.caption }}</p>
+                <!-- Content Section (Right Side) -->
+                <div class="instagram-content-section">
+                    <!-- Profile Header -->
+                    <div class="instagram-header">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="instagram-avatar">
+                                <i class="bi bi-person-circle" style="font-size: 2rem; color: var(--accent-primary);"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <strong style="color: var(--text-primary); font-size: 0.95rem;">{{ post.account.username }}</strong>
+                                {% if post.is_reel %}
+                                    <span class="badge ms-2" style="background: rgba(248, 113, 113, 0.2); border: 1px solid rgba(248, 113, 113, 0.4); color: rgba(248, 113, 113, 0.9); font-size: 0.7rem; padding: 0.15rem 0.4rem;">
+                                        <i class="bi bi-play-fill"></i> Reel
+                                    </span>
+                                {% elif post.is_video %}
+                                    <span class="badge ms-2" style="background: rgba(129, 140, 248, 0.2); border: 1px solid rgba(129, 140, 248, 0.4); color: rgba(129, 140, 248, 0.9); font-size: 0.7rem; padding: 0.15rem 0.4rem;">
+                                        <i class="bi bi-camera-video"></i> Video
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
-                {% else %}
-                    <div class="mb-4">
-                        <p class="text-muted">No caption available.</p>
+                    
+                    <!-- Caption Section (Scrollable) -->
+                    <div class="instagram-caption-section">
+                        <div class="caption-content">
+                            <!-- Engagement Stats -->
+                            <div class="engagement-stats mb-3">
+                                <div style="color: var(--text-primary); font-weight: 600; font-size: 0.95rem;">
+                                    {% if post.like_count > 0 %}
+                                        <span><i class="bi bi-heart-fill" style="color: rgba(239, 154, 154, 0.8); margin-right: 0.25rem;"></i>{{ post.like_count|floatformat:0 }} like{{ post.like_count|pluralize }}</span>
+                                    {% endif %}
+                                    {% if post.is_reel or post.is_video %}
+                                        {% if post.play_count > 0 %}
+                                            <span class="ms-3"><i class="bi bi-play-fill" style="color: rgba(196, 181, 253, 0.8); margin-right: 0.25rem;"></i>{{ post.play_count|floatformat:0 }} play{{ post.play_count|pluralize }}</span>
+                                        {% endif %}
+                                    {% endif %}
+                                    {% if post.comment_count > 0 %}
+                                        <span class="ms-3"><i class="bi bi-chat-fill" style="color: rgba(129, 140, 248, 0.8); margin-right: 0.25rem;"></i>{{ post.comment_count|floatformat:0 }} comment{{ post.comment_count|pluralize }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- Caption -->
+                            <div class="caption-item mb-3">
+                                <strong style="color: var(--text-primary); margin-right: 0.5rem;">{{ post.account.username }}</strong>
+                                <span style="color: var(--text-secondary); white-space: pre-wrap; word-wrap: break-word;">{{ post.caption|default:"No caption available." }}</span>
+                            </div>
+                            
+                            <!-- Post Date -->
+                            <div class="post-date" style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">
+                                {{ post.taken_at|date:"M d, Y" }}
+                            </div>
+                        </div>
                     </div>
-                {% endif %}
-                
-                <!-- Actions -->
-                <div class="d-flex gap-2">
-                    {% if post.instagram_url %}
-                        <a href="{{ post.instagram_url }}" target="_blank" class="btn btn-primary">
-                            <i class="bi bi-instagram"></i> View on Instagram
-                        </a>
-                    {% endif %}
-                    <a href="{% url 'account_analytics' post.account.id %}" class="btn btn-outline-primary">
-                        <i class="bi bi-graph-up"></i> View Account Analytics
-                    </a>
+                    
+                    <!-- External Links -->
+                    <div class="instagram-footer pt-3" style="border-top: 1px solid var(--glass-border); padding: 0 1rem 1rem;">
+                        {% if post.instagram_url %}
+                            <a href="{{ post.instagram_url }}" target="_blank" class="btn btn-sm w-100" style="background: rgba(129, 140, 248, 0.2); border: 1px solid rgba(129, 140, 248, 0.4); color: rgba(129, 140, 248, 0.9);">
+                                <i class="bi bi-instagram"></i> View on Instagram
+                            </a>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -136,19 +168,136 @@
 </div>
 
 <style>
+    .instagram-post-container {
+        max-width: 100%;
+        margin: 0 auto;
+    }
+    
+    .instagram-post-wrapper {
+        display: flex;
+        flex-direction: column;
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--glass-border);
+        border-radius: 12px;
+        overflow: hidden;
+        min-height: 500px;
+    }
+    
+    @media (min-width: 992px) {
+        .instagram-post-wrapper {
+            flex-direction: row;
+            max-height: 90vh;
+        }
+    }
+    
+    .instagram-media-section {
+        width: 100%;
+        background: var(--bg-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+        position: relative;
+    }
+    
+    @media (min-width: 992px) {
+        .instagram-media-section {
+            width: 60%;
+            max-height: 90vh;
+            border-right: 1px solid var(--glass-border);
+        }
+    }
+    
+    .instagram-media-section img,
+    .instagram-media-section video {
+        max-width: 100%;
+        max-height: 100%;
+    }
+    
+    .instagram-content-section {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        background: var(--glass-bg);
+    }
+    
+    @media (min-width: 992px) {
+        .instagram-content-section {
+            width: 40%;
+            max-height: 90vh;
+            overflow: hidden;
+        }
+    }
+    
+    .instagram-header {
+        padding: 1rem;
+        border-bottom: 1px solid var(--glass-border);
+        background: rgba(30, 41, 59, 0.2);
+    }
+    
+    .instagram-avatar {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .instagram-caption-section {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        background: rgba(30, 41, 59, 0.1);
+    }
+    
+    .caption-content {
+        min-height: 100%;
+    }
+    
+    .caption-item {
+        line-height: 1.6;
+        word-break: break-word;
+    }
+    
+    .engagement-stats {
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--glass-border);
+    }
+    
+    .instagram-footer {
+        background: rgba(30, 41, 59, 0.1);
+    }
+    
+    /* Carousel Styling */
     .carousel-control-prev-icon,
     .carousel-control-next-icon {
-        background-color: rgba(0, 0, 0, 0.5);
+        background-color: rgba(30, 41, 59, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
         border-radius: 50%;
         width: 40px;
         height: 40px;
     }
     
+    .carousel-indicators {
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(30, 41, 59, 0.4);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 8px;
+        margin: 0;
+    }
+    
     .carousel-indicators button {
-        background-color: rgba(255, 255, 255, 0.5);
-        border: 2px solid rgba(255, 255, 255, 0.8);
-        width: 12px;
-        height: 12px;
+        background-color: rgba(148, 163, 184, 0.5);
+        border: 1px solid rgba(148, 163, 184, 0.7);
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
         margin: 0 4px;
     }
@@ -157,5 +306,209 @@
         background-color: var(--accent-primary);
         border-color: var(--accent-primary);
     }
+    
+    /* Scrollbar Styling */
+    .instagram-caption-section::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .instagram-caption-section::-webkit-scrollbar-track {
+        background: rgba(30, 41, 59, 0.2);
+    }
+    
+    .instagram-caption-section::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.3);
+        border-radius: 3px;
+    }
+    
+    .instagram-caption-section::-webkit-scrollbar-thumb:hover {
+        background: rgba(148, 163, 184, 0.5);
+    }
 </style>
+
+<script>
+    // Handle carousel video autoplay when slide changes
+    document.addEventListener('DOMContentLoaded', function() {
+        const carousel = document.getElementById('postCarousel');
+        if (carousel) {
+            carousel.addEventListener('slid.bs.carousel', function(event) {
+                // Pause all videos
+                const allVideos = carousel.querySelectorAll('.carousel-video');
+                allVideos.forEach(video => {
+                    video.pause();
+                });
+                
+                // Play video in active slide
+                const activeSlide = event.relatedTarget;
+                const activeVideo = activeSlide.querySelector('.carousel-video');
+                if (activeVideo) {
+                    activeVideo.currentTime = 0;
+                    activeVideo.play().catch(function(error) {
+                        console.log('Carousel video autoplay prevented');
+                    });
+                }
+            });
+            
+            // Ensure first video plays on load
+            const firstVideo = carousel.querySelector('.carousel-item.active .carousel-video');
+            if (firstVideo) {
+                firstVideo.play().catch(function(error) {
+                    console.log('First carousel video autoplay prevented');
+                });
+            }
+        }
+        
+        // Handle reel video autoplay - prioritize reels with enhanced reliability
+        const reelVideo = document.getElementById('reelVideo');
+        const reelPlayOverlay = document.getElementById('reelPlayOverlay');
+        
+        if (reelVideo) {
+            // Ensure video is muted and plays inline (required for autoplay)
+            reelVideo.muted = true;
+            reelVideo.setAttribute('playsinline', 'true');
+            reelVideo.setAttribute('webkit-playsinline', 'true');
+            reelVideo.setAttribute('x5-playsinline', 'true');
+            reelVideo.setAttribute('x5-video-player-type', 'h5');
+            
+            // Hide/show play overlay based on video state
+            const updatePlayOverlay = function() {
+                if (reelPlayOverlay) {
+                    if (reelVideo.paused) {
+                        reelPlayOverlay.style.display = 'flex';
+                    } else {
+                        reelPlayOverlay.style.display = 'none';
+                    }
+                }
+            };
+            
+            // Monitor video play/pause state
+            reelVideo.addEventListener('play', updatePlayOverlay);
+            reelVideo.addEventListener('pause', updatePlayOverlay);
+            reelVideo.addEventListener('playing', updatePlayOverlay);
+            
+            // Click overlay to play
+            if (reelPlayOverlay) {
+                reelPlayOverlay.addEventListener('click', function() {
+                    reelVideo.play().catch(err => console.log('Play failed:', err));
+                });
+            }
+            
+            // Function to attempt playing the video with multiple strategies
+            const attemptPlay = function() {
+                // Strategy 1: Direct play attempt
+                const playPromise = reelVideo.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('Reel video autoplay successful');
+                        reelVideo.currentTime = 0;
+                        updatePlayOverlay();
+                    }).catch(error => {
+                        console.log('Reel autoplay prevented, trying alternative methods:', error);
+                        updatePlayOverlay();
+                        
+                        // Strategy 2: Try playing after a small delay
+                        setTimeout(() => {
+                            reelVideo.play().then(() => {
+                                console.log('Reel video autoplay successful (delayed)');
+                                updatePlayOverlay();
+                            }).catch(() => {
+                                // Strategy 3: Wait for user interaction
+                                setupInteractionPlayback();
+                            });
+                        }, 100);
+                    });
+                }
+            };
+            
+            // Setup interaction-based playback as fallback
+            const setupInteractionPlayback = function() {
+                const playOnInteraction = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    reelVideo.play().then(() => {
+                        console.log('Reel video started on user interaction');
+                        updatePlayOverlay();
+                        // Remove listeners after successful play
+                        document.removeEventListener('click', playOnInteraction);
+                        document.removeEventListener('touchstart', playOnInteraction);
+                        document.removeEventListener('keydown', playOnInteraction);
+                        document.removeEventListener('mousedown', playOnInteraction);
+                    }).catch(err => {
+                        console.log('Failed to play on interaction:', err);
+                    });
+                };
+                
+                // Add multiple interaction listeners
+                ['click', 'touchstart', 'keydown', 'mousedown', 'pointerdown'].forEach(eventType => {
+                    document.addEventListener(eventType, playOnInteraction, { once: true, passive: false });
+                });
+                
+                // Also try on video element itself
+                reelVideo.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    playOnInteraction(e);
+                }, { once: true });
+                reelVideo.addEventListener('touchstart', function(e) {
+                    e.stopPropagation();
+                    playOnInteraction(e);
+                }, { once: true });
+            };
+            
+            // Multiple event listeners to catch video when ready
+            const playWhenReady = function() {
+                if (reelVideo.readyState >= 2) {
+                    attemptPlay();
+                }
+            };
+            
+            // Try immediately if already loaded
+            if (reelVideo.readyState >= 2) {
+                attemptPlay();
+            } else {
+                // Wait for various load events
+                reelVideo.addEventListener('loadedmetadata', playWhenReady, { once: true });
+                reelVideo.addEventListener('canplay', playWhenReady, { once: true });
+                reelVideo.addEventListener('canplaythrough', playWhenReady, { once: true });
+                reelVideo.addEventListener('loadeddata', playWhenReady, { once: true });
+                reelVideo.addEventListener('loadstart', playWhenReady, { once: true });
+                
+                // Fallback: try after delays
+                setTimeout(playWhenReady, 200);
+                setTimeout(playWhenReady, 500);
+                setTimeout(playWhenReady, 1000);
+            }
+            
+            // Also try when video becomes visible (Intersection Observer)
+            if ('IntersectionObserver' in window) {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting && reelVideo.paused) {
+                            attemptPlay();
+                        }
+                    });
+                }, { threshold: 0.5 });
+                observer.observe(reelVideo);
+            }
+            
+            // Initial overlay state
+            updatePlayOverlay();
+        }
+        
+        // Handle main video autoplay (if not in carousel)
+        const mainVideo = document.getElementById('mainVideo');
+        if (mainVideo) {
+            mainVideo.play().catch(function(error) {
+                console.log('Main video autoplay prevented, will play on interaction');
+                const playOnInteraction = function() {
+                    mainVideo.play().then(() => {
+                        document.removeEventListener('click', playOnInteraction);
+                        document.removeEventListener('touchstart', playOnInteraction);
+                    }).catch(() => {});
+                };
+                document.addEventListener('click', playOnInteraction, { once: true });
+                document.addEventListener('touchstart', playOnInteraction, { once: true });
+            });
+        }
+    });
+</script>
 {% endblock %}
