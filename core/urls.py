@@ -14,18 +14,13 @@ urlpatterns = [
     # Dashboard
     path('', views.dashboard_view, name='dashboard'),
     
-    # Analytics
-    path('analytics/', views.analytics_view, name='analytics'),
-    
     # Instagram
     path('instagram/', views.instagram_accounts_view, name='instagram_accounts'),
     path('instagram/add/', views.add_instagram_account_view, name='add_instagram'),
     path('instagram/delete/<int:account_id>/', views.delete_instagram_account_view, name='delete_instagram'),
     path('instagram/scrape/', views.scrape_instagram_view, name='scrape_instagram'),
-    path('instagram/scrape-reels/', views.scrape_reels_view, name='scrape_reels'),
     path('instagram/post/<int:post_id>/', views.instagram_post_detail_view, name='instagram_post_detail'),
     path('instagram/analytics/<int:account_id>/', views.account_analytics_view, name='account_analytics'),
-    path('instagram/reels-analytics/<int:account_id>/', views.account_reels_analytics_view, name='account_reels_analytics'),
     
     # Reddit
     path('reddit/', views.reddit_view, name='reddit'),

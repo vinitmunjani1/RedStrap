@@ -136,7 +136,8 @@ LOGOUT_REDIRECT_URL = 'login'
 RAPIDAPI_KEYS = [
     'a8fda11e76msh91790916e41cd1ep1d15b6jsn684a53a759bf',
     'd8f6b4111bmsh74a2dd675cd6767p124173jsna55fffc313d6',
-    '19408733bamsha9cd9d39c52f78dp1fb914jsnbc5ee6c6a61a'
+    '19408733bamsha9cd9d39c52f78dp1fb914jsnbc5ee6c6a61a',
+    'd409935002msh6ca472652d2ea6ep143efcjsn4d350435d328'
 ]
 # Fallback to single key from environment if provided (for backward compatibility)
 SINGLE_RAPIDAPI_KEY = os.environ.get('RAPIDAPI_KEY', '')
@@ -145,6 +146,26 @@ if SINGLE_RAPIDAPI_KEY and SINGLE_RAPIDAPI_KEY not in RAPIDAPI_KEYS:
 # Use first key as default for backward compatibility
 RAPIDAPI_KEY = RAPIDAPI_KEYS[0] if RAPIDAPI_KEYS else ''
 RAPIDAPI_HOST = 'instagram120.p.rapidapi.com'
+
+# Debug: Save API JSON responses to files for analysis
+# Set to True to save all API responses to debug_responses/ directory
+# Useful for debugging API structure changes or analyzing response formats
+DEBUG_SAVE_RESPONSES = os.environ.get('DEBUG_SAVE_RESPONSES', 'False').lower() == 'true'
+# Maximum number of response files to keep per endpoint type (prevents disk space issues)
+DEBUG_MAX_RESPONSE_FILES = int(os.environ.get('DEBUG_MAX_RESPONSE_FILES', '50'))
+
+# Skip reels endpoint for play_count fetching (if rate limits are an issue)
+# When True, only uses posts endpoint and fallback extraction for play_count
+# This reduces API calls by 50% but may result in missing play_count data
+SKIP_REELS_ENDPOINT_FOR_PLAY_COUNT = os.environ.get('SKIP_REELS_ENDPOINT_FOR_PLAY_COUNT', 'False').lower() == 'true'
+
+# Test mode: Limit reel fetching to 10 recent reels for testing purposes
+# When True, fetch_instagram_reels() will only return the 10 most recent reels
+TEST_MODE_REELS_LIMIT = int(os.environ.get('TEST_MODE_REELS_LIMIT', '10'))
+
+# Test mode: Limit post fetching to 24 recent posts for testing purposes
+# Set to None or 0 to disable test mode and fetch all posts
+TEST_MODE_POSTS_LIMIT = int(os.environ.get('TEST_MODE_POSTS_LIMIT', '24'))
 
 # Logging Configuration
 LOGGING = {

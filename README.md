@@ -59,6 +59,28 @@ RAPIDAPI_KEYS = [
 ]
 ```
 
+### Debug: Save API Responses
+To save API JSON responses to files for debugging and analysis, enable the debug mode in `redstrap_project/settings.py`:
+
+```python
+# Enable saving API responses to files
+DEBUG_SAVE_RESPONSES = True  # Set to True to enable
+DEBUG_MAX_RESPONSE_FILES = 50  # Maximum files to keep per endpoint type
+```
+
+Or set via environment variable:
+```bash
+export DEBUG_SAVE_RESPONSES=true
+export DEBUG_MAX_RESPONSE_FILES=50
+```
+
+When enabled, API responses will be saved to:
+- `debug_responses/reels/<username>_<timestamp>.json` - Reels endpoint responses
+- `debug_responses/posts/<username>_<timestamp>.json` - Posts endpoint responses
+- `debug_responses/post_detail/<username>_<timestamp>.json` - Post detail responses
+
+The system automatically cleans up old files, keeping only the most recent N files (default: 50) per endpoint type to prevent disk space issues.
+
 ## Usage
 
 1. **Register/Login**: Create an account or login

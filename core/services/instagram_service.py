@@ -8,8 +8,11 @@ import requests
 import logging
 import time
 import random
+import json
+import os
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
+from pathlib import Path
 from django.conf import settings
 from django.utils import timezone
 from threading import Lock
@@ -18,13 +21,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 
+# Directory for saving debug responses
+DEBUG_RESPONSES_DIR = Path(__file__).parent.parent.parent / "debug_responses"
+
 # Configuration constants for optimized fetching
 # API limit: 2 calls per second per API key
 # With 5 API keys, we can make 10 calls/sec total
 MIN_DELAY_BETWEEN_REQUESTS = 0.1  # Minimum delay between requests (seconds) - reduced for speed
-RATE_LIMIT_WINDOW = 60  # Rate limit window in seconds
+RATE_LIMIT_WINDOW = 10  # Rate limit window in seconds
 MAX_REQUESTS_PER_WINDOW = 50  # Max requests per window per API key (2 calls/sec * 60 sec = 120)
-CALLS_PER_SECOND_PER_KEY = 2  # API limit: 2 calls per second per key
+CALLS_PER_SECOND_PER_KEY = 1  # API limit: 2 calls per second per key
 
 # Global rate limiter for each API key
 _rate_limiters: Dict[str, deque] = {}
@@ -75,6 +81,85 @@ def _wait_for_rate_limit(api_key: str):
     
     # Record this API call
     limiter.append(time.time())
+
+
+def _save_response_to_file(response_data: Dict, endpoint_type: str, username: str = "", additional_info: str = ""):
+    """
+    Save API response JSON to a file for debugging purposes.
+    Only saves if DEBUG_SAVE_RESPONSES is enabled in settings.
+    
+    Args:
+        response_data: The JSON response data to save
+        endpoint_type: Type of endpoint (e.g., 'reels', 'posts', 'post_detail')
+        username: Instagram username (optional, for filename)
+        additional_info: Additional info for filename (optional)
+    """
+    if not getattr(settings, 'DEBUG_SAVE_RESPONSES', False):
+        return
+    
+    try:
+        # Create debug_responses directory if it doesn't exist
+        DEBUG_RESPONSES_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # Create endpoint-specific subdirectory
+        endpoint_dir = DEBUG_RESPONSES_DIR / endpoint_type
+        endpoint_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
+        safe_username = username.replace('@', '').replace('/', '_') if username else "unknown"
+        safe_info = additional_info.replace('/', '_').replace('\\', '_') if additional_info else ""
+        
+        filename_parts = [endpoint_type, safe_username, safe_info, timestamp]
+        filename = "_".join([p for p in filename_parts if p]) + ".json"
+        filepath = endpoint_dir / filename
+        
+        # Save JSON response
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(response_data, f, indent=2, ensure_ascii=False)
+        
+        logger.debug(f"Saved API response to: {filepath}")
+        
+        # Cleanup old files to prevent disk space issues
+        _cleanup_old_response_files(endpoint_dir, endpoint_type)
+        
+    except Exception as e:
+        logger.warning(f"Failed to save debug response to file: {e}")
+
+
+def _cleanup_old_response_files(directory: Path, endpoint_type: str):
+    """
+    Remove old response files, keeping only the most recent N files.
+    Prevents disk space issues from accumulating too many debug files.
+    
+    Args:
+        directory: Directory containing response files
+        endpoint_type: Type of endpoint (for logging)
+    """
+    try:
+        max_files = getattr(settings, 'DEBUG_MAX_RESPONSE_FILES', 50)
+        
+        # Get all JSON files in directory, sorted by modification time (newest first)
+        json_files = sorted(
+            directory.glob("*.json"),
+            key=lambda f: f.stat().st_mtime,
+            reverse=True
+        )
+        
+        # Remove files beyond the limit
+        if len(json_files) > max_files:
+            files_to_remove = json_files[max_files:]
+            for file_to_remove in files_to_remove:
+                try:
+                    file_to_remove.unlink()
+                    logger.debug(f"Removed old debug response file: {file_to_remove}")
+                except Exception as e:
+                    logger.warning(f"Failed to remove old debug file {file_to_remove}: {e}")
+            
+            logger.info(f"Cleaned up {len(files_to_remove)} old {endpoint_type} response files, kept {max_files} most recent")
+    
+    except Exception as e:
+        logger.warning(f"Failed to cleanup old response files: {e}")
 
 
 def _get_random_api_key() -> str:
@@ -139,15 +224,59 @@ def _make_api_request(url: str, payload: Dict, method: str = "POST", max_retries
                 # Don't retry on 404, it's unlikely to succeed
                 return None
             
+            # Handle 429 (Too Many Requests) with exponential backoff
+            if response.status_code == 429:
+                retry_after = int(response.headers.get('Retry-After', 10))  # Default to 60 seconds
+                wait_time = min(retry_after, 120)  # Cap at 2 minutes
+                logger.warning(f"Rate limit exceeded (429) for {url}. Waiting {wait_time} seconds before retry (attempt {attempt + 1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    time.sleep(wait_time)
+                    continue  # Retry with same or different key
+                else:
+                    logger.error(f"Rate limit exceeded after {max_retries} attempts for URL: {url}")
+                    return None
+            
             response.raise_for_status()
-            return response.json()
+            response_data = response.json()
+            
+            # Save response to file if debug mode is enabled
+            if getattr(settings, 'DEBUG_SAVE_RESPONSES', False):
+                # Determine endpoint type from URL
+                endpoint_type = "unknown"
+                if "/reels" in url:
+                    endpoint_type = "reels"
+                elif "/posts" in url:
+                    endpoint_type = "posts"
+                elif "/post" in url:
+                    endpoint_type = "post_detail"
+                
+                # Extract username from payload if available
+                username = payload.get("username", "") if isinstance(payload, dict) else ""
+                
+                # Save the response
+                _save_response_to_file(response_data, endpoint_type, username)
+            
+            return response_data
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
                 logger.error(f"404 Not Found: {e.response.text[:200] if e.response else 'No response'}")
                 return None
+            elif e.response.status_code == 429:
+                # Handle 429 in exception handler as well (in case raise_for_status wasn't called)
+                retry_after = int(e.response.headers.get('Retry-After', 60))
+                wait_time = min(retry_after, 120)
+                logger.warning(f"Rate limit exceeded (429) for {url}. Waiting {wait_time} seconds (attempt {attempt + 1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logger.error(f"Rate limit exceeded after {max_retries} attempts for URL: {url}")
+                    return None
             logger.warning(f"HTTP error {e.response.status_code} (attempt {attempt + 1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
-                time.sleep(1)
+                # Exponential backoff for other errors
+                wait_time = min(2 ** attempt, 10)  # 1s, 2s, 4s, max 10s
+                time.sleep(wait_time)
             else:
                 logger.error(f"All API key attempts failed for URL: {url} with payload: {payload}")
                 return None
@@ -161,6 +290,133 @@ def _make_api_request(url: str, payload: Dict, method: str = "POST", max_retries
                 return None
     
     return None
+
+
+def _fetch_video_url_by_shortcode(shortcode: str) -> Optional[Dict[str, str]]:
+    """
+    Fetch video URL and caption for a reel/post using the mediaByShortcode endpoint.
+    This endpoint provides the actual video URL that can be used for playback and the caption.
+    
+    Args:
+        shortcode: Instagram post/reel shortcode (e.g., "DPRcWdvgI4P")
+    
+    Returns:
+        Dictionary with 'video_url' and 'caption' keys if found, None otherwise.
+        Format: {'video_url': '...', 'caption': '...'} or None
+    """
+    if not shortcode:
+        return None
+    
+    try:
+        url = "https://instagram120.p.rapidapi.com/api/instagram/mediaByShortcode"
+        payload = {
+            "shortcode": shortcode
+        }
+        
+        response_data = _make_api_request(url, payload, method="POST")
+        
+        if not response_data:
+            logger.warning(f"Could not fetch data from mediaByShortcode for shortcode: {shortcode}")
+            return None
+        
+        # Response is an array: [{"urls": [{"url": "..."}], "meta": {"title": "...", ...}, ...}]
+        # Extract video URL from response[0].urls[0].url
+        # Extract caption from response[0].meta.title
+        if isinstance(response_data, list) and len(response_data) > 0:
+            first_item = response_data[0]
+            if isinstance(first_item, dict):
+                result = {}
+                
+                # Extract video URL
+                urls = first_item.get("urls", [])
+                if isinstance(urls, list) and len(urls) > 0:
+                    video_url = urls[0].get("url", "")
+                    if video_url:
+                        result['video_url'] = video_url
+                
+                # Extract caption from meta.title
+                meta = first_item.get("meta", {})
+                if isinstance(meta, dict):
+                    caption = meta.get("title", "")
+                    if caption:
+                        result['caption'] = caption
+                
+                if result:
+                    logger.info(f"Successfully fetched data from mediaByShortcode for shortcode {shortcode}: video_url={'Yes' if 'video_url' in result else 'No'}, caption={'Yes' if 'caption' in result else 'No'}")
+                    return result
+        
+        logger.warning(f"No data found in mediaByShortcode response for shortcode: {shortcode}")
+        return None
+            
+    except Exception as e:
+        logger.error(f"Error fetching data from mediaByShortcode for shortcode {shortcode}: {e}", exc_info=True)
+        return None
+
+
+def _fetch_reel_play_count(post_code: str) -> Optional[int]:
+    """
+    Fetch play_count for a reel using the post code.
+    Uses the post detail endpoint to get full reel information including play_count.
+    
+    Args:
+        post_code: Instagram post/reel shortcode (e.g., "DCwpUE4xY3M")
+    
+    Returns:
+        Play count as integer if found, None otherwise
+    """
+    if not post_code:
+        return None
+    
+    try:
+        # Try using the post detail endpoint
+        url = "https://instagram120.p.rapidapi.com/api/instagram/post"
+        payload = {
+            "shortcode": post_code
+        }
+        
+        response_data = _make_api_request(url, payload, method="POST")
+        
+        if not response_data:
+            logger.warning(f"Could not fetch post details for play_count, code: {post_code}")
+            return None
+        
+        # Parse the response to extract play_count
+        # The response structure may vary, so check multiple locations
+        play_count = None
+        
+        # Check in result.post or result directly
+        result = response_data.get("result", response_data)
+        if isinstance(result, dict):
+            # Check for play_count directly
+            if "play_count" in result:
+                play_count = result["play_count"]
+            
+            # Check for view_count (some APIs use view_count for reels)
+            if play_count is None and "view_count" in result:
+                view_count = result["view_count"]
+                if view_count is not None:
+                    play_count = view_count
+            
+            # Check in nested media structure
+            if play_count is None and "media" in result:
+                media = result["media"]
+                if isinstance(media, dict):
+                    if "play_count" in media:
+                        play_count = media["play_count"]
+                    elif "view_count" in media and media["view_count"] is not None:
+                        play_count = media["view_count"]
+        
+        if play_count is not None:
+            play_count = int(play_count)
+            logger.info(f"Successfully fetched play_count {play_count} for reel code {post_code}")
+            return play_count
+        else:
+            logger.warning(f"No play_count found in post detail response for code: {post_code}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error fetching play_count for reel code {post_code}: {e}", exc_info=True)
+        return None
 
 
 def _fetch_reel_video_url(post_code: str) -> Optional[str]:
@@ -281,10 +537,14 @@ def _extract_timestamp_from_post_id(post_id: str) -> Optional[datetime]:
         return None
 
 
-def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
+def parse_instagram_post(post_node: Dict, skip_video_url: bool = False) -> Optional[Dict]:
     """
     Parse a single Instagram post from API response.
     Handles both regular posts and reels, with comprehensive timestamp extraction.
+    
+    Args:
+        post_node: Dictionary containing post/reel data from API response
+        skip_video_url: If True, skip video URL extraction (for lazy loading). Default False.
     
     Args:
         post_node: The post node from the API response
@@ -295,11 +555,11 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
     try:
         # Handle nested media structure (for reels endpoint)
         # Some endpoints return node.media, others return post data directly in node
-        # For reels, taken_at can be in node, node.media, or both
-        # IMPORTANT: For reels endpoint, play_count is in node.media.play_count
+        # For reels endpoint: data is directly in node (no nested media structure)
+        # For posts endpoint: might have nested media structure
         media_data = {}
         if "media" in post_node and isinstance(post_node.get("media"), dict):
-            # Extract data from nested media object
+            # Extract data from nested media object (posts endpoint structure)
             media_data = post_node.get("media", {})
             # Merge media data with node data (media_data takes precedence for overlapping fields)
             # This ensures play_count from media is available in actual_post_data
@@ -307,12 +567,14 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
             
             # Debug: Log play_count extraction for reels
             if media_data.get("product_type") == "clips" or post_node.get("product_type") == "clips":
+                logger.info(f"Reel parsing DEBUG: Found nested media structure")
                 logger.info(f"Reel parsing DEBUG: media_data keys: {list(media_data.keys())[:20]}")
                 logger.info(f"Reel parsing DEBUG: media_data.play_count = {media_data.get('play_count')}")
                 logger.info(f"Reel parsing DEBUG: actual_post_data.play_count = {actual_post_data.get('play_count')}")
         else:
-            # Use node directly (standard posts endpoint structure)
+            # Use node directly (reels endpoint structure - data is directly in node, no nested media)
             actual_post_data = post_node
+            # For reels endpoint, there's no nested media, so media_data stays empty
         
         # Extract post ID (use pk as primary identifier)
         post_id = actual_post_data.get("pk") or actual_post_data.get("id", "")
@@ -320,12 +582,13 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
             return None
         
         # Extract caption text
-        # For reels, caption might be in node.caption, node.media.caption, or actual_post_data.caption
+        # For reels endpoint: caption is in node.caption.text (caption is a dict with 'text' field)
+        # For posts endpoint: caption might be in node.caption.text or directly as node.caption
         # Check multiple locations to ensure we capture captions for both posts and reels
         caption = ""
         caption_obj = None
         
-        # Priority 1: Check post_node.caption (top level of node)
+        # Priority 1: Check post_node.caption (top level of node) - this is where reels endpoint stores it
         if post_node.get("caption"):
             caption_obj = post_node.get("caption")
         # Priority 2: Check media_data.caption (for reels with nested structure)
@@ -336,9 +599,18 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
             caption_obj = actual_post_data.get("caption")
         
         # Extract text from caption object
+        # Reels endpoint returns caption as: {"text": "...", "pk": "...", "created_at": ...}
+        # Posts endpoint might return caption as string or dict
         if caption_obj:
             if isinstance(caption_obj, dict):
-                caption = caption_obj.get("text", "")
+                # Caption is a dict - extract the 'text' field (this is the structure from reels endpoint)
+                caption = caption_obj.get("text", "") or caption_obj.get("caption", "")
+                # If still empty, try to get any string value from the dict
+                if not caption:
+                    for key in ["text", "caption", "content"]:
+                        if key in caption_obj and isinstance(caption_obj[key], str):
+                            caption = caption_obj[key]
+                            break
             elif isinstance(caption_obj, str):
                 # Sometimes caption is directly a string
                 caption = caption_obj
@@ -347,9 +619,19 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
         is_reel_check = actual_post_data.get("product_type") == "clips" or post_node.get("product_type") == "clips"
         if is_reel_check:
             if caption:
-                logger.debug(f"Reel {post_id}: Extracted caption (length: {len(caption)})")
+                logger.info(f"Reel {post_id}: Successfully extracted caption (length: {len(caption)}, preview: {caption[:50]}...)")
             else:
-                logger.debug(f"Reel {post_id}: No caption found. Checked: post_node.caption={post_node.get('caption') is not None}, media_data.caption={media_data.get('caption') if media_data else 'N/A'}, actual_post_data.caption={actual_post_data.get('caption') is not None}")
+                # Enhanced debugging for reels caption extraction
+                caption_debug_info = {
+                    "post_node_has_caption": post_node.get("caption") is not None,
+                    "post_node_caption_type": type(post_node.get("caption")).__name__ if post_node.get("caption") is not None else None,
+                    "media_data_has_caption": media_data.get("caption") is not None if media_data else False,
+                    "actual_post_data_has_caption": actual_post_data.get("caption") is not None,
+                }
+                logger.warning(f"Reel {post_id}: No caption found. Debug info: {caption_debug_info}")
+                # Log the actual caption structure if it exists
+                if post_node.get("caption"):
+                    logger.debug(f"Reel {post_id}: post_node.caption structure: {type(post_node.get('caption'))}, keys: {list(post_node.get('caption').keys()) if isinstance(post_node.get('caption'), dict) else 'N/A'}")
         
         # Extract timestamp (taken_at is Unix timestamp)
         # For reels endpoint, taken_at is ALWAYS directly in node.taken_at as an integer Unix timestamp
@@ -626,33 +908,42 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
         image_url = ""
         video_url = ""
         
-        # Check for video versions (reels and videos)
-        # Priority 1: Check in actual_post_data (merged data from node and media)
-        if "video_versions" in actual_post_data and actual_post_data["video_versions"]:
-            video_versions = actual_post_data["video_versions"]
-            if isinstance(video_versions, list) and len(video_versions) > 0:
-                video_url = video_versions[0].get("url", "")
-        
-        # Priority 2: Check in post_node (original node structure)
-        if not video_url and "video_versions" in post_node and post_node["video_versions"]:
-            video_versions = post_node["video_versions"]
-            if isinstance(video_versions, list) and len(video_versions) > 0:
-                video_url = video_versions[0].get("url", "")
-        
-        # Priority 3: Check in media_data (for nested media structure)
-        if not video_url and media_data and "video_versions" in media_data and media_data["video_versions"]:
-            video_versions = media_data["video_versions"]
-            if isinstance(video_versions, list) and len(video_versions) > 0:
-                video_url = video_versions[0].get("url", "")
-        
-        # Priority 4: For reels, check if there's a direct video_url field
-        if not video_url and is_reel:
-            if "video_url" in actual_post_data and actual_post_data["video_url"]:
-                video_url = actual_post_data["video_url"]
-            elif "video_url" in post_node and post_node["video_url"]:
-                video_url = post_node["video_url"]
-            elif media_data and "video_url" in media_data and media_data["video_url"]:
-                video_url = media_data["video_url"]
+        # Skip video URL extraction if skip_video_url is True (for lazy loading)
+        # This reduces initial API calls - video URLs will be fetched on-demand when user views the post
+        if not skip_video_url:
+            # Check for video versions (reels and videos)
+            # Priority 1: Check in post_node first (this is where reels endpoint stores it directly)
+            if "video_versions" in post_node and post_node["video_versions"]:
+                video_versions = post_node["video_versions"]
+                if isinstance(video_versions, list) and len(video_versions) > 0:
+                    video_url = video_versions[0].get("url", "")
+                    if video_url and is_reel:
+                        logger.debug(f"Reel {post_id}: Found video_url in post_node.video_versions")
+            
+            # Priority 2: Check in actual_post_data (merged data from node and media)
+            if not video_url and "video_versions" in actual_post_data and actual_post_data["video_versions"]:
+                video_versions = actual_post_data["video_versions"]
+                if isinstance(video_versions, list) and len(video_versions) > 0:
+                    video_url = video_versions[0].get("url", "")
+                    if video_url and is_reel:
+                        logger.debug(f"Reel {post_id}: Found video_url in actual_post_data.video_versions")
+            
+            # Priority 3: Check in media_data (for nested media structure)
+            if not video_url and media_data and "video_versions" in media_data and media_data["video_versions"]:
+                video_versions = media_data["video_versions"]
+                if isinstance(video_versions, list) and len(video_versions) > 0:
+                    video_url = video_versions[0].get("url", "")
+                    if video_url and is_reel:
+                        logger.debug(f"Reel {post_id}: Found video_url in media_data.video_versions")
+            
+            # Priority 4: For reels, check if there's a direct video_url field
+            if not video_url and is_reel:
+                if "video_url" in actual_post_data and actual_post_data["video_url"]:
+                    video_url = actual_post_data["video_url"]
+                elif "video_url" in post_node and post_node["video_url"]:
+                    video_url = post_node["video_url"]
+                elif media_data and "video_url" in media_data and media_data["video_url"]:
+                    video_url = media_data["video_url"]
         
         # Check for image versions
         if "image_versions2" in actual_post_data:
@@ -691,27 +982,26 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
         comment_count = safe_int(actual_post_data.get("comment_count"), 0)
         
         # For reels, extract play_count from various possible locations
-        # Based on the API response structure: play_count is in node.media.play_count
-        # After merging media_data with post_node, it should be in actual_post_data
+        # Reels endpoint structure: data is directly in node (no nested media)
+        # Posts endpoint structure: might have nested media with play_count
         play_count_value = None
         
-        # Check in order of likelihood - prioritize media_data first (where play_count actually is)
-        # Based on JSON structure: play_count is in node.media.play_count
-        # After merging, it should be in both media_data and actual_post_data
+        # Priority 1: Check actual_post_data directly (for reels endpoint - data is directly in node)
+        # This is the most common location for reels endpoint responses
+        if "play_count" in actual_post_data:
+            play_count_in_actual = actual_post_data.get("play_count")
+            if play_count_in_actual is not None:
+                play_count_value = play_count_in_actual
+                logger.info(f"{'Reel' if is_reel else 'Post'} {post_id}: ✓ Found play_count in actual_post_data: {play_count_value}")
         
-        # Direct check of media_data first (most reliable for reels endpoint)
-        # Based on JSON: play_count is in node.media.play_count
-        # CRITICAL: Always check post_node.media.play_count directly for reels
-        # Check in this order: 1) media_data, 2) post_node.media directly, 3) actual_post_data
-        
-        # Priority 1: Check media_data if it was extracted
-        if media_data and "play_count" in media_data:
+        # Priority 2: Check media_data if it was extracted (for posts endpoint with nested media)
+        if play_count_value is None and media_data and "play_count" in media_data:
             play_count_in_media = media_data.get("play_count")
             if play_count_in_media is not None:
                 play_count_value = play_count_in_media
                 logger.info(f"{'Reel' if is_reel else 'Post'} {post_id}: ✓ Found play_count in media_data: {play_count_value}")
         
-        # Priority 2: Check post_node.media directly (most reliable - this is where it actually is)
+        # Priority 3: Check post_node.media directly (for posts endpoint structure)
         if play_count_value is None and isinstance(post_node.get("media"), dict):
             media_obj = post_node.get("media", {})
             if "play_count" in media_obj:
@@ -720,14 +1010,8 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
                     play_count_value = play_count_in_node_media
                     logger.info(f"{'Reel' if is_reel else 'Post'} {post_id}: ✓ Found play_count in post_node.media: {play_count_value}")
         
-        # Priority 3: Check actual_post_data (after merging) if not found
-        if play_count_value is None and "play_count" in actual_post_data:
-            play_count_in_actual = actual_post_data.get("play_count")
-            if play_count_in_actual is not None:
-                play_count_value = play_count_in_actual
-                logger.info(f"{'Reel' if is_reel else 'Post'} {post_id}: ✓ Found play_count in actual_post_data: {play_count_value}")
-        else:
-            # Try other possible locations
+        # Priority 4: Try other possible locations with alternative field names
+        if play_count_value is None:
             check_locations = [
                 ("actual_post_data.video_play_count", lambda: actual_post_data.get("video_play_count")),
                 ("actual_post_data.reel_play_count", lambda: actual_post_data.get("reel_play_count")),
@@ -746,8 +1030,8 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
                 except Exception as e:
                     logger.debug(f"Error checking {location_name} for reel {post_id}: {e}")
         
-        # For reels, if play_count is not found, use view_count as fallback
-        # (Some APIs use view_count for reels even though the field name is view_count)
+        # Priority 5: For reels, if play_count is not found, try view_count as fallback
+        # Note: Some API responses may have view_count instead of play_count
         if is_reel and play_count_value is None:
             # Try view_count as fallback (it exists in the API response structure)
             view_count_fallback = (
@@ -761,11 +1045,19 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
         
         # Enhanced debug logging for reels with missing play_count
         if is_reel and play_count == 0:
+            # Check all possible numeric fields that might be play_count
+            all_numeric_fields = {}
+            for key, value in actual_post_data.items():
+                if isinstance(value, (int, float)) and ('play' in key.lower() or 'view' in key.lower() or ('count' in key.lower() and ('play' in key.lower() or 'view' in key.lower()))):
+                    all_numeric_fields[key] = value
+            
             logger.warning(
                 f"Reel {post_id}: play_count is 0 after extraction. "
-                f"media_data has play_count: {media_data.get('play_count') if media_data else 'N/A'}, "
-                f"actual_post_data has play_count: {actual_post_data.get('play_count')}, "
-                f"post_node.media has play_count: {post_node.get('media', {}).get('play_count') if isinstance(post_node.get('media'), dict) else 'N/A'}"
+                f"Checked locations: actual_post_data.play_count={actual_post_data.get('play_count')}, "
+                f"media_data.play_count={media_data.get('play_count') if media_data else 'N/A'}, "
+                f"post_node.media.play_count={post_node.get('media', {}).get('play_count') if isinstance(post_node.get('media'), dict) else 'N/A'}, "
+                f"view_count={actual_post_data.get('view_count')}. "
+                f"All play/view related numeric fields: {all_numeric_fields if all_numeric_fields else 'None found'}"
             )
         
         # Debug logging for reels with missing play_count
@@ -798,7 +1090,12 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
         
         # Check if it's a carousel - handle None values explicitly
         carousel_media_count = safe_int(actual_post_data.get("carousel_media_count"), 0)
-        is_carousel = carousel_media_count > 1
+        is_carousel = bool(carousel_media_count > 1)  # Ensure boolean
+        
+        # Ensure all boolean fields are proper booleans (not dicts or other types)
+        is_video_value = bool(video_url) or bool(is_reel)
+        is_reel_value = bool(is_reel)
+        is_carousel_value = bool(is_carousel)
         
         return {
             "post_id": str(post_id),
@@ -807,9 +1104,9 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
             "taken_at": taken_at,
             "image_url": image_url,
             "video_url": video_url,
-            "is_video": bool(video_url) or is_reel,
-            "is_reel": is_reel,
-            "is_carousel": is_carousel,
+            "is_video": is_video_value,
+            "is_reel": is_reel_value,
+            "is_carousel": is_carousel_value,
             "carousel_media_count": carousel_media_count,
             "like_count": like_count,
             "comment_count": comment_count,
@@ -820,7 +1117,7 @@ def parse_instagram_post(post_node: Dict) -> Optional[Dict]:
         return None
 
 
-def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = None) -> List[Dict]:
+def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = None, save_callback: Optional[callable] = None) -> List[Dict]:
     """
     Fetch all posts for a given Instagram username.
     
@@ -828,10 +1125,15 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
         username: Instagram username (without @)
         max_age_hours: Optional. If provided, only fetch posts from the last N hours.
                       If None, fetch all available posts.
+        save_callback: Optional callback function that receives a list of post dictionaries
+                      after each API call. Called as: save_callback(posts_batch)
+                      This allows saving posts incrementally instead of waiting for all posts.
     
     Returns:
-        List of parsed post dictionaries
+        List of parsed post dictionaries (all posts fetched, even if saved via callback)
     """
+    from django.conf import settings
+    
     # Clean username: remove @, trim whitespace, convert to lowercase
     username = str(username).strip().lstrip('@').lower()
     
@@ -843,6 +1145,11 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
     user_id = None
     end_cursor = None
     has_next_page = True
+    
+    # Get test mode limit from settings (default 24 posts for testing)
+    test_mode_limit = getattr(settings, 'TEST_MODE_POSTS_LIMIT', 24)
+    if test_mode_limit and test_mode_limit > 0:
+        logger.info(f"Test mode enabled: Fetching only {test_mode_limit} recent posts for {username}")
     
     # Calculate cutoff time if max_age_hours is provided
     cutoff_time = None
@@ -885,7 +1192,16 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
                         edges = [{"node": post} if not isinstance(post, dict) or "node" not in post else post for post in edges]
                 
                 if edges:
+                    batch_posts = []  # Collect posts from this API response batch
+                    reels_count = 0  # Track reels included in this batch
+                    
                     for edge in edges:
+                        # Check test mode limit before processing each post - stop immediately if limit reached
+                        if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
+                            logger.info(f"Reached test mode limit of {test_mode_limit} posts, stopping immediately")
+                            has_next_page = False
+                            break
+                        
                         # Handle both edge format and direct node format
                         if isinstance(edge, dict):
                             node = edge.get("node", edge)  # Fallback to edge itself if no node key
@@ -897,6 +1213,17 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
                             
                         parsed_post = parse_instagram_post(node)
                         if parsed_post:
+                            # Include both posts and reels - don't skip reels
+                            if parsed_post.get("is_reel"):
+                                reels_count += 1
+                                logger.debug(f"Including reel {parsed_post.get('post_id')} in posts")
+                            
+                            # Check test mode limit again after filtering reels - stop if we've reached the limit
+                            if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
+                                logger.info(f"Reached test mode limit of {test_mode_limit} posts, stopping pagination")
+                                has_next_page = False
+                                break
+                            
                             # If max_age_hours is set, check if post is within time window
                             if cutoff_time is not None:
                                 if parsed_post.get("taken_at") and parsed_post["taken_at"] < cutoff_time:
@@ -904,7 +1231,30 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
                                     logger.info(f"Reached posts older than {max_age_hours} hours, stopping pagination")
                                     has_next_page = False
                                     break
+                            
                             all_posts.append(parsed_post)
+                            batch_posts.append(parsed_post)  # Add to batch for callback
+                    
+                    # Log batch statistics
+                    total_items = len(edges)
+                    regular_posts_count = len(batch_posts) - reels_count
+                    logger.info(f"API call returned {total_items} items: {regular_posts_count} posts, {reels_count} reels (total: {len(batch_posts)})")
+                    
+                    # Save posts from this batch immediately via callback (if provided)
+                    # This allows incremental saving after each API call
+                    if save_callback and batch_posts:
+                        try:
+                            save_callback(batch_posts)
+                            logger.info(f"Saved {len(batch_posts)} posts to database from this API call")
+                        except Exception as e:
+                            logger.error(f"Error in save_callback for batch: {e}", exc_info=True)
+                            # Continue processing even if callback fails
+                    
+                    # Check test mode limit after processing batch - stop pagination if limit reached
+                    # This ensures we stop even if the inner break didn't trigger
+                    if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
+                        logger.info(f"Reached test mode limit of {test_mode_limit} posts after processing batch, stopping pagination")
+                        has_next_page = False
                     
                     # Check for pagination - handle different pagination formats
                     page_info = result.get("page_info", {})
@@ -922,10 +1272,46 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
                     has_next_page = False
             elif isinstance(result, list):
                 # Handle direct list of posts
+                batch_posts = []  # Collect posts from this API response batch
+                reels_count = 0  # Track reels included in this batch
+                
                 for post_data in result:
+                    # Check test mode limit before processing more posts
+                    if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
+                        logger.info(f"Reached test mode limit of {test_mode_limit} posts, stopping")
+                        has_next_page = False
+                        break
+                    
                     parsed_post = parse_instagram_post(post_data)
                     if parsed_post:
+                        # Include both posts and reels - don't skip reels
+                        if parsed_post.get("is_reel"):
+                            reels_count += 1
+                            logger.debug(f"Including reel {parsed_post.get('post_id')} in posts")
+                        
+                        # Check test mode limit again after filtering reels
+                        if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
+                            logger.info(f"Reached test mode limit of {test_mode_limit} posts, stopping")
+                            has_next_page = False
+                            break
+                        
                         all_posts.append(parsed_post)
+                        batch_posts.append(parsed_post)  # Add to batch for callback
+                
+                # Log batch statistics
+                total_items = len(result)
+                regular_posts_count = len(batch_posts) - reels_count
+                logger.info(f"API call returned {total_items} items: {regular_posts_count} posts, {reels_count} reels (total: {len(batch_posts)})")
+                
+                # Save posts from this batch immediately via callback (if provided)
+                if save_callback and batch_posts:
+                    try:
+                        save_callback(batch_posts)
+                        logger.info(f"Saved {len(batch_posts)} posts to database from this API call")
+                    except Exception as e:
+                        logger.error(f"Error in save_callback for batch: {e}", exc_info=True)
+                        # Continue processing even if callback fails
+                
                 has_next_page = False
             else:
                 logger.warning(f"Unexpected result format for {username}: {type(result)}")
@@ -935,16 +1321,221 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
             has_next_page = False
         
         # Small delay between pagination requests
-        if has_next_page:
+        # Skip delay if we've reached test mode limit (already have enough posts)
+        if has_next_page and not (test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit):
             time.sleep(0.2)
     
     logger.info(f"Fetched {len(all_posts)} posts for {username}")
     return all_posts
 
 
+def _fetch_reels_from_reels_endpoint(username: str, max_age_hours: Optional[int] = None) -> Dict[str, int]:
+    """
+    Fetch reels from the reels endpoint to extract play_count data.
+    This endpoint provides play_count but not video URLs.
+    
+    Args:
+        username: Instagram username (without @)
+        max_age_hours: Optional. If provided, only fetch reels from the last N hours.
+    
+    Returns:
+        Dictionary mapping post_id -> play_count and post_code -> play_count
+        Format: {'post_id_map': {post_id: play_count}, 'post_code_map': {post_code: play_count}}
+    """
+    username = str(username).strip().lstrip('@').lower()
+    
+    if not username:
+        logger.error("Empty username provided for reels endpoint")
+        return {'post_id_map': {}, 'post_code_map': {}}
+    
+    play_count_lookup = {'post_id_map': {}, 'post_code_map': {}}
+    end_cursor = None
+    has_next_page = True
+    consecutive_429_errors = 0
+    max_429_errors = 3  # Stop after 3 consecutive 429 errors
+    
+    # Calculate cutoff time if max_age_hours is provided
+    cutoff_time = None
+    if max_age_hours is not None:
+        cutoff_time = timezone.now() - timedelta(hours=max_age_hours)
+        logger.info(f"Fetching play_count data from reels endpoint (last {max_age_hours} hours)")
+    else:
+        logger.info(f"Fetching play_count data from reels endpoint for {username}")
+    
+    while has_next_page:
+        url = "https://instagram120.p.rapidapi.com/api/instagram/reels"
+        payload = {
+            "username": username,
+            "maxId": end_cursor if end_cursor else ""
+        }
+        
+        response_data = _make_api_request(url, payload, method="POST")
+        
+        if not response_data:
+            # Check if this was a 429 error (rate limit)
+            # The _make_api_request logs 429 errors, so we can infer from consecutive failures
+            consecutive_429_errors += 1
+            if consecutive_429_errors >= max_429_errors:
+                logger.error(f"Reels endpoint returned {max_429_errors} consecutive rate limit errors for {username}. Skipping reels endpoint and using fallback extraction.")
+                break
+            else:
+                logger.warning(f"Reels endpoint request failed (attempt {consecutive_429_errors}/{max_429_errors}) for {username}, retrying with delay...")
+                # Exponential backoff: wait longer after each 429 error
+                wait_time = min(2 ** consecutive_429_errors * 5, 60)  # 5s, 10s, 20s, max 60s
+                time.sleep(wait_time)
+                continue
+        
+        # Reset consecutive error counter on success
+        consecutive_429_errors = 0
+        
+        # Add delay between requests to avoid rate limits
+        # Reels endpoint is separate from posts endpoint, so we need to be careful
+        time.sleep(0.5)
+        
+        # Extract play_count from reels endpoint response
+        if "result" in response_data:
+            result = response_data["result"]
+            if isinstance(result, dict):
+                edges = result.get("edges", [])
+                if not edges:
+                    edges = result.get("reels", [])
+                    if edges:
+                        edges = [{"node": reel} if not isinstance(reel, dict) or "node" not in reel else reel for reel in edges]
+                
+                if edges:
+                    for edge in edges:
+                        if isinstance(edge, dict):
+                            node = edge.get("node", edge)
+                        else:
+                            node = edge
+                        
+                        if not isinstance(node, dict):
+                            continue
+                        
+                        # Check if this is a reel (product_type == "clips")
+                        if node.get("product_type") != "clips":
+                            continue
+                        
+                        # Extract post_id and post_code for matching
+                        post_id = str(node.get("pk") or node.get("id", ""))
+                        post_code = node.get("code", "")
+                        
+                        # Extract play_count from reels endpoint
+                        # Check multiple locations as the structure may vary
+                        play_count = None
+                        
+                        # Priority 1: Check node directly (most common location)
+                        if "play_count" in node:
+                            play_count = node.get("play_count")
+                        elif "view_count" in node:
+                            view_count = node.get("view_count")
+                            if view_count is not None:
+                                play_count = view_count
+                        
+                        # Priority 2: Check nested media if it exists
+                        if play_count is None and "media" in node and isinstance(node["media"], dict):
+                            media = node["media"]
+                            if "play_count" in media:
+                                play_count = media.get("play_count")
+                            elif "view_count" in media:
+                                view_count = media.get("view_count")
+                                if view_count is not None:
+                                    play_count = view_count
+                        
+                        # Priority 3: Check clips_metadata (some APIs store metrics here)
+                        if play_count is None and "clips_metadata" in node and isinstance(node["clips_metadata"], dict):
+                            clips_meta = node["clips_metadata"]
+                            if "play_count" in clips_meta:
+                                play_count = clips_meta.get("play_count")
+                            elif "view_count" in clips_meta:
+                                view_count = clips_meta.get("view_count")
+                                if view_count is not None:
+                                    play_count = view_count
+                        
+                        # Priority 4: Search for any field with 'play' or 'view' in name that has a numeric value
+                        if play_count is None:
+                            for key, value in node.items():
+                                if isinstance(value, (int, float)) and value is not None:
+                                    if 'play' in key.lower() and 'count' in key.lower():
+                                        play_count = value
+                                        logger.debug(f"Found play_count in field '{key}': {value}")
+                                        break
+                                    elif 'view' in key.lower() and 'count' in key.lower() and play_count is None:
+                                        play_count = value
+                                        logger.debug(f"Found view_count in field '{key}': {value}")
+                        
+                        # Store play_count if found
+                        if play_count is not None:
+                            try:
+                                play_count_int = int(play_count)
+                                if post_id:
+                                    play_count_lookup['post_id_map'][post_id] = play_count_int
+                                if post_code:
+                                    play_count_lookup['post_code_map'][post_code] = play_count_int
+                                logger.debug(f"Extracted play_count {play_count_int} for reel {post_id} ({post_code}) from reels endpoint")
+                            except (ValueError, TypeError):
+                                logger.warning(f"Invalid play_count value {play_count} for reel {post_id}")
+                        
+                        # Check time cutoff if specified
+                        if cutoff_time is not None:
+                            taken_at_timestamp = node.get("taken_at")
+                            if taken_at_timestamp:
+                                try:
+                                    taken_at = datetime.fromtimestamp(taken_at_timestamp, tz=timezone.utc)
+                                    if taken_at < cutoff_time:
+                                        logger.info(f"Reached reels older than {max_age_hours} hours in reels endpoint, stopping")
+                                        has_next_page = False
+                                        break
+                                except (ValueError, OSError, OverflowError):
+                                    pass
+                    
+                    # Check for pagination
+                    page_info = result.get("page_info", {})
+                    if isinstance(page_info, dict):
+                        has_next_page = page_info.get("has_next_page", False)
+                        end_cursor = page_info.get("end_cursor") or page_info.get("maxId")
+                    else:
+                        has_next_page = result.get("has_more", False)
+                        end_cursor = result.get("next_max_id") or result.get("maxId")
+                        if not has_next_page:
+                            has_next_page = bool(end_cursor)
+                else:
+                    logger.warning(f"No reels found in reels endpoint response for {username}")
+                    has_next_page = False
+            elif isinstance(result, list):
+                # Handle direct list format
+                for reel_data in result:
+                    if isinstance(reel_data, dict) and reel_data.get("product_type") == "clips":
+                        post_id = str(reel_data.get("pk") or reel_data.get("id", ""))
+                        post_code = reel_data.get("code", "")
+                        play_count = reel_data.get("play_count") or reel_data.get("view_count")
+                        if play_count is not None and post_id:
+                            try:
+                                play_count_lookup['post_id_map'][post_id] = int(play_count)
+                                if post_code:
+                                    play_count_lookup['post_code_map'][post_code] = int(play_count)
+                            except (ValueError, TypeError):
+                                pass
+                has_next_page = False
+            else:
+                logger.warning(f"Unexpected result format in reels endpoint for {username}: {type(result)}")
+                has_next_page = False
+        else:
+            logger.error(f"No 'result' key in reels endpoint response for {username}")
+            has_next_page = False
+        
+        if has_next_page:
+            time.sleep(0.2)
+    
+    total_play_counts = len(play_count_lookup['post_id_map']) + len(play_count_lookup['post_code_map'])
+    logger.info(f"Fetched play_count data for {total_play_counts} reels from reels endpoint for {username}")
+    return play_count_lookup
+
+
 def fetch_instagram_reels(username: str, max_age_hours: Optional[int] = None) -> List[Dict]:
     """
-    Fetch all reels for a given Instagram username using the reels endpoint.
+    Fetch all reels for a given Instagram username using ONLY the reels endpoint.
+    Video URLs will be fetched lazily when user views the post detail page.
     
     Args:
         username: Instagram username (without @)
@@ -952,7 +1543,7 @@ def fetch_instagram_reels(username: str, max_age_hours: Optional[int] = None) ->
                       If None, fetch all available reels.
     
     Returns:
-        List of parsed reel dictionaries
+        List of parsed reel dictionaries with play_count (video_url fetched on-demand)
     """
     # Clean username: remove @, trim whitespace, convert to lowercase
     username = str(username).strip().lstrip('@').lower()
@@ -965,30 +1556,31 @@ def fetch_instagram_reels(username: str, max_age_hours: Optional[int] = None) ->
     end_cursor = None
     has_next_page = True
     
+    # Check for test mode limit from settings
+    from django.conf import settings
+    test_mode_limit = getattr(settings, 'TEST_MODE_REELS_LIMIT', None)
+    
     # Calculate cutoff time if max_age_hours is provided
     cutoff_time = None
     if max_age_hours is not None:
         cutoff_time = timezone.now() - timedelta(hours=max_age_hours)
-        logger.info(f"Fetching reels from last {max_age_hours} hours (cutoff: {cutoff_time})")
+        logger.info(f"Fetching reels from reels endpoint (last {max_age_hours} hours)")
     else:
-        logger.info(f"Fetching all available reels for {username}")
+        logger.info(f"Fetching all available reels from reels endpoint for {username}")
+    
+    # Log test mode status
+    if test_mode_limit:
+        logger.info(f"TEST MODE: Limiting reel fetch to {test_mode_limit} most recent reels")
     
     while has_next_page:
-        # Use posts endpoint for reels to get video URLs (reels endpoint doesn't return video_versions)
-        # The posts endpoint includes reels and has video_versions with actual video URLs
-        url = "https://instagram120.p.rapidapi.com/api/instagram/posts"
+        # Use ONLY the reels endpoint - posts should be fetched separately
+        url = "https://instagram120.p.rapidapi.com/api/instagram/reels"
         payload = {
             "username": username,
             "maxId": end_cursor if end_cursor else ""
         }
         
         response_data = _make_api_request(url, payload, method="POST")
-        
-        # Fallback: Try reels endpoint if posts endpoint fails (but it won't have video URLs)
-        if not response_data:
-            logger.info(f"Posts endpoint failed, trying reels endpoint for {username} (note: may not have video URLs)")
-            url = "https://instagram120.p.rapidapi.com/api/instagram/reels"
-            response_data = _make_api_request(url, payload, method="POST")
         
         # Also try the reel detail endpoint to get view counts if available
         # Note: This might require individual API calls per reel, which could be rate-limited
@@ -1020,27 +1612,32 @@ def fetch_instagram_reels(username: str, max_age_hours: Optional[int] = None) ->
                         if not isinstance(node, dict):
                             continue
                         
-                        # Parse the post/reel
-                        parsed_reel = parse_instagram_post(node)
+                        # Parse the reel - skip video URL extraction for lazy loading
+                        # Video URLs will be fetched on-demand when user views the post detail page
+                        parsed_reel = parse_instagram_post(node, skip_video_url=True)
                         
                         # Only include reels (filter by product_type or is_reel flag)
                         if parsed_reel and parsed_reel.get("is_reel"):
                             # Ensure is_reel is set to True
                             parsed_reel["is_reel"] = True
                             
-                            # Debug: Log what play_count and video_url were extracted
-                            logger.info(f"DEBUG: Parsed reel {parsed_reel.get('post_id')} has play_count: {parsed_reel.get('play_count')}, video_url: {'Yes' if parsed_reel.get('video_url') else 'No'}, post_code: {parsed_reel.get('post_code')}")
+                            # Play count should be extracted from the reels endpoint response
+                            # Skip fallback API calls in test mode for speed optimization
+                            post_id = parsed_reel.get("post_id", "")
+                            post_code = parsed_reel.get("post_code", "")
                             
-                            # If video_url is missing, try to fetch it using the post code
-                            # Only do this if we have a post_code and no video_url
-                            if not parsed_reel.get("video_url") and parsed_reel.get("post_code"):
-                                logger.info(f"Reel {parsed_reel.get('post_id')} missing video_url, fetching details using code: {parsed_reel.get('post_code')}")
-                                video_url = _fetch_reel_video_url(parsed_reel.get("post_code"))
-                                if video_url:
-                                    parsed_reel["video_url"] = video_url
-                                    logger.info(f"Successfully fetched video_url for reel {parsed_reel.get('post_id')}")
-                                else:
-                                    logger.warning(f"Could not fetch video_url for reel {parsed_reel.get('post_id')} with code {parsed_reel.get('post_code')}")
+                            # Fallback: If no play_count from reels endpoint, try post detail endpoint
+                            # SKIP in test mode to avoid slow individual API calls
+                            if not test_mode_limit and parsed_reel.get("play_count", 0) == 0 and post_code:
+                                logger.debug(f"Reel {post_id} has no play_count from reels endpoint, trying post detail endpoint")
+                                play_count = _fetch_reel_play_count(post_code)
+                                if play_count is not None and play_count > 0:
+                                    parsed_reel["play_count"] = play_count
+                                    logger.info(f"Fetched play_count {play_count} from post detail endpoint for reel {post_id}")
+                            
+                            # Video URL will be fetched lazily when user views the post detail page
+                            # This reduces initial API calls and improves performance
+                            logger.debug(f"Reel {post_id}: play_count={parsed_reel.get('play_count')}, video_url=Lazy load, post_code={post_code}")
                             
                             # If max_age_hours is set, check if reel is within time window
                             if cutoff_time is not None:
@@ -1049,26 +1646,39 @@ def fetch_instagram_reels(username: str, max_age_hours: Optional[int] = None) ->
                                     logger.info(f"Reached reels older than {max_age_hours} hours, stopping pagination")
                                     has_next_page = False
                                     break
+                            
                             all_reels.append(parsed_reel)
+                            
+                            # Check test mode limit: stop immediately after reaching limit
+                            # This prevents processing remaining reels in the current response
+                            if test_mode_limit and len(all_reels) >= test_mode_limit:
+                                logger.info(f"TEST MODE: Reached limit of {test_mode_limit} reels, stopping immediately")
+                                has_next_page = False
+                                break
                     
                     # Check for pagination - handle different pagination formats
-                    page_info = result.get("page_info", {})
-                    if isinstance(page_info, dict):
-                        has_next_page = page_info.get("has_next_page", False)
-                        end_cursor = page_info.get("end_cursor") or page_info.get("maxId")
+                    # Skip pagination check if we've reached test mode limit
+                    if test_mode_limit and len(all_reels) >= test_mode_limit:
+                        has_next_page = False
                     else:
-                        # Try alternative pagination fields
-                        has_next_page = result.get("has_more", False)
-                        end_cursor = result.get("next_max_id") or result.get("maxId")
-                        if not has_next_page:
-                            has_next_page = bool(end_cursor)
+                        page_info = result.get("page_info", {})
+                        if isinstance(page_info, dict):
+                            has_next_page = page_info.get("has_next_page", False)
+                            end_cursor = page_info.get("end_cursor") or page_info.get("maxId")
+                        else:
+                            # Try alternative pagination fields
+                            has_next_page = result.get("has_more", False)
+                            end_cursor = result.get("next_max_id") or result.get("maxId")
+                            if not has_next_page:
+                                has_next_page = bool(end_cursor)
                 else:
                     logger.warning(f"No reels found in response for {username}. Response keys: {list(result.keys())}")
                     has_next_page = False
             elif isinstance(result, list):
                 # Handle direct list of reels
                 for reel_data in result:
-                    parsed_reel = parse_instagram_post(reel_data)
+                    # Parse reel - skip video URL extraction for lazy loading
+                    parsed_reel = parse_instagram_post(reel_data, skip_video_url=True)
                     if parsed_reel:
                         parsed_reel["is_reel"] = True
                         # If max_age_hours is set, check if reel is within time window
@@ -1079,6 +1689,12 @@ def fetch_instagram_reels(username: str, max_age_hours: Optional[int] = None) ->
                                 has_next_page = False
                                 break
                         all_reels.append(parsed_reel)
+                        
+                        # Check test mode limit: stop fetching if we've reached the limit
+                        if test_mode_limit and len(all_reels) >= test_mode_limit:
+                            logger.info(f"TEST MODE: Reached limit of {test_mode_limit} reels, stopping fetch")
+                            has_next_page = False
+                            break
                 has_next_page = False
             else:
                 logger.warning(f"Unexpected result format for reels {username}: {type(result)}")
@@ -1088,10 +1704,20 @@ def fetch_instagram_reels(username: str, max_age_hours: Optional[int] = None) ->
             has_next_page = False
         
         # Small delay between pagination requests
-        if has_next_page:
+        # Skip delay if we've reached test mode limit (already have enough reels)
+        if has_next_page and not (test_mode_limit and len(all_reels) >= test_mode_limit):
             time.sleep(0.2)
     
-    logger.info(f"Fetched {len(all_reels)} reels for {username}")
+    # Apply test mode limit to final results if needed (safety check)
+    if test_mode_limit and len(all_reels) > test_mode_limit:
+        logger.info(f"TEST MODE: Truncating results from {len(all_reels)} to {test_mode_limit} reels")
+        all_reels = all_reels[:test_mode_limit]
+    
+    # Log summary of results
+    merged_count = sum(1 for reel in all_reels if reel.get("play_count", 0) > 0)
+    video_count = sum(1 for reel in all_reels if reel.get("video_url"))
+    logger.info(f"Fetched {len(all_reels)} reels for {username}: {merged_count} with play_count, {video_count} with video_url")
+    
     return all_reels
 
 

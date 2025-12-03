@@ -3,26 +3,14 @@
 {% block title %}Dashboard - REDSTRAP{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-    <h1 class="mb-0"><i class="bi bi-house-fill"></i> Dashboard</h1>
-    <div class="d-flex gap-2 flex-wrap align-items-center">
-        <input type="text" id="searchDashboard" class="form-control form-control-sm" placeholder="Search usernames..." style="max-width: 250px;">
-    </div>
-</div>
-
-<!-- Fetch Buttons Section - Separated from search bar -->
-<div class="mb-4">
-    <div class="d-flex gap-2 flex-wrap">
+<div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
+    <h1 class="mb-0" style="font-size: 2rem; font-weight: 600;"><i class="bi bi-house-fill"></i> Dashboard</h1>
+    <div class="d-flex gap-3 flex-wrap align-items-center">
+        <input type="text" id="searchDashboard" class="form-control form-control-sm" placeholder="Search usernames..." style="max-width: 280px; padding: 0.5rem 1rem;">
         <form method="post" action="{% url 'scrape_instagram' %}" class="d-inline">
             {% csrf_token %}
-            <button type="submit" class="btn btn-success">
+            <button type="submit" class="btn btn-success" style="padding: 0.5rem 1.25rem;">
                 <i class="bi bi-download"></i> Fetch Posts
-            </button>
-        </form>
-        <form method="post" action="{% url 'scrape_reels' %}" class="d-inline">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-info">
-                <i class="bi bi-play-circle"></i> Fetch Reels
             </button>
         </form>
     </div>
@@ -30,39 +18,45 @@
 
 {% if username_posts_list %}
     {% for username_data in username_posts_list %}
-        <div class="glass-card mb-4" data-username-section="{{ username_data.username|lower }}">
-            <div class="card-header" style="background: rgba(30, 41, 59, 0.2); backdrop-filter: blur(10px); border-bottom: 1px solid var(--glass-border);">
-                <div class="d-flex justify-content-between align-items-center">
+        <div class="glass-card mb-5" data-username-section="{{ username_data.username|lower }}" style="border-radius: 12px; overflow: hidden;">
+            <div class="card-header" style="background: rgba(30, 41, 59, 0.3); backdrop-filter: blur(10px); border-bottom: 1px solid var(--glass-border); padding: 1.25rem 1.5rem;">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
                     <div>
-                        <h4 class="mb-0" style="color: var(--accent-primary);">
+                        <h4 class="mb-1" style="color: var(--accent-primary); font-weight: 600; font-size: 1.25rem;">
                             <i class="bi bi-instagram"></i> @{{ username_data.username }}
                         </h4>
-                        <small class="text-muted">{{ username_data.count }} post{{ username_data.count|pluralize }}</small>
+                        <small class="text-muted" style="font-size: 0.875rem;">{{ username_data.count }} post{{ username_data.count|pluralize }}</small>
                     </div>
-                    <a href="{% url 'account_analytics' username_data.account_id %}" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-graph-up"></i> Analytics
+                    <a href="{% url 'account_analytics' username_data.account_id %}" class="btn btn-sm btn-outline-primary" style="white-space: nowrap; min-width: 110px; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-weight: 500;">
+                        <i class="bi bi-graph-up"></i> <span>Analytics</span>
                     </a>
                 </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" style="padding: 1.5rem;">
                 <div class="post-grid">
                     {% for post in username_data.posts %}
-                            <div class="glass-card post-card post-card-item" style="border: 1px solid var(--glass-border); padding: 0; overflow: hidden;" data-caption="{{ post.caption|lower|default:'' }}" data-username="{{ username_data.username|lower }}">
+                            <div class="glass-card post-card post-card-item" style="border: 1px solid var(--glass-border); padding: 0; overflow: hidden; border-radius: 12px; background: rgba(30, 41, 59, 0.4);" data-caption="{{ post.caption|lower|default:'' }}" data-username="{{ username_data.username|lower }}">
                                 <a href="{% url 'instagram_post_detail' post.id %}" class="text-decoration-none">
                                     <div style="position: relative; overflow: hidden;">
-                                        {% if post.image_url %}
-                                            <img src="{{ post.image_url }}" class="card-img-top post-image" alt="Post image" style="height: 280px; object-fit: cover; transition: transform 0.3s ease;">
-                                        {% elif post.video_url %}
-                                            <video class="post-video-thumbnail" data-video-url="{{ post.video_url }}" style="width: 100%; height: 280px; object-fit: cover; background: rgba(30, 41, 59, 0.3);" muted loop playsinline preload="metadata">
+                                        {# For reels and videos, always prefer showing the video instead of the image thumbnail #}
+                                        {% if post.is_reel and post.video_url %}
+                                            <video class="post-video-thumbnail" data-video-url="{{ post.video_url }}" style="width: 100%; height: 380px; object-fit: cover; background: rgba(30, 41, 59, 0.3);" muted loop playsinline preload="metadata">
                                                 <source src="{{ post.video_url }}" type="video/mp4">
                                             </video>
-                                            <div class="position-absolute top-0 end-0 m-2" style="z-index: 3;">
-                                                <span class="badge" style="background: rgba(248, 113, 113, 0.8); border: 1px solid rgba(248, 113, 113, 0.5);">
-                                                    <i class="bi bi-play-fill"></i> Video
-                                                </span>
-                                            </div>
+                                        {% elif post.is_video and post.video_url %}
+                                            <video class="post-video-thumbnail" data-video-url="{{ post.video_url }}" style="width: 100%; height: 380px; object-fit: cover; background: rgba(30, 41, 59, 0.3);" muted loop playsinline preload="metadata">
+                                                <source src="{{ post.video_url }}" type="video/mp4">
+                                            </video>
+                                        {% elif post.image_url %}
+                                            {# Regular image post, or reel/video without a video_url fallback to image #}
+                                            <img src="{{ post.image_url }}" class="card-img-top post-image" alt="Post image" style="height: 380px; object-fit: cover; transition: transform 0.3s ease;">
+                                        {% elif post.video_url %}
+                                            {# Non-reel/non-video flagged post that still has a video_url - show video #}
+                                            <video class="post-video-thumbnail" data-video-url="{{ post.video_url }}" style="width: 100%; height: 380px; object-fit: cover; background: rgba(30, 41, 59, 0.3);" muted loop playsinline preload="metadata">
+                                                <source src="{{ post.video_url }}" type="video/mp4">
+                                            </video>
                                         {% else %}
-                                            <div style="height: 280px; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center;">
+                                            <div style="height: 380px; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center;">
                                                 <i class="bi bi-image" style="font-size: 3rem; color: var(--text-muted);"></i>
                                             </div>
                                         {% endif %}
@@ -98,30 +92,30 @@
                                     </div>
                                 </a>
                                 
-                            <div class="card-body post-item" style="background: rgba(30, 41, 59, 0.1);" data-caption="{{ post.caption|lower|default:'' }}" data-username="{{ username_data.username|lower }}">
+                            <div class="card-body post-item" style="background: rgba(30, 41, 59, 0.15); padding: 1.25rem 1.5rem;" data-caption="{{ post.caption|lower|default:'' }}" data-username="{{ username_data.username|lower }}">
                                 {% if post.caption %}
-                                    <p class="card-text small mb-2" style="color: var(--text-secondary); min-height: 40px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                    <p class="card-text mb-3" style="color: var(--text-secondary); min-height: 52px; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.9rem; line-height: 1.6;">
                                         {{ post.caption }}
                                     </p>
                                 {% else %}
-                                    <p class="card-text small mb-2 text-muted" style="min-height: 40px;">No caption</p>
+                                    <p class="card-text mb-3 text-muted" style="min-height: 52px; font-size: 0.9rem;">No caption</p>
                                 {% endif %}
                                     
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <div class="d-flex gap-2 flex-wrap">
-                                            <span class="engagement-compact likes">
-                                                <i class="bi bi-heart-fill"></i> {{ post.like_count|floatformat:0 }}
+                                        <div class="d-flex gap-3 flex-wrap">
+                                            <span class="engagement-compact likes" style="font-size: 0.9rem; font-weight: 500;">
+                                                <i class="bi bi-heart-fill" style="color: #ef4444;"></i> {{ post.like_count|floatformat:0 }}
                                             </span>
-                                            <span class="engagement-compact comments">
-                                                <i class="bi bi-chat-fill"></i> {{ post.comment_count|floatformat:0 }}
+                                            <span class="engagement-compact comments" style="font-size: 0.9rem; font-weight: 500;">
+                                                <i class="bi bi-chat-fill" style="color: #3b82f6;"></i> {{ post.comment_count|floatformat:0 }}
                                             </span>
                                             {% if post.is_reel or post.is_video %}
-                                                <span class="engagement-compact plays">
-                                                    <i class="bi bi-play-fill"></i> {{ post.play_count|floatformat:0 }}
+                                                <span class="engagement-compact plays" style="font-size: 0.9rem; font-weight: 500;">
+                                                    <i class="bi bi-play-fill" style="color: #10b981;"></i> {{ post.play_count|floatformat:0 }}
                                                 </span>
                                             {% endif %}
                                         </div>
-                                        <small class="text-muted">{{ post.taken_at|date:"M d" }}</small>
+                                        <small class="text-muted" style="font-size: 0.85rem; font-weight: 500;">{{ post.taken_at|date:"M d" }}</small>
                                     </div>
                                 </div>
                             </div>
@@ -131,12 +125,12 @@
         </div>
     {% endfor %}
 {% else %}
-    <div class="glass-card">
-        <div class="card-body text-center py-5">
-            <i class="bi bi-info-circle" style="font-size: 4rem; color: var(--text-muted);"></i>
-            <h4 class="mt-3 mb-2" style="color: var(--text-primary);">No posts found</h4>
-            <p class="text-muted mb-4">Add an Instagram account and fetch posts to get started.</p>
-            <a href="{% url 'add_instagram' %}" class="btn btn-primary">
+    <div class="glass-card" style="border-radius: 12px;">
+        <div class="card-body text-center py-5 px-4">
+            <i class="bi bi-info-circle" style="font-size: 4.5rem; color: var(--text-muted); opacity: 0.6;"></i>
+            <h4 class="mt-4 mb-3" style="color: var(--text-primary); font-weight: 600;">No posts found</h4>
+            <p class="text-muted mb-5" style="font-size: 1rem; max-width: 500px; margin-left: auto; margin-right: auto;">Add an Instagram account and fetch posts to get started.</p>
+            <a href="{% url 'add_instagram' %}" class="btn btn-primary" style="padding: 0.75rem 1.5rem; font-weight: 500;">
                 <i class="bi bi-plus-circle"></i> Add Instagram Account
             </a>
         </div>
@@ -176,8 +170,64 @@
     
     .post-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 1.5rem;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 2rem;
+    }
+    
+    @media (min-width: 1200px) {
+        .post-grid {
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 2.25rem;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .post-grid {
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+    }
+    
+    .post-card {
+        min-height: 520px;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .post-card .card-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .post-card .post-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    
+    .post-card {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .post-card:hover {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+    
+    .engagement-compact {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.25rem 0.5rem;
+        background: rgba(30, 41, 59, 0.3);
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+    
+    .engagement-compact:hover {
+        background: rgba(30, 41, 59, 0.5);
+        transform: translateY(-1px);
     }
 </style>
 

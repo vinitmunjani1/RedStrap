@@ -60,3 +60,6 @@ Thumbs.db
 !package.json
 !package-lock.json
 
+# Debug response files (generated when DEBUG_SAVE_RESPONSES is enabled)
+debug_responses/
+
