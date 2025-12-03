@@ -1,0 +1,122 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Instagram Keywords - REDSTRAP{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <h1 class="mb-0"><i class="bi bi-tags-fill"></i> Extracted Instagram Keywords</h1>
+    <div class="d-flex gap-2">
+        <form method="post" action="{% url 'extract_instagram_keywords' %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-tags"></i> Extract Keywords
+            </button>
+        </form>
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+
+{% if posts_data %}
+    <div class="mb-4">
+        <p class="text-muted" style="font-size: 0.9rem;">
+            <i class="bi bi-info-circle"></i> Keywords are grouped by post to show how they work together to represent the full context of each caption.
+        </p>
+    </div>
+    
+    <div class="list-group">
+        {% for post_data in posts_data %}
+            <div class="glass-card mb-4" style="border: 1px solid var(--glass-border); border-radius: 12px; overflow: hidden;">
+                <div class="card-header" style="background: rgba(30, 41, 59, 0.3); backdrop-filter: blur(10px); border-bottom: 1px solid var(--glass-border); padding: 1rem 1.5rem;">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                        <div class="flex-grow-1">
+                            <h5 class="mb-1" style="color: var(--accent-primary); font-weight: 600;">
+                                <i class="bi bi-instagram"></i> @{{ post_data.post.account.username }}
+                            </h5>
+                            <small class="text-muted" style="font-size: 0.85rem;">
+                                <i class="bi bi-calendar3"></i> {{ post_data.post.taken_at|date:"M d, Y" }}
+                            </small>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center">
+                            <span class="badge" style="background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: rgba(239, 68, 68, 0.9);">
+                                <i class="bi bi-heart-fill"></i> {{ post_data.post.like_count|floatformat:0 }}
+                            </span>
+                            <span class="badge" style="background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: rgba(59, 130, 246, 0.9);">
+                                <i class="bi bi-chat-fill"></i> {{ post_data.post.comment_count|floatformat:0 }}
+                            </span>
+                            <a href="{% url 'instagram_post_detail' post_data.post.id %}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> View Post
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body" style="padding: 1.25rem 1.5rem;">
+                    <!-- Caption Preview -->
+                    <div class="mb-3" style="
+                        background: rgba(30, 41, 59, 0.2);
+                        border-left: 3px solid var(--accent-primary);
+                        padding: 0.75rem 1rem;
+                        border-radius: 6px;
+                    ">
+                        <p class="mb-0" style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6;">
+                            {{ post_data.post.caption|truncatewords:30|default:"No caption available." }}
+                        </p>
+                    </div>
+                    
+                    <!-- Context Keywords Section -->
+                    <div style="
+                        background: rgba(129, 140, 248, 0.05);
+                        border: 1px solid rgba(129, 140, 248, 0.15);
+                        border-radius: 10px;
+                        padding: 1rem;
+                    ">
+                        <div class="d-flex align-items-center gap-2 mb-3" style="font-size: 0.85rem; color: var(--text-muted);">
+                            <i class="bi bi-lightbulb-fill" style="color: var(--accent-primary); font-size: 0.9rem;"></i>
+                            <span style="font-weight: 600; color: var(--text-primary);">Context Keywords</span>
+                            <span style="opacity: 0.7;">({{ post_data.keywords|length }} keywords representing full context)</span>
+                        </div>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            {% for keyword in post_data.keywords %}
+                                <span class="keyword-badge" style="
+                                    background: linear-gradient(135deg, rgba(129, 140, 248, 0.15) 0%, rgba(167, 139, 250, 0.1) 100%);
+                                    color: var(--accent-primary);
+                                    border: 1px solid rgba(129, 140, 248, 0.3);
+                                    font-size: 0.85rem;
+                                    padding: 0.4rem 0.8rem;
+                                    border-radius: 12px;
+                                    font-weight: 500;
+                                    transition: all 0.2s ease;
+                                    display: inline-flex;
+                                    align-items: center;
+                                    gap: 0.35rem;
+                                " title="Similarity: {{ keyword.similarity|floatformat:2 }}">
+                                    {{ keyword.keyword }}
+                                    <span style="
+                                        color: var(--text-muted);
+                                        font-size: 0.7rem;
+                                        opacity: 0.8;
+                                        font-weight: 400;
+                                    ">
+                                        {{ keyword.similarity|floatformat:2 }}
+                                    </span>
+                                </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="glass-card text-center py-5">
+        <i class="bi bi-tags" style="font-size: 4rem; color: var(--text-muted);"></i>
+        <h4 class="mt-3 mb-2" style="color: var(--text-primary);">No keywords extracted yet</h4>
+        <p class="text-muted mb-4">Go to the dashboard and click "Extract Keywords" to analyze your Instagram posts.</p>
+        <a href="{% url 'dashboard' %}" class="btn btn-primary">
+            <i class="bi bi-arrow-left"></i> Go to Dashboard
+        </a>
+    </div>
+{% endif %}
+{% endblock %}
+

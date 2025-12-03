@@ -44,10 +44,14 @@ class InstagramPost(models.Model):
     comment_count = models.IntegerField(default=0, help_text="Number of comments on the post")
     play_count = models.IntegerField(default=0, help_text="Number of plays/views on the post (for reels/videos)")
     created_at = models.DateTimeField(auto_now_add=True, help_text="When this post was added to our database")
+    keywords_extracted = models.BooleanField(default=False, help_text="Whether keywords have been extracted from this post")
     
     class Meta:
         ordering = ['-taken_at']
         unique_together = [['account', 'post_id']]
+        indexes = [
+            models.Index(fields=['keywords_extracted', '-taken_at']),
+        ]
     
     def __str__(self):
         return f"Post {self.post_id} by {self.account.username}"
@@ -80,6 +84,26 @@ class InstagramCarouselItem(models.Model):
     
     def __str__(self):
         return f"Carousel item {self.item_index} of post {self.post.post_id}"
+
+
+class InstagramKeyword(models.Model):
+    """
+    Represents a keyword extracted from an Instagram post caption.
+    Keywords are extracted using semantic similarity analysis.
+    """
+    post = models.ForeignKey(InstagramPost, on_delete=models.CASCADE, related_name='keywords')
+    keyword = models.CharField(max_length=255, help_text="Extracted keyword/phrase")
+    similarity = models.FloatField(help_text="Similarity score (0.0 to 1.0) indicating how well the keyword represents the post")
+    extracted_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-similarity', 'keyword']
+        indexes = [
+            models.Index(fields=['-similarity']),
+        ]
+    
+    def __str__(self):
+        return f"{self.keyword} (similarity: {self.similarity:.2f})"
 
 
 class Subreddit(models.Model):

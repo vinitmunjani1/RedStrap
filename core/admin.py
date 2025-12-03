@@ -3,7 +3,7 @@ Django admin configuration for core models.
 """
 from django.contrib import admin
 from .models import (
-    InstagramAccount, InstagramPost, InstagramCarouselItem,
+    InstagramAccount, InstagramPost, InstagramCarouselItem, InstagramKeyword,
     Subreddit, RedditPost, RedditKeyword
 )
 
@@ -18,11 +18,19 @@ class InstagramAccountAdmin(admin.ModelAdmin):
 
 @admin.register(InstagramPost)
 class InstagramPostAdmin(admin.ModelAdmin):
-    list_display = ['post_id', 'account', 'taken_at', 'is_reel', 'is_video', 'like_count', 'play_count']
-    list_filter = ['is_reel', 'is_video', 'is_carousel', 'taken_at', 'created_at']
+    list_display = ['post_id', 'account', 'taken_at', 'is_reel', 'is_video', 'like_count', 'play_count', 'keywords_extracted']
+    list_filter = ['is_reel', 'is_video', 'is_carousel', 'keywords_extracted', 'taken_at', 'created_at']
     search_fields = ['post_id', 'caption', 'account__username']
     readonly_fields = ['created_at']
     date_hierarchy = 'taken_at'
+
+
+@admin.register(InstagramKeyword)
+class InstagramKeywordAdmin(admin.ModelAdmin):
+    list_display = ['keyword', 'post', 'similarity', 'extracted_at']
+    list_filter = ['extracted_at', 'similarity']
+    search_fields = ['keyword', 'post__caption', 'post__post_id']
+    readonly_fields = ['extracted_at']
 
 
 @admin.register(InstagramCarouselItem)
