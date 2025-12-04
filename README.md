@@ -89,9 +89,57 @@ The system automatically cleans up old files, keeping only the most recent N fil
 4. **Fetch Reels**: Click "Fetch Reels" to scrape all reels for all accounts
 5. **View Analytics**: View engagement metrics and top performing posts
 
+## Automatic Post Fetching
+
+The application supports automatic scheduled fetching of Instagram posts for all usernames.
+
+### Enable Automatic Fetching
+
+Set the following environment variable in your `.env` file:
+
+```bash
+ENABLE_AUTO_FETCH=true
+AUTO_FETCH_INTERVAL_HOURS=8  # Optional: default is 8 hours
+```
+
+Or configure in `redstrap_project/settings.py`:
+
+```python
+ENABLE_AUTO_FETCH = True
+AUTO_FETCH_INTERVAL_HOURS = 8  # Fetch every 8 hours
+```
+
+### How It Works
+
+- **Automatic Start**: When enabled, the scheduler automatically starts when Django starts (via `runserver` or production WSGI)
+- **Interval**: Fetches posts for all usernames every 8 hours (configurable)
+- **Features**: The automatic fetch includes:
+  - Concurrent processing of all accounts
+  - Automatic keyword extraction from new posts
+  - Discord notifications for posts from last 24 hours
+  - Conditional fetching (2 pages if posts exist, all posts if new account)
+
+### Manual Scheduler Control
+
+For production deployments, you can run the scheduler as a separate process:
+
+```bash
+python manage.py start_scheduler --interval 8
+```
+
+This runs the scheduler in the foreground. Use a process manager like `supervisord` or `systemd` to keep it running.
+
+### Disable Automatic Fetching
+
+To disable automatic fetching, either:
+- Remove `ENABLE_AUTO_FETCH=true` from your `.env` file
+- Set `ENABLE_AUTO_FETCH = False` in `settings.py`
+- Don't set the environment variable (defaults to `False`)
+
 ## Management Commands
 
-- `python manage.py scrape_instagram`: Scrape posts via command line
+- `python manage.py scrape_instagram`: Scrape posts via command line (enhanced with keywords and Discord notifications)
+- `python manage.py start_scheduler`: Start scheduler manually in foreground
 - `python manage.py fix_reel_timestamps`: Fix timestamps for existing reels
 - `python manage.py delete_all_reels`: Delete all reels from database
 

@@ -3,19 +3,26 @@
 {% block title %}Dashboard - REDSTRAP{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
+<!-- Header Section -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
     <h1 class="mb-0" style="font-size: 2rem; font-weight: 600;"><i class="bi bi-house-fill"></i> Dashboard</h1>
     <div class="d-flex gap-3 flex-wrap align-items-center">
         <input type="text" id="searchDashboard" class="form-control form-control-sm" placeholder="Search usernames..." style="max-width: 280px; padding: 0.5rem 1rem;">
+    </div>
+</div>
+
+<!-- Action Buttons Section -->
+<div class="mb-5">
+    <div class="d-flex gap-3 flex-wrap align-items-center">
         <form method="post" action="{% url 'scrape_instagram' %}" id="fetchPostsForm" class="d-inline">
             {% csrf_token %}
-            <button type="submit" class="btn btn-success" style="padding: 0.5rem 1.25rem;">
+            <button type="submit" class="btn btn-success" style="padding: 0.75rem 1.5rem; font-weight: 500;">
                 <i class="bi bi-download"></i> Fetch Posts
             </button>
         </form>
         <form method="post" action="{% url 'extract_instagram_keywords' %}" class="d-inline">
             {% csrf_token %}
-            <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1.25rem;">
+            <button type="submit" class="btn btn-primary" style="padding: 0.75rem 1.5rem; font-weight: 500;">
                 <i class="bi bi-tags"></i> Extract Keywords
             </button>
         </form>
@@ -158,11 +165,11 @@
                                             <span class="engagement-compact comments" style="font-size: 0.9rem; font-weight: 500;">
                                                 <i class="bi bi-chat-fill" style="color: #3b82f6;"></i> {{ post.comment_count|floatformat:0 }}
                                             </span>
-                                            {% if post.is_reel or post.is_video %}
+                                            <!-- {% if post.is_reel or post.is_video %}
                                                 <span class="engagement-compact plays" style="font-size: 0.9rem; font-weight: 500;">
                                                     <i class="bi bi-play-fill" style="color: #10b981;"></i> {{ post.play_count|floatformat:0 }}
                                                 </span>
-                                            {% endif %}
+                                            {% endif %} -->
                                         </div>
                                         <small class="text-muted" style="font-size: 0.85rem; font-weight: 500;">{{ post.taken_at|date:"M d" }}</small>
                                     </div>

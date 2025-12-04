@@ -187,6 +187,15 @@ TEST_MODE_PAGES_LIMIT = int(os.environ.get('TEST_MODE_PAGES_LIMIT', '50'))
 # If not set or empty, Discord notifications will be disabled
 DISCORD_WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL', 'https://discord.com/api/webhooks/1446030878026367019/4nxWz_3z2gAdUmJHLbejTZ-Z5rRbl6VOyRAG4cfThLOb3OhHQFR4opDPhMYFfosVVCsw').strip()
 
+# Automatic post fetching scheduler
+# Enable automatic scheduled fetching of Instagram posts
+# Set ENABLE_AUTO_FETCH=true in environment to enable
+ENABLE_AUTO_FETCH = os.environ.get('ENABLE_AUTO_FETCH', 'False').lower() == 'true'
+
+# Interval in hours for automatic post fetching (default: 8 hours)
+# Set AUTO_FETCH_INTERVAL_HOURS in environment to customize
+AUTO_FETCH_INTERVAL_HOURS = int(os.environ.get('AUTO_FETCH_INTERVAL_HOURS', '8'))
+
 # Logging Configuration
 LOGGING = {
     'version': 1,

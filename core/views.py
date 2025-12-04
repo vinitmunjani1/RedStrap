@@ -1144,6 +1144,435 @@ def scrape_instagram_view(request):
 
 
 @login_required
+def fetch_single_account_posts_view(request, account_id):
+    """
+    Fetch posts for a single Instagram account.
+    Supports both AJAX (with progress tracking) and regular POST requests.
+    """
+    if request.method != 'POST':
+        return redirect('instagram_accounts')
+    
+    account = get_object_or_404(InstagramAccount, id=account_id, user=request.user)
+    
+    # Check if this is an AJAX request
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    
+    if is_ajax:
+        # Generate unique task ID
+        task_id = str(uuid.uuid4())
+        
+        # Start background thread for single account
+        def fetch_single_account_with_progress(user, account, task_id):
+            try:
+                # Initialize progress
+                _update_progress(
+                    task_id,
+                    phase='fetching_posts',
+                    current_account=account.username,
+                    accounts_total=1,
+                    accounts_processed=0,
+                    posts_fetched=0,
+                    posts_total=0,
+                    start_time=time.time(),
+                    message=f'Fetching posts for @{account.username}...'
+                )
+                
+                username = account.username.strip().lstrip('@').lower()
+                has_posts = account.posts.exists()
+                account_new_posts = []
+                account_saved_count = 0
+                
+                def save_posts_batch(posts_batch):
+                    nonlocal account_saved_count, account_new_posts
+                    batch_new_posts = 0
+                    
+                    for post_data in posts_batch:
+                        post, created = InstagramPost.objects.update_or_create(
+                            account=account,
+                            post_id=post_data['post_id'],
+                            defaults={
+                                'post_code': post_data.get('post_code', ''),
+                                'caption': post_data.get('caption', ''),
+                                'taken_at': post_data.get('taken_at'),
+                                'image_url': post_data.get('image_url', ''),
+                                'video_url': post_data.get('video_url', ''),
+                                'is_video': post_data.get('is_video', False),
+                                'is_reel': post_data.get('is_reel', False),
+                                'is_carousel': post_data.get('is_carousel', False),
+                                'carousel_media_count': post_data.get('carousel_media_count', 0),
+                                'like_count': post_data.get('like_count', 0),
+                                'comment_count': post_data.get('comment_count', 0),
+                                'play_count': post_data.get('play_count', 0),
+                            }
+                        )
+                        
+                        if created:
+                            account_saved_count += 1
+                            batch_new_posts += 1
+                            if post.caption and post.caption.strip():
+                                account_new_posts.append(post)
+                    
+                    # Update progress
+                    if batch_new_posts > 0:
+                        current_progress = cache.get(f'fetch_progress_{task_id}', {})
+                        current_fetched = current_progress.get('posts_fetched', 0)
+                        new_fetched = current_fetched + batch_new_posts
+                        current_total = current_progress.get('posts_total', 0)
+                        new_total = max(new_fetched, current_total)
+                        _update_progress(
+                            task_id,
+                            posts_fetched=new_fetched,
+                            posts_total=new_total
+                        )
+                
+                # Fetch posts
+                if has_posts:
+                    posts_data = instagram_service.get_all_posts_for_username(
+                        username, max_pages=2, save_callback=save_posts_batch
+                    )
+                else:
+                    posts_data = instagram_service.get_all_posts_for_username(
+                        username, save_callback=save_posts_batch
+                    )
+                
+                account.last_scraped_at = timezone.now()
+                account.save()
+                
+                # Send Discord notification for posts from last 24 hours
+                if account_new_posts:
+                    recent_posts = filter_recent_posts(account_new_posts, hours=24)
+                    if recent_posts:
+                        from django.conf import settings
+                        from core.services.discord_service import send_discord_webhook
+                        
+                        webhook_url = getattr(settings, 'DISCORD_WEBHOOK_URL', '')
+                        if webhook_url:
+                            try:
+                                send_discord_webhook(webhook_url, username, recent_posts)
+                            except Exception as e:
+                                logger.error(f"Error sending Discord notification for @{username}: {e}", exc_info=True)
+                
+                # Extract keywords for new posts
+                total_keywords_extracted = 0
+                if account_new_posts:
+                    # Update progress to show keyword extraction phase
+                    estimated_keywords_total = len(account_new_posts) * 4
+                    _update_progress(
+                        task_id,
+                        phase='extracting_keywords',
+                        keyword_start_time=time.time(),
+                        keywords_total=estimated_keywords_total,
+                        keywords_extracted=0,
+                        message=f'Extracting keywords from {len(account_new_posts)} posts...'
+                    )
+                    
+                    max_workers = min(len(account_new_posts), (os.cpu_count() or 4) * 2, 20)
+                    results = []
+                    keyword_errors = 0
+                    keywords_extracted_count = 0
+                    
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        future_to_post = {
+                            executor.submit(_extract_keywords_for_post, post): post
+                            for post in account_new_posts
+                        }
+                        
+                        for future in as_completed(future_to_post):
+                            post = future_to_post[future]
+                            try:
+                                post_id, keywords, error = future.result()
+                                results.append({
+                                    'post_id': post_id,
+                                    'keywords': keywords,
+                                    'error': error
+                                })
+                                if error:
+                                    keyword_errors += 1
+                                else:
+                                    keywords_extracted_count += len(keywords)
+                                    total_keywords_extracted += len(keywords)
+                                    # Update progress
+                                    current_progress = cache.get(f'fetch_progress_{task_id}', {})
+                                    current_total = current_progress.get('keywords_total', 0)
+                                    new_total = max(keywords_extracted_count, current_total)
+                                    _update_progress(
+                                        task_id,
+                                        keywords_extracted=keywords_extracted_count,
+                                        keywords_total=new_total
+                                    )
+                            except Exception as e:
+                                logger.error(f"Exception extracting keywords for post {post.id}: {e}", exc_info=True)
+                                keyword_errors += 1
+                                results.append({
+                                    'post_id': post.id,
+                                    'keywords': [],
+                                    'error': str(e)
+                                })
+                    
+                    # Batch database operations for keyword saving
+                    post_map = {post.id: post for post in account_new_posts}
+                    keywords_to_create = []
+                    posts_to_update = []
+                    post_ids_to_delete_keywords = []
+                    
+                    with transaction.atomic():
+                        for result in results:
+                            post_id = result['post_id']
+                            keywords = result['keywords']
+                            error = result['error']
+                            
+                            if error:
+                                continue
+                            
+                            post = post_map.get(post_id)
+                            if not post:
+                                continue
+                            
+                            post_ids_to_delete_keywords.append(post_id)
+                            
+                            for kw_data in keywords:
+                                keywords_to_create.append(
+                                    InstagramKeyword(
+                                        post=post,
+                                        keyword=kw_data['keyword'],
+                                        similarity=kw_data['similarity']
+                                    )
+                                )
+                            
+                            post.keywords_extracted = True
+                            posts_to_update.append(post)
+                        
+                        if post_ids_to_delete_keywords:
+                            InstagramKeyword.objects.filter(post_id__in=post_ids_to_delete_keywords).delete()
+                        
+                        if keywords_to_create:
+                            InstagramKeyword.objects.bulk_create(keywords_to_create, batch_size=100)
+                        
+                        if posts_to_update:
+                            InstagramPost.objects.bulk_update(posts_to_update, ['keywords_extracted'], batch_size=100)
+                
+                # Mark as completed
+                _update_progress(
+                    task_id,
+                    phase='completed',
+                    accounts_processed=1,
+                    posts_fetched=account_saved_count,
+                    posts_total=account_saved_count,
+                    keywords_extracted=total_keywords_extracted,
+                    keywords_total=total_keywords_extracted,
+                    message=f'Successfully fetched {account_saved_count} posts and extracted {total_keywords_extracted} keywords for @{account.username}!'
+                )
+                
+            except Exception as e:
+                logger.error(f"Error fetching posts for @{account.username}: {e}", exc_info=True)
+                _update_progress(
+                    task_id,
+                    phase='error',
+                    error=str(e),
+                    message=f'Error fetching posts for @{account.username}: {str(e)}'
+                )
+        
+        thread = threading.Thread(
+            target=fetch_single_account_with_progress,
+            args=(request.user, account, task_id),
+            daemon=True
+        )
+        thread.start()
+        
+        # Return task_id immediately
+        return JsonResponse({'task_id': task_id})
+    
+    # Regular POST request - process synchronously
+    try:
+        username = account.username.strip().lstrip('@').lower()
+        if not username:
+            messages.warning(request, f'Invalid username for account: {account.username}')
+            return redirect('instagram_accounts')
+        
+        has_posts = account.posts.exists()
+        saved_count = 0
+        skipped_reels = 0
+        all_new_posts = []
+        new_posts_for_keywords = []
+        
+        def save_posts_batch(posts_batch):
+            nonlocal saved_count, skipped_reels, new_posts_for_keywords, all_new_posts
+            
+            for post_data in posts_batch:
+                def safe_bool(value, default=False):
+                    if value is None:
+                        return default
+                    if isinstance(value, bool):
+                        return value
+                    if isinstance(value, dict) and not value:
+                        return default
+                    if isinstance(value, (list, dict, str)) and not value:
+                        return default
+                    return bool(value)
+                
+                is_reel = safe_bool(post_data.get('is_reel'), False)
+                
+                post, created = InstagramPost.objects.update_or_create(
+                    account=account,
+                    post_id=post_data['post_id'],
+                    defaults={
+                        'post_code': post_data.get('post_code', ''),
+                        'caption': post_data.get('caption', ''),
+                        'taken_at': post_data.get('taken_at'),
+                        'image_url': post_data.get('image_url', ''),
+                        'video_url': post_data.get('video_url', ''),
+                        'is_video': safe_bool(post_data.get('is_video'), False),
+                        'is_reel': is_reel,
+                        'is_carousel': safe_bool(post_data.get('is_carousel'), False),
+                        'carousel_media_count': post_data.get('carousel_media_count', 0),
+                        'like_count': post_data.get('like_count', 0),
+                        'comment_count': post_data.get('comment_count', 0),
+                        'play_count': post_data.get('play_count', 0),
+                    }
+                )
+                
+                if created:
+                    saved_count += 1
+                    all_new_posts.append(post)
+                    if post.caption and post.caption.strip():
+                        new_posts_for_keywords.append(post)
+        
+        # Fetch posts
+        if has_posts:
+            posts_data = instagram_service.get_all_posts_for_username(
+                username, max_pages=2, save_callback=save_posts_batch
+            )
+        else:
+            posts_data = instagram_service.get_all_posts_for_username(
+                username, save_callback=save_posts_batch
+            )
+        
+        account.last_scraped_at = timezone.now()
+        account.save()
+        
+        # Send Discord notification for posts from last 24 hours
+        if all_new_posts:
+            recent_posts = filter_recent_posts(all_new_posts, hours=24)
+            if recent_posts:
+                from django.conf import settings
+                from core.services.discord_service import send_discord_webhook
+                
+                webhook_url = getattr(settings, 'DISCORD_WEBHOOK_URL', '')
+                if webhook_url:
+                    try:
+                        send_discord_webhook(webhook_url, username, recent_posts)
+                    except Exception as e:
+                        logger.error(f"Error sending Discord notification for @{username}: {e}", exc_info=True)
+        
+        # Automatically extract keywords for all newly fetched posts
+        total_keywords_extracted = 0
+        if new_posts_for_keywords:
+            logger.info(f"Automatically extracting keywords for {len(new_posts_for_keywords)} newly fetched posts")
+            
+            # Determine optimal number of workers for keyword extraction
+            max_workers = min(len(new_posts_for_keywords), (os.cpu_count() or 4) * 2, 20)
+            
+            # Process keyword extraction concurrently
+            results = []
+            keyword_errors = 0
+            
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # Submit all extraction tasks
+                future_to_post = {
+                    executor.submit(_extract_keywords_for_post, post): post
+                    for post in new_posts_for_keywords
+                }
+                
+                # Process completed tasks as they finish
+                for future in as_completed(future_to_post):
+                    post = future_to_post[future]
+                    try:
+                        post_id, keywords, error = future.result()
+                        results.append({
+                            'post_id': post_id,
+                            'keywords': keywords,
+                            'error': error
+                        })
+                        if error:
+                            keyword_errors += 1
+                        else:
+                            total_keywords_extracted += len(keywords)
+                    except Exception as e:
+                        logger.error(f"Exception extracting keywords for post {post.id}: {e}", exc_info=True)
+                        keyword_errors += 1
+                        results.append({
+                            'post_id': post.id,
+                            'keywords': [],
+                            'error': str(e)
+                        })
+            
+            # Batch database operations for keyword saving
+            post_map = {post.id: post for post in new_posts_for_keywords}
+            keywords_to_create = []
+            posts_to_update = []
+            post_ids_to_delete_keywords = []
+            
+            with transaction.atomic():
+                for result in results:
+                    post_id = result['post_id']
+                    keywords = result['keywords']
+                    error = result['error']
+                    
+                    if error:
+                        continue  # Skip posts with errors
+                    
+                    # Get the post instance from our map (no database query needed)
+                    post = post_map.get(post_id)
+                    if not post:
+                        logger.warning(f"Post {post_id} not found in post map, skipping")
+                        continue
+                    
+                    # Collect post IDs for bulk keyword deletion
+                    post_ids_to_delete_keywords.append(post_id)
+                    
+                    # Prepare new keywords for bulk creation
+                    for kw_data in keywords:
+                        keywords_to_create.append(
+                            InstagramKeyword(
+                                post=post,
+                                keyword=kw_data['keyword'],
+                                similarity=kw_data['similarity']
+                            )
+                        )
+                    
+                    # Mark post as processed
+                    post.keywords_extracted = True
+                    posts_to_update.append(post)
+                
+                # Bulk delete old keywords for all posts at once (more efficient than per-post deletion)
+                if post_ids_to_delete_keywords:
+                    InstagramKeyword.objects.filter(post_id__in=post_ids_to_delete_keywords).delete()
+                    logger.info(f"Bulk deleted old keywords for {len(post_ids_to_delete_keywords)} posts")
+                
+                # Bulk create all keywords at once
+                if keywords_to_create:
+                    InstagramKeyword.objects.bulk_create(keywords_to_create, batch_size=100)
+                    logger.info(f"Bulk created {len(keywords_to_create)} keywords")
+                
+                # Bulk update posts
+                if posts_to_update:
+                    InstagramPost.objects.bulk_update(posts_to_update, ['keywords_extracted'], batch_size=100)
+                    logger.info(f"Bulk updated {len(posts_to_update)} posts")
+        
+        if total_keywords_extracted > 0:
+            messages.success(request, f'Fetched {saved_count} new posts and extracted {total_keywords_extracted} keywords for @{account.username}!')
+        else:
+            messages.success(request, f'Fetched {saved_count} new posts for @{account.username}')
+        if keyword_errors > 0:
+            messages.warning(request, f'Encountered {keyword_errors} errors during automatic keyword extraction.')
+        
+    except Exception as e:
+        messages.error(request, f'Error fetching posts for @{account.username}: {str(e)}')
+    
+    return redirect('instagram_accounts')
+
+
+@login_required
 def instagram_post_detail_view(request, post_id):
     """View details of a specific Instagram post."""
     post = get_object_or_404(InstagramPost.objects.prefetch_related('keywords'), id=post_id, account__user=request.user)

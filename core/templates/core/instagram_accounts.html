@@ -52,10 +52,16 @@
                                 </div>
                             </div>
                             
-                            <!-- Analytics Button -->
-                            <div class="mt-3">
-                                <a href="{% url 'account_analytics' account.id %}" class="btn btn-outline-primary w-100" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; font-weight: 500;">
-                                    <i class="bi bi-graph-up"></i> View Analytics
+                            <!-- Action Buttons -->
+                            <div class="mt-3 d-flex gap-2">
+                                <form method="post" action="{% url 'fetch_single_account_posts' account.id %}" class="flex-grow-1" id="fetchForm{{ account.id }}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-success w-100" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; font-weight: 500;">
+                                        <i class="bi bi-download"></i> Fetch Posts
+                                    </button>
+                                </form>
+                                <a href="{% url 'account_analytics' account.id %}" class="btn btn-outline-primary" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; font-weight: 500; min-width: 140px;">
+                                    <i class="bi bi-graph-up"></i> Analytics
                                 </a>
                             </div>
                         </div>
@@ -132,7 +138,316 @@
 }
 </style>
 
+<!-- Progress Modal -->
+<div class="modal fade" id="fetchProgressModal" tabindex="-1" aria-labelledby="fetchProgressModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(10px); border: 1px solid var(--glass-border);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--glass-border);">
+                <h5 class="modal-title" id="fetchProgressModalLabel" style="color: var(--text-primary);">
+                    <i class="bi bi-download" id="phaseIcon"></i> <span id="modalTitle">Fetching Posts...</span>
+                </h5>
+            </div>
+            <div class="modal-body" style="padding: 1.5rem;">
+                <!-- Progress Bar -->
+                <div class="progress mb-4" style="height: 25px; background: rgba(30, 41, 59, 0.5); border-radius: 12px; overflow: hidden;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressBar" 
+                         role="progressbar" style="width: 0%; background: linear-gradient(90deg, #818cf8 0%, #a78bfa 100%); transition: width 0.3s ease;">
+                    </div>
+                </div>
+                
+                <!-- Status Text -->
+                <div id="statusText" class="mb-3" style="color: var(--text-secondary); font-size: 0.95rem; min-height: 24px;">
+                    <i class="bi bi-hourglass-split spinner-border spinner-border-sm me-2" style="color: var(--accent-primary);"></i>
+                    <span id="statusMessage">Initializing...</span>
+                </div>
+                
+                <!-- Current Account -->
+                <div id="currentAccount" class="mb-2" style="color: var(--text-muted); font-size: 0.85rem; display: none;">
+                    <i class="bi bi-person-circle"></i> <span id="currentAccountName"></span>
+                </div>
+                
+                <!-- Post Count -->
+                <div id="postCount" class="mb-2" style="color: var(--text-primary); font-weight: 500;">
+                    <i class="bi bi-image"></i> Posts: <span id="postsFetched">0</span> / <span id="postsTotal">0</span>
+                </div>
+                
+                <!-- Keyword Count (hidden initially) -->
+                <div id="keywordCount" class="mb-2" style="display: none; color: var(--text-primary); font-weight: 500;">
+                    <i class="bi bi-tags"></i> Keywords: <span id="keywordsExtracted">0</span> / <span id="keywordsTotal">0</span>
+                </div>
+                
+                <!-- Time Information -->
+                <div class="mt-3 pt-3" style="border-top: 1px solid var(--glass-border);">
+                    <div id="timeEstimate" class="mb-2" style="color: var(--text-muted); font-size: 0.9rem;">
+                        <i class="bi bi-clock"></i> Estimated time remaining: <span id="timeRemaining">Calculating...</span>
+                    </div>
+                    <div id="elapsedTime" style="color: var(--text-muted); font-size: 0.85rem;">
+                        <i class="bi bi-stopwatch"></i> Time elapsed: <span id="elapsedTimeValue">0s</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid var(--glass-border);">
+                <button type="button" class="btn btn-secondary" id="closeModalBtn" data-bs-dismiss="modal" style="display: none;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+    // Progress tracking variables
+    let progressPollInterval = null;
+    let taskId = null;
+    
+    // Format time in seconds to human-readable format
+    function formatTime(seconds) {
+        if (seconds < 60) {
+            return Math.round(seconds) + 's';
+        } else if (seconds < 3600) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.round(seconds % 60);
+            return mins + 'm ' + secs + 's';
+        } else {
+            const hours = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            return hours + 'h ' + mins + 'm';
+        }
+    }
+    
+    // Calculate time estimate based on progress
+    function calculateTimeEstimate(progress) {
+        const elapsed = progress.elapsed_time || 0;
+        
+        if (elapsed < 2) {
+            return null;
+        }
+        
+        if (progress.phase === 'fetching_posts') {
+            const postsFetched = progress.posts_fetched || 0;
+            const postsTotal = progress.posts_total || 0;
+            
+            if (postsFetched > 0 && postsTotal > 0 && postsTotal > postsFetched) {
+                const rate = postsFetched / elapsed;
+                if (rate > 0) {
+                    const remaining = (postsTotal - postsFetched) / rate;
+                    return remaining > 0 ? remaining : 0;
+                }
+            } else if (postsFetched > 0 && elapsed > 3) {
+                const rate = postsFetched / elapsed;
+                if (rate > 0) {
+                    return postsFetched / rate;
+                }
+            }
+        } else if (progress.phase === 'extracting_keywords') {
+            const keywordsExtracted = progress.keywords_extracted || 0;
+            const keywordsTotal = progress.keywords_total || 0;
+            
+            // Calculate elapsed time since keyword extraction started
+            // keyword_start_time is the absolute timestamp when keyword extraction started
+            // elapsed is the total elapsed time from start_time
+            let keywordElapsedTime = 0;
+            
+            if (progress.keyword_start_time && progress.start_time) {
+                // Both are absolute timestamps
+                // elapsed = current_time - start_time
+                // keywordElapsedTime = current_time - keyword_start_time
+                // So: keywordElapsedTime = elapsed - (keyword_start_time - start_time)
+                const keywordStartOffset = progress.keyword_start_time - progress.start_time;
+                keywordElapsedTime = Math.max(elapsed - keywordStartOffset, 1);
+            } else if (progress.fetch_end_time && progress.start_time) {
+                // Estimate: keyword extraction started after fetching ended
+                // fetch_end_time is absolute time, calculate elapsed since fetch ended
+                keywordElapsedTime = elapsed - (progress.fetch_end_time - progress.start_time);
+            } else {
+                // Fallback: estimate that keyword extraction started when we have extracted keywords
+                // Assume it started around 70% of total elapsed time (after fetching)
+                keywordElapsedTime = elapsed * 0.3;
+            }
+            
+            // Ensure we have a valid elapsed time (at least 1 second, but not more than total elapsed)
+            keywordElapsedTime = Math.max(1, Math.min(keywordElapsedTime, elapsed * 0.9));
+            
+            if (keywordsExtracted > 0 && keywordsTotal > 0 && keywordsTotal > keywordsExtracted && keywordElapsedTime > 1) {
+                const rate = keywordsExtracted / keywordElapsedTime;
+                if (rate > 0) {
+                    const remaining = (keywordsTotal - keywordsExtracted) / rate;
+                    // Ensure remaining is positive and reasonable
+                    return remaining > 0 ? Math.min(remaining, 600) : 0; // Cap at 10 minutes
+                }
+            } else if (keywordsExtracted > 0 && keywordElapsedTime > 2) {
+                // Estimate based on current rate
+                const rate = keywordsExtracted / keywordElapsedTime;
+                if (rate > 0) {
+                    // Estimate: assume we'll extract similar number more
+                    const estimatedRemaining = keywordsExtracted / rate;
+                    return Math.min(estimatedRemaining, 300); // Cap at 5 minutes
+                }
+            }
+        }
+        
+        return null; // Cannot estimate yet
+    }
+    
+    // Update progress modal with data
+    function updateProgressModal(progress) {
+        const progressBar = document.getElementById('progressBar');
+        const statusMessage = document.getElementById('statusMessage');
+        const currentAccountDiv = document.getElementById('currentAccount');
+        const currentAccountName = document.getElementById('currentAccountName');
+        const postsFetched = document.getElementById('postsFetched');
+        const postsTotal = document.getElementById('postsTotal');
+        const timeRemaining = document.getElementById('timeRemaining');
+        const elapsedTimeValue = document.getElementById('elapsedTimeValue');
+        const modalTitle = document.getElementById('modalTitle');
+        const phaseIcon = document.getElementById('phaseIcon');
+        const closeBtn = document.getElementById('closeModalBtn');
+        
+        // Update phase icon and title
+        if (progress.phase === 'fetching_posts') {
+            phaseIcon.className = 'bi bi-download';
+            modalTitle.textContent = 'Fetching Posts...';
+            postCount.style.display = 'block';
+            keywordCount.style.display = 'none';
+        } else if (progress.phase === 'extracting_keywords') {
+            phaseIcon.className = 'bi bi-tags';
+            modalTitle.textContent = 'Extracting Keywords...';
+            postCount.style.display = 'none';
+            keywordCount.style.display = 'block';
+        } else if (progress.phase === 'completed') {
+            phaseIcon.className = 'bi bi-check-circle';
+            modalTitle.textContent = 'Completed!';
+            progressBar.classList.remove('progress-bar-animated');
+            progressBar.style.background = 'linear-gradient(90deg, #10b981 0%, #059669 100%)';
+            closeBtn.style.display = 'block';
+        } else if (progress.phase === 'error') {
+            phaseIcon.className = 'bi bi-exclamation-triangle';
+            modalTitle.textContent = 'Error';
+            progressBar.style.background = 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)';
+            closeBtn.style.display = 'block';
+        }
+        
+        // Update status message
+        if (progress.message) {
+            statusMessage.textContent = progress.message;
+        }
+        
+        // Show current account being processed
+        if (progress.current_account) {
+            currentAccountName.textContent = '@' + progress.current_account;
+            currentAccountDiv.style.display = 'block';
+        } else {
+            currentAccountDiv.style.display = 'none';
+        }
+        
+        // Update progress bar
+        let progressPercent = 0;
+        if (progress.phase === 'fetching_posts') {
+            const postsFetchedValue = progress.posts_fetched || 0;
+            const postsTotalValue = progress.posts_total || 0;
+            if (postsTotalValue > 0) {
+                progressPercent = (postsFetchedValue / postsTotalValue) * 50; // 0-50% for fetching
+            } else if (postsFetchedValue > 0) {
+                progressPercent = 25; // Estimate
+            }
+        } else if (progress.phase === 'extracting_keywords') {
+            const keywordsExtractedValue = progress.keywords_extracted || 0;
+            const keywordsTotalValue = progress.keywords_total || 0;
+            if (keywordsTotalValue > 0) {
+                progressPercent = 50 + ((keywordsExtractedValue / keywordsTotalValue) * 50); // 50-100% for keywords
+            } else {
+                progressPercent = 50;
+            }
+        } else if (progress.phase === 'completed') {
+            progressPercent = 100;
+        }
+        
+        progressBar.style.width = progressPercent + '%';
+        progressBar.setAttribute('aria-valuenow', progressPercent);
+        
+        // Update counts
+        const postsFetchedValue = progress.posts_fetched || 0;
+        const postsTotalValue = progress.posts_total || postsFetchedValue || 0;
+        postsFetched.textContent = postsFetchedValue;
+        postsTotal.textContent = postsTotalValue;
+        
+        const keywordsExtractedValue = progress.keywords_extracted || 0;
+        let keywordsTotalValue = progress.keywords_total || 0;
+        if (keywordsTotalValue < keywordsExtractedValue && keywordsExtractedValue > 0) {
+            keywordsTotalValue = keywordsExtractedValue;
+        }
+        const keywordsExtracted = document.getElementById('keywordsExtracted');
+        const keywordsTotal = document.getElementById('keywordsTotal');
+        if (keywordsExtracted) keywordsExtracted.textContent = keywordsExtractedValue;
+        if (keywordsTotal) {
+            if (keywordsTotalValue > 0) {
+                keywordsTotal.textContent = keywordsTotalValue;
+            } else if (keywordsExtractedValue > 0) {
+                keywordsTotal.textContent = Math.ceil(keywordsExtractedValue * 1.25);
+            } else {
+                keywordsTotal.textContent = '?';
+            }
+        }
+        
+        // Update time
+        const elapsed = progress.elapsed_time || 0;
+        elapsedTimeValue.textContent = formatTime(elapsed);
+        
+        const estimate = calculateTimeEstimate(progress);
+        if (estimate !== null && estimate > 0 && !isNaN(estimate) && isFinite(estimate)) {
+            timeRemaining.textContent = formatTime(estimate);
+        } else if (progress.posts_fetched > 0 && progress.posts_total === 0) {
+            timeRemaining.textContent = 'Estimating...';
+        } else {
+            timeRemaining.textContent = 'Calculating...';
+        }
+    }
+    
+    // Poll for progress updates
+    function pollProgress(taskId) {
+        const progressUrl = '{% url "check_fetch_progress" "TASK_ID" %}'.replace('TASK_ID', taskId);
+        fetch(progressUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to fetch progress');
+                }
+                return response.json();
+            })
+            .then(data => {
+                updateProgressModal(data);
+                
+                // Stop polling if completed or error
+                if (data.phase === 'completed') {
+                    clearInterval(progressPollInterval);
+                    setTimeout(() => {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('fetchProgressModal'));
+                        if (modal) {
+                            modal.hide();
+                        }
+                        window.location.reload();
+                    }, 2000);
+                } else if (data.phase === 'error') {
+                    clearInterval(progressPollInterval);
+                }
+            })
+            .catch(error => {
+                console.error('Error polling progress:', error);
+            });
+    }
+    
+    // Start progress tracking
+    function startFetchProgress(taskId) {
+        const modalElement = document.getElementById('fetchProgressModal');
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        
+        // Start polling every 1.5 seconds
+        progressPollInterval = setInterval(() => {
+            pollProgress(taskId);
+        }, 1500);
+        
+        // Initial poll
+        pollProgress(taskId);
+    }
+    
     // Search functionality for accounts
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('searchAccounts');
@@ -152,6 +467,41 @@
                 });
             });
         }
+        
+        // Handle fetch buttons for each account
+        const fetchForms = document.querySelectorAll('[id^="fetchForm"]');
+        fetchForms.forEach(form => {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(form);
+                const csrfToken = formData.get('csrfmiddlewaretoken');
+                const formAction = form.getAttribute('action');
+                
+                // Submit via AJAX
+                fetch(formAction, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error: ' + data.error);
+                    } else if (data.task_id) {
+                        taskId = data.task_id;
+                        startFetchProgress(taskId);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error starting fetch:', error);
+                    alert('Error starting fetch operation. Please try again.');
+                });
+            });
+        });
     });
 </script>
 {% endblock %}
