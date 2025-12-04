@@ -521,6 +521,24 @@ def _update_progress(task_id, **kwargs):
     return progress
 
 
+def filter_recent_posts(posts, hours=24):
+    """
+    Filter posts to only include those from the last N hours based on taken_at timestamp.
+    
+    Args:
+        posts: List of InstagramPost model instances
+        hours: Number of hours to look back (default: 24)
+    
+    Returns:
+        List of posts from the last N hours
+    """
+    if not posts:
+        return []
+    
+    cutoff_time = timezone.now() - timedelta(hours=hours)
+    return [post for post in posts if post.taken_at and post.taken_at >= cutoff_time]
+
+
 def _fetch_posts_with_progress(user, task_id):
     """
     Background function to fetch posts and extract keywords with progress tracking.
@@ -659,6 +677,21 @@ def _fetch_posts_with_progress(user, task_id):
                 
                 account.last_scraped_at = timezone.now()
                 account.save()
+                
+                # Send Discord notification for posts from last 24 hours
+                if account_new_posts:
+                    recent_posts = filter_recent_posts(account_new_posts, hours=24)
+                    if recent_posts:
+                        from django.conf import settings
+                        from core.services.discord_service import send_discord_webhook
+                        
+                        webhook_url = getattr(settings, 'DISCORD_WEBHOOK_URL', '')
+                        if webhook_url:
+                            try:
+                                send_discord_webhook(webhook_url, username, recent_posts)
+                            except Exception as e:
+                                logger.error(f"Error sending Discord notification for @{username}: {e}", exc_info=True)
+                                # Don't fail the entire fetch if Discord fails
                 
                 return account_saved_count, account_new_posts, None
                 
@@ -902,11 +935,12 @@ def scrape_instagram_view(request):
             # Track saved posts and skipped reels
             saved_count = 0
             skipped_reels = 0
+            all_new_posts = []  # Track all new posts for Discord notifications
             
             # Define callback function to save posts immediately after each API call
             def save_posts_batch(posts_batch):
                 """Save a batch of posts (including reels) to database immediately after API call."""
-                nonlocal saved_count, skipped_reels, new_posts_for_keywords
+                nonlocal saved_count, skipped_reels, new_posts_for_keywords, all_new_posts
                 
                 for post_data in posts_batch:
                     # Ensure boolean fields are always True/False, not empty dicts or other values
@@ -960,6 +994,7 @@ def scrape_instagram_view(request):
                     
                     if created:
                         saved_count += 1
+                        all_new_posts.append(post)  # Track all new posts for Discord
                         # Collect new posts with captions for keyword extraction
                         if post.caption and post.caption.strip():
                             new_posts_for_keywords.append(post)
@@ -983,6 +1018,21 @@ def scrape_instagram_view(request):
             
             account.last_scraped_at = timezone.now()
             account.save()
+            
+            # Send Discord notification for posts from last 24 hours
+            if all_new_posts:
+                recent_posts = filter_recent_posts(all_new_posts, hours=24)
+                if recent_posts:
+                    from django.conf import settings
+                    from core.services.discord_service import send_discord_webhook
+                    
+                    webhook_url = getattr(settings, 'DISCORD_WEBHOOK_URL', '')
+                    if webhook_url:
+                        try:
+                            send_discord_webhook(webhook_url, username, recent_posts)
+                        except Exception as e:
+                            logger.error(f"Error sending Discord notification for @{username}: {e}", exc_info=True)
+                            # Don't fail the entire fetch if Discord fails
             
             total_posts += saved_count
             if skipped_reels > 0:

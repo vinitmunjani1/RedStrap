@@ -181,6 +181,12 @@ TEST_MODE_POSTS_LIMIT = int(os.environ.get('TEST_MODE_POSTS_LIMIT', '600'))
 # Set to None or 0 to disable page limit and fetch all pages
 TEST_MODE_PAGES_LIMIT = int(os.environ.get('TEST_MODE_PAGES_LIMIT', '50'))
 
+# Discord Webhook Configuration
+# Discord webhook URL for sending notifications about new Instagram posts
+# Set in environment variable DISCORD_WEBHOOK_URL
+# If not set or empty, Discord notifications will be disabled
+DISCORD_WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL', 'https://discord.com/api/webhooks/1446030878026367019/4nxWz_3z2gAdUmJHLbejTZ-Z5rRbl6VOyRAG4cfThLOb3OhHQFR4opDPhMYFfosVVCsw').strip()
+
 # Logging Configuration
 LOGGING = {
     'version': 1,
