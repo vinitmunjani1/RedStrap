@@ -173,9 +173,13 @@ SKIP_REELS_ENDPOINT_FOR_PLAY_COUNT = os.environ.get('SKIP_REELS_ENDPOINT_FOR_PLA
 # When True, fetch_instagram_reels() will only return the 10 most recent reels
 TEST_MODE_REELS_LIMIT = int(os.environ.get('TEST_MODE_REELS_LIMIT', '10'))
 
-# Test mode: Limit post fetching to 24 recent posts for testing purposes
+# Test mode: Limit post fetching to 600 recent posts for testing purposes
 # Set to None or 0 to disable test mode and fetch all posts
-TEST_MODE_POSTS_LIMIT = int(os.environ.get('TEST_MODE_POSTS_LIMIT', '24'))
+TEST_MODE_POSTS_LIMIT = int(os.environ.get('TEST_MODE_POSTS_LIMIT', '600'))
+
+# Test mode: Limit page fetching to 50 pages for testing purposes
+# Set to None or 0 to disable page limit and fetch all pages
+TEST_MODE_PAGES_LIMIT = int(os.environ.get('TEST_MODE_PAGES_LIMIT', '50'))
 
 # Logging Configuration
 LOGGING = {

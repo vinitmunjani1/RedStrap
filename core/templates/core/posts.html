@@ -245,6 +245,29 @@
     </div>
 {% endif %}
 
+<!-- Back to Top Button -->
+<button id="backToTopBtn" type="button" style="
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: none;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: none;
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    flex-direction: column;
+">
+    <i class="bi bi-arrow-up" style="font-size: 1.5rem; color: white; line-height: 1;"></i>
+</button>
+
 <style>
     /* Hide scrollbar but keep scrolling functionality */
     body {
@@ -364,6 +387,15 @@
     .dropdown-item.active {
         background-color: rgba(129, 140, 248, 0.3);
         color: var(--accent-primary);
+    }
+    
+    #backToTopBtn:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 20px rgba(129, 140, 248, 0.4);
+    }
+    
+    #backToTopBtn:active {
+        transform: translateY(-2px);
     }
 </style>
 
@@ -689,6 +721,86 @@
             }
         });
     });
+    
+    // Back to Top Button Functionality - Optimized
+    (function() {
+        const backToTopBtn = document.getElementById('backToTopBtn');
+        if (!backToTopBtn) return;
+        
+        let totalPostsCount = 0;
+        let checkTimeout = null;
+        
+        // Function to count total posts on page
+        function countTotalPosts() {
+            const postCards = document.querySelectorAll('.post-card');
+            return postCards.length;
+        }
+        
+        // Function to check scroll position
+        function checkScrollPosition() {
+            const scrollY = window.scrollY || window.pageYOffset;
+            const scrollThreshold = 500; // Show button after scrolling 500px
+            
+            // Check if we have 12+ posts OR user has scrolled down enough
+            totalPostsCount = countTotalPosts();
+            const shouldShow = totalPostsCount >= 12 || scrollY > scrollThreshold;
+            
+            if (shouldShow) {
+                backToTopBtn.style.display = 'flex';
+            } else {
+                backToTopBtn.style.display = 'none';
+            }
+        }
+        
+        // Optimized scroll handler with throttling
+        function handleScroll() {
+            if (checkTimeout) {
+                cancelAnimationFrame(checkTimeout);
+            }
+            checkTimeout = requestAnimationFrame(checkScrollPosition);
+        }
+        
+        // Listen to scroll events
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        
+        // Initial check
+        checkScrollPosition();
+        
+        // Observe post grids for changes (when new posts are loaded via infinite scroll)
+        const postGrids = document.querySelectorAll('.post-grid');
+        if (postGrids.length > 0) {
+            const observer = new MutationObserver(function() {
+                // Debounce the check
+                if (checkTimeout) {
+                    cancelAnimationFrame(checkTimeout);
+                }
+                checkTimeout = requestAnimationFrame(checkScrollPosition);
+            });
+            
+            postGrids.forEach(grid => {
+                observer.observe(grid, { 
+                    childList: true, 
+                    subtree: false // Only watch direct children for better performance
+                });
+            });
+        }
+        
+        // Scroll to top when button is clicked
+        backToTopBtn.addEventListener('click', function() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+        
+        // Also check periodically in case posts are added outside of mutation observer
+        setInterval(function() {
+            const currentCount = countTotalPosts();
+            if (currentCount !== totalPostsCount) {
+                checkScrollPosition();
+            }
+        }, 1000);
+    })();
 </script>
 {% endblock %}
 

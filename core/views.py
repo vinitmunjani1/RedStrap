@@ -645,10 +645,14 @@ def _fetch_posts_with_progress(user, task_id):
                 
                 # Fetch posts (concurrently with other accounts)
                 if has_posts:
+                    # Fetch only 2 pages (24 posts) when posts exist in database
+                    logger.info(f"Account {username} has existing posts, fetching 2 pages (24 posts) only")
                     posts_data = instagram_service.get_all_posts_for_username(
-                        username, max_age_hours=48, save_callback=save_posts_batch
+                        username, max_pages=2, save_callback=save_posts_batch
                     )
                 else:
+                    # No posts in database: fetch all posts (up to 600 limit from TEST_MODE_POSTS_LIMIT)
+                    logger.info(f"Account {username} has no posts in database, fetching all available posts (up to 600)")
                     posts_data = instagram_service.get_all_posts_for_username(
                         username, save_callback=save_posts_batch
                     )
@@ -962,16 +966,16 @@ def scrape_instagram_view(request):
             
             # Fetch posts with callback to save incrementally
             if has_posts:
-                # Fetch only posts from last 48 hours
-                logger.info(f"Account {username} has existing posts, fetching last 48 hours only")
+                # Fetch only 2 pages (24 posts) when posts exist in database
+                logger.info(f"Account {username} has existing posts, fetching 2 pages (24 posts) only")
                 posts_data = instagram_service.get_all_posts_for_username(
                     username, 
-                    max_age_hours=48,
+                    max_pages=2,
                     save_callback=save_posts_batch
                 )
             else:
-                # First time: fetch all posts
-                logger.info(f"Account {username} has no posts, fetching all available posts")
+                # No posts in database: fetch all posts (up to 600 limit from TEST_MODE_POSTS_LIMIT)
+                logger.info(f"Account {username} has no posts in database, fetching all available posts (up to 600)")
                 posts_data = instagram_service.get_all_posts_for_username(
                     username,
                     save_callback=save_posts_batch

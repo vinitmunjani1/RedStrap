@@ -1197,7 +1197,7 @@ def _fetch_single_page(username: str, end_cursor: Optional[str] = None) -> Optio
     return result
 
 
-def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = None, save_callback: Optional[callable] = None) -> List[Dict]:
+def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = None, max_pages: Optional[int] = None, save_callback: Optional[callable] = None) -> List[Dict]:
     """
     Fetch all posts for a given Instagram username using concurrent pagination.
     Uses up to 13 API keys concurrently to fetch multiple pages simultaneously.
@@ -1207,6 +1207,8 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
         username: Instagram username (without @)
         max_age_hours: Optional. If provided, only fetch posts from the last N hours.
                       If None, fetch all available posts.
+        max_pages: Optional. If provided, only fetch up to N pages (1 page = 12 posts).
+                  If None, uses TEST_MODE_PAGES_LIMIT from settings or fetches all pages.
         save_callback: Optional callback function that receives a list of post dictionaries
                       after each API call. Called as: save_callback(posts_batch)
                       This allows saving posts incrementally instead of waiting for all posts.
@@ -1224,12 +1226,19 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
         logger.error("Empty username provided")
         return []
     
-    # Get test mode limit from settings
-    test_mode_limit = getattr(settings, 'TEST_MODE_POSTS_LIMIT', 24)
+    # Get test mode limits from settings
+    test_mode_limit = getattr(settings, 'TEST_MODE_POSTS_LIMIT', 600)
+    test_mode_pages_limit = getattr(settings, 'TEST_MODE_PAGES_LIMIT', 50)
+    
+    # Use max_pages parameter if provided, otherwise use test_mode_pages_limit
+    effective_pages_limit = max_pages if max_pages is not None else test_mode_pages_limit
+    
     if test_mode_limit and test_mode_limit > 0:
         logger.info(f"Test mode enabled: Fetching only {test_mode_limit} recent posts for {username}")
     else:
         logger.info(f"Test mode disabled: Fetching all available posts for {username}")
+    if effective_pages_limit and effective_pages_limit > 0:
+        logger.info(f"Page limit: Maximum {effective_pages_limit} pages will be fetched")
     
     # Calculate cutoff time if max_age_hours is provided
     cutoff_time = None
@@ -1340,12 +1349,18 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
                             if page_result.get('has_next_page') and page_result.get('end_cursor'):
                                 next_cursor = page_result.get('end_cursor')
                                 next_page = page_num + 1
+                                
+                                # Check page limit before queuing
+                                if effective_pages_limit and effective_pages_limit > 0 and next_page > effective_pages_limit:
+                                    logger.info(f"Reached page limit of {effective_pages_limit} pages, stopping pagination")
+                                    break
+                                
                                 page_queue.put((next_cursor, next_page))
                                 logger.debug(f"Queued page {next_page} with cursor {next_cursor}")
                             
                             # Check if we should stop
                             if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
-                                logger.info(f"Reached test mode limit, stopping pagination")
+                                logger.info(f"Reached test mode post limit of {test_mode_limit} posts, stopping pagination")
                                 break
                             if cutoff_time and any(p.get("taken_at") and p["taken_at"] < cutoff_time for p in batch_posts):
                                 logger.info(f"Reached time cutoff, stopping pagination")
@@ -1359,6 +1374,12 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
                 
                 # Check if we should stop
                 if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
+                    logger.info(f"Reached test mode post limit of {test_mode_limit} posts, stopping")
+                    break
+                # Check page limit
+                max_page_fetched = max(fetched_pages.keys()) if fetched_pages else 0
+                if effective_pages_limit and effective_pages_limit > 0 and max_page_fetched >= effective_pages_limit:
+                    logger.info(f"Reached page limit of {effective_pages_limit} pages, stopping")
                     break
                 
                 # Small sleep to avoid busy waiting
