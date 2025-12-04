@@ -1,0 +1,694 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Posts - REDSTRAP{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
+    <h1 class="mb-0" style="font-size: 2rem; font-weight: 600;"><i class="bi bi-images"></i> Posts</h1>
+    <div class="d-flex gap-3 flex-wrap align-items-center">
+        <!-- Search by Username -->
+        <form method="get" action="{% url 'posts' %}" class="d-flex gap-2 align-items-center" style="max-width: 300px;">
+            <input type="text" name="search" class="form-control form-control-sm" placeholder="Search username..." value="{{ search_query }}" style="padding: 0.5rem 1rem;">
+            {% if sort_by %}
+                <input type="hidden" name="sort" value="{{ sort_by }}">
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-sm" style="padding: 0.5rem 1rem; white-space: nowrap;">
+                <i class="bi bi-search"></i>
+            </button>
+            {% if search_query %}
+                <a href="{% url 'posts' %}{% if sort_by %}?sort={{ sort_by }}{% endif %}" class="btn btn-outline-secondary btn-sm" style="padding: 0.5rem 1rem;" title="Clear search">
+                    <i class="bi bi-x"></i>
+                </a>
+            {% endif %}
+        </form>
+        
+        <!-- Sort Dropdown -->
+        <div class="dropdown">
+            <button class="btn btn-info btn-sm dropdown-toggle" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="padding: 0.5rem 1.25rem;">
+                <i class="bi bi-sort-down"></i> Sort
+            </button>
+            <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="sortDropdown">
+                <li><h6 class="dropdown-header">Sort by Time</h6></li>
+                <li><a class="dropdown-item {% if sort_by == 'time_desc' %}active{% endif %}" href="?sort=time_desc{% if search_query %}&search={{ search_query }}{% endif %}">
+                    <i class="bi bi-clock-history"></i> Newest First
+                </a></li>
+                <li><a class="dropdown-item {% if sort_by == 'time_asc' %}active{% endif %}" href="?sort=time_asc{% if search_query %}&search={{ search_query }}{% endif %}">
+                    <i class="bi bi-clock"></i> Oldest First
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><h6 class="dropdown-header">Sort by Likes</h6></li>
+                <li><a class="dropdown-item {% if sort_by == 'likes_desc' %}active{% endif %}" href="?sort=likes_desc{% if search_query %}&search={{ search_query }}{% endif %}">
+                    <i class="bi bi-heart-fill"></i> Most Likes
+                </a></li>
+                <li><a class="dropdown-item {% if sort_by == 'likes_asc' %}active{% endif %}" href="?sort=likes_asc{% if search_query %}&search={{ search_query }}{% endif %}">
+                    <i class="bi bi-heart"></i> Least Likes
+                </a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><h6 class="dropdown-header">Sort by Comments</h6></li>
+                <li><a class="dropdown-item {% if sort_by == 'comments_desc' %}active{% endif %}" href="?sort=comments_desc{% if search_query %}&search={{ search_query }}{% endif %}">
+                    <i class="bi bi-chat-fill"></i> Most Comments
+                </a></li>
+                <li><a class="dropdown-item {% if sort_by == 'comments_asc' %}active{% endif %}" href="?sort=comments_asc{% if search_query %}&search={{ search_query }}{% endif %}">
+                    <i class="bi bi-chat"></i> Least Comments
+                </a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+{% if search_query %}
+    <div class="alert alert-info mb-4" style="border-radius: 12px;">
+        <i class="bi bi-info-circle"></i> Showing results for username: <strong>{{ search_query }}</strong> ({{ total_posts }} post{{ total_posts|pluralize }})
+    </div>
+{% endif %}
+
+{% if username_posts_list %}
+    {% for username_data in username_posts_list %}
+        <div class="glass-card mb-5 username-section" 
+             data-username-section="{{ username_data.username|lower }}" 
+             data-username="{{ username_data.username }}"
+             data-offset="{{ username_data.loaded_count }}"
+             data-has-more="{% if username_data.has_more %}true{% else %}false{% endif %}"
+             data-sort="{{ sort_by }}"
+             data-search="{{ search_query }}"
+             style="border-radius: 12px; overflow: hidden;">
+            <div class="card-header" style="background: rgba(30, 41, 59, 0.3); backdrop-filter: blur(10px); border-bottom: 1px solid var(--glass-border); padding: 1.25rem 1.5rem;">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div>
+                        <h4 class="mb-1" style="color: var(--accent-primary); font-weight: 600; font-size: 1.25rem;">
+                            <i class="bi bi-instagram"></i> @{{ username_data.username }}
+                        </h4>
+                        <small class="text-muted" style="font-size: 0.875rem;">
+                            <span class="loaded-count">{{ username_data.loaded_count }}</span> / {{ username_data.count }} post{{ username_data.count|pluralize }}
+                        </small>
+                    </div>
+                    <a href="{% url 'account_analytics' username_data.account_id %}" class="btn btn-sm btn-outline-primary" style="white-space: nowrap; min-width: 110px; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-weight: 500;">
+                        <i class="bi bi-graph-up"></i> <span>Analytics</span>
+                    </a>
+                </div>
+            </div>
+            <div class="card-body" style="padding: 1.5rem;">
+                <div class="post-grid" data-username="{{ username_data.username }}" data-post-detail-base="/instagram/post/">
+                    {% for post in username_data.posts %}
+                            <div class="glass-card post-card post-card-item" style="border: 1px solid var(--glass-border); padding: 0; overflow: hidden; border-radius: 12px; background: rgba(30, 41, 59, 0.4);" data-caption="{{ post.caption|lower|default:'' }}" data-username="{{ username_data.username|lower }}">
+                                <a href="{% url 'instagram_post_detail' post.id %}" class="text-decoration-none">
+                                    <div style="position: relative; overflow: hidden;">
+                                        {# For reels and videos, always prefer showing the video instead of the image thumbnail #}
+                                        {% if post.is_reel and post.video_url %}
+                                            <video class="post-video-thumbnail" data-video-url="{{ post.video_url }}" style="width: 100%; height: 380px; object-fit: cover; background: rgba(30, 41, 59, 0.3);" muted loop playsinline preload="metadata">
+                                                <source src="{{ post.video_url }}" type="video/mp4">
+                                            </video>
+                                        {% elif post.is_video and post.video_url %}
+                                            <video class="post-video-thumbnail" data-video-url="{{ post.video_url }}" style="width: 100%; height: 380px; object-fit: cover; background: rgba(30, 41, 59, 0.3);" muted loop playsinline preload="metadata">
+                                                <source src="{{ post.video_url }}" type="video/mp4">
+                                            </video>
+                                        {% elif post.image_url %}
+                                            <img src="{{ post.image_url }}" alt="Post image" class="post-image" style="width: 100%; height: 380px; object-fit: cover; background: rgba(30, 41, 59, 0.3);">
+                                        {% else %}
+                                            <div style="width: 100%; height: 380px; background: rgba(30, 41, 59, 0.3); display: flex; align-items: center; justify-content: center;">
+                                                <i class="bi bi-image" style="font-size: 3rem; color: var(--text-muted); opacity: 0.5;"></i>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <div class="post-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.4); opacity: 0; transition: opacity 0.3s ease; display: flex; align-items: center; justify-content: center;">
+                                            <i class="bi bi-arrow-right-circle" style="font-size: 3rem; color: white;"></i>
+                                        </div>
+                                        
+                                        <div style="position: absolute; top: 10px; left: 10px; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                            {% if post.is_reel %}
+                                                <span class="badge" style="background: rgba(239, 68, 68, 0.9); border: 1px solid rgba(239, 68, 68, 0.5);">
+                                                    <i class="bi bi-play-circle-fill"></i> Reel
+                                                </span>
+                                            {% endif %}
+                                            {% if post.is_video %}
+                                                <span class="badge" style="background: rgba(96, 165, 250, 0.9); border: 1px solid rgba(96, 165, 250, 0.5);">
+                                                    <i class="bi bi-camera-video-fill"></i> Video
+                                                </span>
+                                            {% endif %}
+                                            {% if post.is_carousel %}
+                                                <span class="badge" style="background: rgba(96, 165, 250, 0.8); border: 1px solid rgba(96, 165, 250, 0.5);">
+                                                    <i class="bi bi-images"></i>
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </a>
+                                
+                            <div class="card-body post-item" style="background: rgba(30, 41, 59, 0.15); padding: 1.25rem 1.5rem;" data-caption="{{ post.caption|lower|default:'' }}" data-username="{{ username_data.username|lower }}">
+                                {% if post.caption %}
+                                    <p class="card-text mb-3" style="color: var(--text-secondary); min-height: 52px; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.9rem; line-height: 1.6;">
+                                        {{ post.caption }}
+                                    </p>
+                                {% else %}
+                                    <p class="card-text mb-3 text-muted" style="min-height: 52px; font-size: 0.9rem;">No caption</p>
+                                {% endif %}
+                                
+                                <!-- Keywords Display - Context Understanding -->
+                                {% if post.keywords.all %}
+                                    <div class="mb-3" style="
+                                        background: rgba(129, 140, 248, 0.05);
+                                        border: 1px solid rgba(129, 140, 248, 0.15);
+                                        border-radius: 10px;
+                                        padding: 0.75rem;
+                                    ">
+                                        <div class="d-flex align-items-center gap-2 mb-2" style="font-size: 0.75rem; color: var(--text-muted);">
+                                            <i class="bi bi-lightbulb-fill" style="color: var(--accent-primary); font-size: 0.8rem;"></i>
+                                            <span style="font-weight: 500;">Context Keywords</span>
+                                            <span style="opacity: 0.7;">({{ post.keywords.all|length }})</span>
+                                        </div>
+                                        <div class="d-flex flex-wrap align-items-center gap-1">
+                                            {% for keyword in post.keywords.all %}
+                                                <span class="keyword-badge" style="
+                                                    background: linear-gradient(135deg, rgba(129, 140, 248, 0.15) 0%, rgba(167, 139, 250, 0.1) 100%);
+                                                    color: var(--accent-primary);
+                                                    border: 1px solid rgba(129, 140, 248, 0.3);
+                                                    font-size: 0.75rem;
+                                                    padding: 0.35rem 0.7rem;
+                                                    border-radius: 12px;
+                                                    font-weight: 500;
+                                                    transition: all 0.2s ease;
+                                                    display: inline-flex;
+                                                    align-items: center;
+                                                    gap: 0.3rem;
+                                                " title="Similarity: {{ keyword.similarity|floatformat:2 }}">
+                                                    {{ keyword.keyword }}
+                                                    <span style="
+                                                        color: var(--text-muted);
+                                                        font-size: 0.65rem;
+                                                        opacity: 0.8;
+                                                        font-weight: 400;
+                                                    ">
+                                                        {{ keyword.similarity|floatformat:2 }}
+                                                    </span>
+                                                </span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                    
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="d-flex gap-3 flex-wrap">
+                                            <span class="engagement-compact likes" style="font-size: 0.9rem; font-weight: 500;">
+                                                <i class="bi bi-heart-fill" style="color: #ef4444;"></i> {{ post.like_count|floatformat:0 }}
+                                            </span>
+                                            <span class="engagement-compact comments" style="font-size: 0.9rem; font-weight: 500;">
+                                                <i class="bi bi-chat-fill" style="color: #3b82f6;"></i> {{ post.comment_count|floatformat:0 }}
+                                            </span>
+                                            {% if post.is_reel or post.is_video %}
+                                                <span class="engagement-compact plays" style="font-size: 0.9rem; font-weight: 500;">
+                                                    <i class="bi bi-play-fill" style="color: #10b981;"></i> {{ post.play_count|floatformat:0 }}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                        <small class="text-muted" style="font-size: 0.85rem; font-weight: 500;">{{ post.taken_at|date:"M d" }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                    {% endfor %}
+                </div>
+                {% if username_data.has_more %}
+                    <div class="load-more-container text-center mt-4" data-username="{{ username_data.username }}" style="display: none;">
+                        <div class="loading-spinner mt-3" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="glass-card" style="border-radius: 12px;">
+        <div class="card-body text-center py-5 px-4">
+            <i class="bi bi-info-circle" style="font-size: 4.5rem; color: var(--text-muted); opacity: 0.6;"></i>
+            <h4 class="mt-4 mb-3" style="color: var(--text-primary); font-weight: 600;">
+                {% if search_query %}No posts found{% else %}No posts available{% endif %}
+            </h4>
+            <p class="text-muted mb-5" style="font-size: 1rem; max-width: 500px; margin-left: auto; margin-right: auto;">
+                {% if search_query %}
+                    No posts found for username "{{ search_query }}". Try a different search term.
+                {% else %}
+                    Add an Instagram account and fetch posts to get started.
+                {% endif %}
+            </p>
+            {% if not search_query %}
+                <a href="{% url 'add_instagram' %}" class="btn btn-primary" style="padding: 0.75rem 1.5rem; font-weight: 500;">
+                    <i class="bi bi-plus-circle"></i> Add Instagram Account
+                </a>
+            {% else %}
+                <a href="{% url 'posts' %}" class="btn btn-primary" style="padding: 0.75rem 1.5rem; font-weight: 500;">
+                    <i class="bi bi-arrow-left"></i> View All Posts
+                </a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+
+<style>
+    /* Hide scrollbar but keep scrolling functionality */
+    body {
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE and Edge */
+    }
+    
+    body::-webkit-scrollbar {
+        display: none; /* Chrome, Safari, Opera */
+    }
+    
+    html {
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE and Edge */
+    }
+    
+    html::-webkit-scrollbar {
+        display: none; /* Chrome, Safari, Opera */
+    }
+    
+    .post-card {
+        transition: all 0.3s ease;
+    }
+    
+    .post-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+        border-color: rgba(129, 140, 248, 0.5) !important;
+    }
+    
+    .post-card:hover .post-image {
+        transform: scale(1.05);
+    }
+    
+    .post-card:hover .post-video-thumbnail {
+        transform: scale(1.05);
+    }
+    
+    .post-card:hover .post-overlay {
+        opacity: 1;
+    }
+    
+    .post-video-thumbnail {
+        transition: transform 0.3s ease;
+    }
+    
+    .post-card:hover .post-video-thumbnail {
+        filter: brightness(1.1);
+    }
+    
+    .post-image {
+        transition: transform 0.3s ease;
+    }
+    
+    .post-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 2rem;
+    }
+    
+    @media (min-width: 1200px) {
+        .post-grid {
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 2.25rem;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .post-grid {
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+    }
+    
+    .post-card {
+        min-height: 520px;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .post-card .card-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .post-card .post-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    
+    .post-card {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .post-card:hover {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+    
+    .engagement-compact {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.25rem 0.5rem;
+        background: rgba(30, 41, 59, 0.3);
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+    
+    .engagement-compact:hover {
+        background: rgba(30, 41, 59, 0.5);
+        transform: translateY(-1px);
+    }
+    
+    .dropdown-item.active {
+        background-color: rgba(129, 140, 248, 0.3);
+        color: var(--accent-primary);
+    }
+</style>
+
+<script>
+    // Infinite scroll and post loading functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        // Video autoplay on hover functionality
+        function setupVideoAutoplay() {
+            const videoThumbnails = document.querySelectorAll('.post-video-thumbnail');
+            
+            videoThumbnails.forEach(video => {
+                const videoUrl = video.getAttribute('data-video-url');
+                if (videoUrl && !video.hasAttribute('data-autoplay-setup')) {
+                    video.setAttribute('data-autoplay-setup', 'true');
+                    let hoverTimeout;
+                    
+                    video.parentElement.addEventListener('mouseenter', function() {
+                        hoverTimeout = setTimeout(() => {
+                            if (video.readyState >= 2) {
+                                video.play().catch(e => {
+                                    console.log('Video autoplay prevented:', e);
+                                });
+                            } else {
+                                video.load();
+                                video.play().catch(e => {
+                                    console.log('Video autoplay prevented:', e);
+                                });
+                            }
+                        }, 300);
+                    });
+                    
+                    video.parentElement.addEventListener('mouseleave', function() {
+                        clearTimeout(hoverTimeout);
+                        video.pause();
+                        video.currentTime = 0;
+                    });
+                }
+            });
+        }
+        
+        // Initialize video autoplay for initial posts
+        setupVideoAutoplay();
+        
+        // Function to render a post from JSON data
+        function renderPost(postData, postDetailUrl) {
+            const postId = postData.id;
+            const isReel = postData.is_reel;
+            const isVideo = postData.is_video;
+            const isCarousel = postData.is_carousel;
+            const videoUrl = postData.video_url || '';
+            const imageUrl = postData.image_url || '';
+            const caption = postData.caption || '';
+            const likeCount = Math.floor(postData.like_count || 0);
+            const commentCount = Math.floor(postData.comment_count || 0);
+            const playCount = Math.floor(postData.play_count || 0);
+            const keywords = postData.keywords || [];
+            const takenAt = new Date(postData.taken_at);
+            const dateStr = takenAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            
+            // Determine media HTML
+            let mediaHtml = '';
+            if (isReel && videoUrl) {
+                mediaHtml = `<video class="post-video-thumbnail" data-video-url="${videoUrl}" style="width: 100%; height: 380px; object-fit: cover; background: rgba(30, 41, 59, 0.3);" muted loop playsinline preload="metadata">
+                    <source src="${videoUrl}" type="video/mp4">
+                </video>`;
+            } else if (isVideo && videoUrl) {
+                mediaHtml = `<video class="post-video-thumbnail" data-video-url="${videoUrl}" style="width: 100%; height: 380px; object-fit: cover; background: rgba(30, 41, 59, 0.3);" muted loop playsinline preload="metadata">
+                    <source src="${videoUrl}" type="video/mp4">
+                </video>`;
+            } else if (imageUrl) {
+                mediaHtml = `<img src="${imageUrl}" alt="Post image" class="post-image" style="width: 100%; height: 380px; object-fit: cover; background: rgba(30, 41, 59, 0.3);">`;
+            } else {
+                mediaHtml = `<div style="width: 100%; height: 380px; background: rgba(30, 41, 59, 0.3); display: flex; align-items: center; justify-content: center;">
+                    <i class="bi bi-image" style="font-size: 3rem; color: var(--text-muted); opacity: 0.5;"></i>
+                </div>`;
+            }
+            
+            // Badges HTML
+            let badgesHtml = '';
+            if (isReel) {
+                badgesHtml += `<span class="badge" style="background: rgba(239, 68, 68, 0.9); border: 1px solid rgba(239, 68, 68, 0.5);">
+                    <i class="bi bi-play-circle-fill"></i> Reel
+                </span>`;
+            }
+            if (isVideo) {
+                badgesHtml += `<span class="badge" style="background: rgba(96, 165, 250, 0.9); border: 1px solid rgba(96, 165, 250, 0.5);">
+                    <i class="bi bi-camera-video-fill"></i> Video
+                </span>`;
+            }
+            if (isCarousel) {
+                badgesHtml += `<span class="badge" style="background: rgba(96, 165, 250, 0.8); border: 1px solid rgba(96, 165, 250, 0.5);">
+                    <i class="bi bi-images"></i>
+                </span>`;
+            }
+            
+            // Keywords HTML
+            let keywordsHtml = '';
+            if (keywords.length > 0) {
+                keywordsHtml = `<div class="mb-3" style="
+                    background: rgba(129, 140, 248, 0.05);
+                    border: 1px solid rgba(129, 140, 248, 0.15);
+                    border-radius: 10px;
+                    padding: 0.75rem;
+                ">
+                    <div class="d-flex align-items-center gap-2 mb-2" style="font-size: 0.75rem; color: var(--text-muted);">
+                        <i class="bi bi-lightbulb-fill" style="color: var(--accent-primary); font-size: 0.8rem;"></i>
+                        <span style="font-weight: 500;">Context Keywords</span>
+                        <span style="opacity: 0.7;">(${keywords.length})</span>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-1">
+                        ${keywords.map(kw => `
+                            <span class="keyword-badge" style="
+                                background: linear-gradient(135deg, rgba(129, 140, 248, 0.15) 0%, rgba(167, 139, 250, 0.1) 100%);
+                                color: var(--accent-primary);
+                                border: 1px solid rgba(129, 140, 248, 0.3);
+                                font-size: 0.75rem;
+                                padding: 0.35rem 0.7rem;
+                                border-radius: 12px;
+                                font-weight: 500;
+                                transition: all 0.2s ease;
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 0.3rem;
+                            " title="Similarity: ${parseFloat(kw.similarity).toFixed(2)}">
+                                ${kw.keyword}
+                                <span style="
+                                    color: var(--text-muted);
+                                    font-size: 0.65rem;
+                                    opacity: 0.8;
+                                    font-weight: 400;
+                                ">
+                                    ${parseFloat(kw.similarity).toFixed(2)}
+                                </span>
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>`;
+            }
+            
+            // Engagement HTML
+            let engagementHtml = `
+                <span class="engagement-compact likes" style="font-size: 0.9rem; font-weight: 500;">
+                    <i class="bi bi-heart-fill" style="color: #ef4444;"></i> ${likeCount}
+                </span>
+                <span class="engagement-compact comments" style="font-size: 0.9rem; font-weight: 500;">
+                    <i class="bi bi-chat-fill" style="color: #3b82f6;"></i> ${commentCount}
+                </span>`;
+            
+            if (isReel || isVideo) {
+                engagementHtml += `
+                <span class="engagement-compact plays" style="font-size: 0.9rem; font-weight: 500;">
+                    <i class="bi bi-play-fill" style="color: #10b981;"></i> ${playCount}
+                </span>`;
+            }
+            
+            const captionHtml = caption ? 
+                `<p class="card-text mb-3" style="color: var(--text-secondary); min-height: 52px; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 0.9rem; line-height: 1.6;">${caption}</p>` :
+                `<p class="card-text mb-3 text-muted" style="min-height: 52px; font-size: 0.9rem;">No caption</p>`;
+            
+            return `
+                <div class="glass-card post-card post-card-item" style="border: 1px solid var(--glass-border); padding: 0; overflow: hidden; border-radius: 12px; background: rgba(30, 41, 59, 0.4);">
+                    <a href="${postDetailUrl}" class="text-decoration-none">
+                        <div style="position: relative; overflow: hidden;">
+                            ${mediaHtml}
+                            <div class="post-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.4); opacity: 0; transition: opacity 0.3s ease; display: flex; align-items: center; justify-content: center;">
+                                <i class="bi bi-arrow-right-circle" style="font-size: 3rem; color: white;"></i>
+                            </div>
+                            <div style="position: absolute; top: 10px; left: 10px; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                ${badgesHtml}
+                            </div>
+                        </div>
+                    </a>
+                    <div class="card-body post-item" style="background: rgba(30, 41, 59, 0.15); padding: 1.25rem 1.5rem;">
+                        ${captionHtml}
+                        ${keywordsHtml}
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex gap-3 flex-wrap">
+                                ${engagementHtml}
+                            </div>
+                            <small class="text-muted" style="font-size: 0.85rem; font-weight: 500;">${dateStr}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Function to load more posts for a username
+        function loadMorePosts(usernameSection) {
+            const username = usernameSection.getAttribute('data-username');
+            const currentOffset = parseInt(usernameSection.getAttribute('data-offset') || '0');
+            const hasMore = usernameSection.getAttribute('data-has-more') === 'true';
+            const sortBy = usernameSection.getAttribute('data-sort') || 'time_desc';
+            const searchQuery = usernameSection.getAttribute('data-search') || '';
+            const postGrid = usernameSection.querySelector('.post-grid');
+            const loadMoreContainer = usernameSection.querySelector('.load-more-container');
+            const loadingSpinner = usernameSection.querySelector('.loading-spinner');
+            const loadedCountSpan = usernameSection.querySelector('.loaded-count');
+            
+            if (!hasMore || !postGrid) {
+                return;
+            }
+            
+            // Show loading state
+            if (loadMoreContainer) loadMoreContainer.style.display = 'block';
+            if (loadingSpinner) loadingSpinner.style.display = 'block';
+            
+            // Fetch more posts via AJAX
+            const url = new URL('{% url "load_more_posts" %}', window.location.origin);
+            url.searchParams.set('username', username);
+            url.searchParams.set('offset', currentOffset);
+            url.searchParams.set('sort', sortBy);
+            if (searchQuery) {
+                url.searchParams.set('search', searchQuery);
+            }
+            
+            fetch(url.toString(), {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    console.error('Error loading more posts:', data.error);
+                    if (loadingSpinner) loadingSpinner.style.display = 'none';
+                    return;
+                }
+                
+                // Render new posts
+                const postDetailUrlBase = postGrid.getAttribute('data-post-detail-base') || '/instagram/post/';
+                data.posts.forEach(postData => {
+                    const postDetailUrl = postDetailUrlBase + postData.id + '/';
+                    const postHtml = renderPost(postData, postDetailUrl);
+                    postGrid.insertAdjacentHTML('beforeend', postHtml);
+                });
+                
+                // Update state
+                const newOffset = data.next_offset;
+                usernameSection.setAttribute('data-offset', newOffset);
+                usernameSection.setAttribute('data-has-more', data.has_more ? 'true' : 'false');
+                
+                if (loadedCountSpan) {
+                    loadedCountSpan.textContent = newOffset;
+                }
+                
+                // Hide load more container if no more posts
+                if (!data.has_more && loadMoreContainer) {
+                    loadMoreContainer.style.display = 'none';
+                }
+                
+                if (loadingSpinner) loadingSpinner.style.display = 'none';
+                if (loadMoreContainer && data.has_more) {
+                    loadMoreContainer.style.display = 'none';
+                }
+                
+                // Reset loading state
+                loadingStates.set(usernameSection, false);
+                
+                // Setup video autoplay for new posts
+                setupVideoAutoplay();
+                
+                // Update intersection observer to watch the new last post
+                if (data.has_more) {
+                    const newLastPost = postGrid.querySelector('.post-card:last-child');
+                    if (newLastPost) {
+                        // Find the observer for this section and update it
+                        const sectionObservers = window.intersectionObservers || new Map();
+                        const observer = sectionObservers.get(usernameSection);
+                        if (observer) {
+                            observer.observe(newLastPost);
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                if (loadingSpinner) loadingSpinner.style.display = 'none';
+                if (loadMoreContainer) loadMoreContainer.style.display = 'none';
+                // Reset loading state on error
+                loadingStates.set(usernameSection, false);
+            });
+        }
+        
+        // Setup infinite scroll using Intersection Observer
+        const usernameSections = document.querySelectorAll('.username-section');
+        const loadingStates = new Map(); // Track loading state per section
+        
+        usernameSections.forEach(section => {
+            const hasMore = section.getAttribute('data-has-more') === 'true';
+            if (!hasMore) return;
+            
+            const loadMoreContainer = section.querySelector('.load-more-container');
+            
+            // Setup intersection observer for infinite scroll
+            // Observe the last post in the grid to trigger when scrolling near bottom
+            const postGrid = section.querySelector('.post-grid');
+            if (postGrid && hasMore) {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting && !loadingStates.get(section)) {
+                            const hasMore = section.getAttribute('data-has-more') === 'true';
+                            if (hasMore) {
+                                loadingStates.set(section, true);
+                                loadMorePosts(section);
+                            }
+                        }
+                    });
+                }, {
+                    rootMargin: '300px' // Start loading when 300px away from viewport
+                });
+                
+                // Store observer for later updates
+                if (!window.intersectionObservers) {
+                    window.intersectionObservers = new Map();
+                }
+                window.intersectionObservers.set(section, observer);
+                
+                // Observe the last post card in the grid
+                const lastPost = postGrid.querySelector('.post-card:last-child');
+                if (lastPost) {
+                    observer.observe(lastPost);
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}
+

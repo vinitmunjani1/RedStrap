@@ -13,6 +13,8 @@ urlpatterns = [
     
     # Dashboard
     path('', views.dashboard_view, name='dashboard'),
+    path('posts/', views.posts_view, name='posts'),
+    path('posts/load-more/', views.load_more_posts_view, name='load_more_posts'),
     
     # Instagram
     path('instagram/', views.instagram_accounts_view, name='instagram_accounts'),

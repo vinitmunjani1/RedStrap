@@ -112,6 +112,177 @@ def dashboard_view(request):
 
 
 @login_required
+def posts_view(request):
+    """
+    View all posts grouped by username with sorting and search functionality.
+    Supports sorting by likes count, comments count, and time (taken_at).
+    Supports searching by username.
+    """
+    from collections import defaultdict
+    
+    # Get all posts for the user (no time restriction)
+    all_posts = InstagramPost.objects.filter(
+        account__user=request.user
+    ).select_related('account').prefetch_related('keywords')
+    
+    # Get search query from request
+    search_query = request.GET.get('search', '').strip().lower()
+    
+    # Filter by username if search query provided
+    if search_query:
+        all_posts = all_posts.filter(account__username__icontains=search_query)
+    
+    # Get sort parameter from request (default: time, descending)
+    sort_by = request.GET.get('sort', 'time_desc')
+    
+    # Group posts by username
+    posts_by_username = defaultdict(list)
+    account_id_map = {}
+    
+    for post in all_posts:
+        posts_by_username[post.account.username].append(post)
+        if post.account.username not in account_id_map:
+            account_id_map[post.account.username] = post.account.id
+    
+    # Sort posts within each username group based on sort parameter
+    username_posts_list = []
+    for username, posts in posts_by_username.items():
+        if sort_by == 'likes_desc':
+            posts.sort(key=lambda x: x.like_count or 0, reverse=True)
+        elif sort_by == 'likes_asc':
+            posts.sort(key=lambda x: x.like_count or 0, reverse=False)
+        elif sort_by == 'comments_desc':
+            posts.sort(key=lambda x: x.comment_count or 0, reverse=True)
+        elif sort_by == 'comments_asc':
+            posts.sort(key=lambda x: x.comment_count or 0, reverse=False)
+        elif sort_by == 'time_desc':
+            posts.sort(key=lambda x: x.taken_at, reverse=True)
+        elif sort_by == 'time_asc':
+            posts.sort(key=lambda x: x.taken_at, reverse=False)
+        else:
+            # Default: sort by time descending
+            posts.sort(key=lambda x: x.taken_at, reverse=True)
+        
+        account_id = account_id_map.get(username)
+        if account_id:
+            # Initially show only first 6 posts for faster page load
+            # Remaining posts will be loaded via AJAX on scroll
+            initial_posts = posts[:6]
+            username_posts_list.append({
+                'username': username,
+                'account_id': account_id,
+                'posts': initial_posts,  # Only first 6 posts initially
+                'all_posts': posts,  # Keep all posts for reference
+                'count': len(posts),  # Total count
+                'loaded_count': len(initial_posts),  # Currently loaded count
+                'has_more': len(posts) > 6  # Whether there are more posts to load
+            })
+    
+    # Sort username groups by most recent post (or by username if search is active)
+    if search_query:
+        # When searching, sort by username alphabetically
+        username_posts_list.sort(key=lambda x: x['username'].lower())
+    else:
+        # Otherwise, sort by most recent post across all usernames
+        username_posts_list.sort(
+            key=lambda x: max(p.taken_at for p in x['posts']) if x['posts'] else timezone.now() - timedelta(days=365),
+            reverse=True
+        )
+    
+    context = {
+        'username_posts_list': username_posts_list,
+        'search_query': search_query,
+        'sort_by': sort_by,
+        'total_posts': all_posts.count(),
+    }
+    return render(request, 'core/posts.html', context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def load_more_posts_view(request):
+    """
+    AJAX endpoint to load more posts for infinite scroll.
+    Returns next 6 posts for a specific username.
+    """
+    username = request.GET.get('username', '').strip()
+    offset = int(request.GET.get('offset', 0))
+    sort_by = request.GET.get('sort', 'time_desc')
+    search_query = request.GET.get('search', '').strip().lower()
+    limit = 6  # Load 6 posts at a time
+    
+    if not username:
+        return JsonResponse({'error': 'Username required'}, status=400)
+    
+    # Get posts for this username
+    posts_query = InstagramPost.objects.filter(
+        account__user=request.user,
+        account__username=username
+    ).select_related('account').prefetch_related('keywords')
+    
+    # Apply search filter if provided
+    if search_query:
+        posts_query = posts_query.filter(account__username__icontains=search_query)
+    
+    # Get all posts and sort them
+    all_posts = list(posts_query)
+    
+    # Sort posts based on sort parameter
+    if sort_by == 'likes_desc':
+        all_posts.sort(key=lambda x: x.like_count or 0, reverse=True)
+    elif sort_by == 'likes_asc':
+        all_posts.sort(key=lambda x: x.like_count or 0, reverse=False)
+    elif sort_by == 'comments_desc':
+        all_posts.sort(key=lambda x: x.comment_count or 0, reverse=True)
+    elif sort_by == 'comments_asc':
+        all_posts.sort(key=lambda x: x.comment_count or 0, reverse=False)
+    elif sort_by == 'time_desc':
+        all_posts.sort(key=lambda x: x.taken_at, reverse=True)
+    elif sort_by == 'time_asc':
+        all_posts.sort(key=lambda x: x.taken_at, reverse=False)
+    else:
+        all_posts.sort(key=lambda x: x.taken_at, reverse=True)
+    
+    # Get next batch of posts
+    next_posts = all_posts[offset:offset + limit]
+    has_more = (offset + limit) < len(all_posts)
+    
+    # Serialize posts to JSON
+    posts_data = []
+    for post in next_posts:
+        posts_data.append({
+            'id': post.id,
+            'post_id': post.post_id,
+            'post_code': post.post_code,
+            'caption': post.caption or '',
+            'taken_at': post.taken_at.isoformat() if post.taken_at else '',
+            'image_url': post.image_url or '',
+            'video_url': post.video_url or '',
+            'is_video': post.is_video,
+            'is_reel': post.is_reel,
+            'is_carousel': post.is_carousel,
+            'carousel_media_count': post.carousel_media_count,
+            'like_count': post.like_count or 0,
+            'comment_count': post.comment_count or 0,
+            'play_count': post.play_count or 0,
+            'keywords': [
+                {
+                    'keyword': kw.keyword,
+                    'similarity': float(kw.similarity)
+                }
+                for kw in post.keywords.all()
+            ]
+        })
+    
+    return JsonResponse({
+        'posts': posts_data,
+        'has_more': has_more,
+        'next_offset': offset + len(next_posts),
+        'total_count': len(all_posts)
+    })
+
+
+@login_required
 def instagram_accounts_view(request):
     """View all Instagram accounts with inline analytics in card layout."""
     import json
@@ -381,27 +552,31 @@ def _fetch_posts_with_progress(user, task_id):
         total_posts = 0
         total_errors = 0
         new_posts_for_keywords = []
+        accounts_processed_lock = threading.Lock()  # Thread-safe counter for accounts processed
         
-        for idx, account in enumerate(accounts):
+        def fetch_account_posts(account):
+            """Fetch posts for a single account - designed for concurrent execution."""
+            nonlocal total_posts, total_errors, new_posts_for_keywords
+            account_new_posts = []
+            account_saved_count = 0
+            
             try:
                 username = account.username.strip().lstrip('@').lower()
                 if not username:
-                    continue
+                    return account_saved_count, account_new_posts, None
                 
+                # Update current account being processed
                 _update_progress(
                     task_id,
                     current_account=username,
-                    accounts_processed=idx,
-                    message=f'Fetching posts for @{username} ({idx + 1}/{accounts_total})...'
+                    message=f'Fetching posts for @{username}...'
                 )
                 
                 has_posts = account.posts.exists()
-                saved_count = 0
-                skipped_reels = 0
                 
                 def save_posts_batch(posts_batch):
-                    """Save a batch of posts and update progress."""
-                    nonlocal saved_count, skipped_reels, new_posts_for_keywords
+                    """Save a batch of posts and update progress - thread-safe."""
+                    nonlocal account_saved_count, account_new_posts
                     batch_new_posts = 0
                     
                     for post_data in posts_batch:
@@ -449,25 +624,26 @@ def _fetch_posts_with_progress(user, task_id):
                                 )
                         
                         if created:
-                            saved_count += 1
+                            account_saved_count += 1
                             batch_new_posts += 1
                             if post.caption and post.caption.strip():
-                                new_posts_for_keywords.append(post)
+                                account_new_posts.append(post)
                     
-                    # Update progress after processing batch
+                    # Thread-safe progress update after processing batch
                     if batch_new_posts > 0:
-                        current_progress = cache.get(f'fetch_progress_{task_id}', {})
-                        current_fetched = current_progress.get('posts_fetched', 0)
-                        new_fetched = current_fetched + batch_new_posts
-                        # Update total to be at least the fetched count (we discover total as we go)
-                        current_total = current_progress.get('posts_total', 0)
-                        new_total = max(new_fetched, current_total)
-                        _update_progress(
-                            task_id, 
-                            posts_fetched=new_fetched,
-                            posts_total=new_total
-                        )
+                        with accounts_processed_lock:
+                            current_progress = cache.get(f'fetch_progress_{task_id}', {})
+                            current_fetched = current_progress.get('posts_fetched', 0)
+                            new_fetched = current_fetched + batch_new_posts
+                            current_total = current_progress.get('posts_total', 0)
+                            new_total = max(new_fetched, current_total)
+                            _update_progress(
+                                task_id, 
+                                posts_fetched=new_fetched,
+                                posts_total=new_total
+                            )
                 
+                # Fetch posts (concurrently with other accounts)
                 if has_posts:
                     posts_data = instagram_service.get_all_posts_for_username(
                         username, max_age_hours=48, save_callback=save_posts_batch
@@ -480,27 +656,66 @@ def _fetch_posts_with_progress(user, task_id):
                 account.last_scraped_at = timezone.now()
                 account.save()
                 
-                total_posts += saved_count
-                
-                # Update progress after each account
-                current_progress = cache.get(f'fetch_progress_{task_id}', {})
-                current_total = current_progress.get('posts_total', 0)
-                new_total = max(total_posts, current_total)
-                _update_progress(
-                    task_id,
-                    accounts_processed=idx + 1,
-                    posts_total=new_total,
-                    message=f'Fetched {saved_count} posts from @{username} ({idx + 1}/{accounts_total}). Total: {total_posts} posts...'
-                )
+                return account_saved_count, account_new_posts, None
                 
             except Exception as e:
-                total_errors += 1
                 logger.error(f"Error fetching posts for @{account.username}: {e}", exc_info=True)
-                _update_progress(
-                    task_id,
-                    accounts_processed=idx + 1,
-                    message=f'Error fetching posts for @{account.username}: {str(e)}'
-                )
+                return 0, [], str(e)
+        
+        # Process accounts concurrently using ThreadPoolExecutor
+        # Use up to 13 workers (one per API key) to maximize throughput
+        # Get number of API keys from settings
+        from django.conf import settings
+        api_keys = getattr(settings, 'RAPIDAPI_KEYS', [])
+        num_api_keys = len(api_keys) if api_keys else 13  # Default to 13 if not found
+        max_workers = min(len(accounts), num_api_keys)  # Match number of API keys for optimal distribution
+        
+        logger.info(f"Processing {accounts_total} accounts concurrently with {max_workers} workers")
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all account fetching tasks
+            future_to_account = {
+                executor.submit(fetch_account_posts, account): account
+                for account in accounts
+            }
+            
+            # Process completed tasks as they finish
+            completed_accounts = 0
+            for future in as_completed(future_to_account):
+                account = future_to_account[future]
+                completed_accounts += 1
+                
+                try:
+                    saved_count, account_new_posts, error = future.result()
+                    
+                    # Thread-safe updates
+                    with accounts_processed_lock:
+                        total_posts += saved_count
+                        new_posts_for_keywords.extend(account_new_posts)
+                        if error:
+                            total_errors += 1
+                        
+                        # Update progress
+                        current_progress = cache.get(f'fetch_progress_{task_id}', {})
+                        current_total = current_progress.get('posts_total', 0)
+                        new_total = max(total_posts, current_total)
+                        _update_progress(
+                            task_id,
+                            accounts_processed=completed_accounts,
+                            posts_total=new_total,
+                            message=f'Completed @{account.username}: {saved_count} posts ({completed_accounts}/{accounts_total} accounts)...'
+                        )
+                        
+                except Exception as e:
+                    logger.error(f"Exception processing account {account.username}: {e}", exc_info=True)
+                    with accounts_processed_lock:
+                        total_errors += 1
+                        completed_accounts += 1
+                        _update_progress(
+                            task_id,
+                            accounts_processed=completed_accounts,
+                            message=f'Error processing @{account.username}: {str(e)}'
+                        )
         
         # Update progress after fetching all accounts
         _update_progress(
@@ -879,40 +1094,6 @@ def instagram_post_detail_view(request, post_id):
     """View details of a specific Instagram post."""
     post = get_object_or_404(InstagramPost.objects.prefetch_related('keywords'), id=post_id, account__user=request.user)
     carousel_items = post.carousel_items.all() if post.is_carousel else []
-    
-    # Lazy-load video URL and caption for reels if not already in database
-    # This reduces initial API calls and only fetches video URLs when user actually views the post
-    if post.is_reel and post.post_code:
-        needs_video_url = not post.video_url
-        needs_caption = not post.caption
-        
-        if needs_video_url or needs_caption:
-            logger.info(f"Lazy-loading video URL and caption for reel {post.id} (shortcode: {post.post_code})")
-            try:
-                data = instagram_service._fetch_video_url_by_shortcode(post.post_code)
-                if data:
-                    update_fields = []
-                    
-                    # Save video URL if fetched and not already in database
-                    if needs_video_url and 'video_url' in data and data['video_url']:
-                        post.video_url = data['video_url']
-                        update_fields.append('video_url')
-                        logger.info(f"Successfully fetched and saved video URL for reel {post.id}")
-                    
-                    # Save caption if fetched and not already in database
-                    if needs_caption and 'caption' in data and data['caption']:
-                        post.caption = data['caption']
-                        update_fields.append('caption')
-                        logger.info(f"Successfully fetched and saved caption for reel {post.id}")
-                    
-                    # Save only if we have fields to update
-                    if update_fields:
-                        post.save(update_fields=update_fields)
-                else:
-                    logger.warning(f"Could not fetch data for reel {post.id} with shortcode {post.post_code}")
-            except Exception as e:
-                logger.error(f"Error lazy-loading data for reel {post.id}: {e}", exc_info=True)
-                # Continue without video URL/caption - template will show thumbnail/fallback
     
     context = {
         'post': post,

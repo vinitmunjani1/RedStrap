@@ -137,7 +137,17 @@ RAPIDAPI_KEYS = [
     'a8fda11e76msh91790916e41cd1ep1d15b6jsn684a53a759bf',
     'd8f6b4111bmsh74a2dd675cd6767p124173jsna55fffc313d6',
     '19408733bamsha9cd9d39c52f78dp1fb914jsnbc5ee6c6a61a',
-    'd409935002msh6ca472652d2ea6ep143efcjsn4d350435d328'
+    'd409935002msh6ca472652d2ea6ep143efcjsn4d350435d328',
+    #sallu's keys
+    '39d4dc717fmsh78d577788d2a3a6p161679jsn5e4efe64ee0b',
+    'bacf8822a1msh8016f4f6b538841p12cfbbjsn537ac3fe0e64',
+    '2e58497092msh34920d58ae43ee2p19c8ecjsna42f6519a892',
+    '6c9bb0a034msha5c2cd9f2e24080p1bb7cdjsnd04ddf1fc7b0',
+    '05f131b61cmshe63b7bc03e266e4p16239bjsnf6b3cb76ffe2',
+    '8e9284a02emsh6d316c5682fa1dfp15b103jsn075b2b6505e9',
+    '455f886804msh5720a293836962bp1c54abjsnc8d7a0af2028',
+    '970fe3d582msh54c325dab9e922cp1fc3cdjsn950bef760cf',
+    'a9d39e5f2dmsh8b33c5111ac35dep18f68ejsn07e38e0beeff'
 ]
 # Fallback to single key from environment if provided (for backward compatibility)
 SINGLE_RAPIDAPI_KEY = os.environ.get('RAPIDAPI_KEY', '')

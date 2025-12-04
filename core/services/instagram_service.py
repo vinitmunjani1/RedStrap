@@ -25,12 +25,13 @@ logger = logging.getLogger(__name__)
 DEBUG_RESPONSES_DIR = Path(__file__).parent.parent.parent / "debug_responses"
 
 # Configuration constants for optimized fetching
-# API limit: 2 calls per second per API key
-# With 5 API keys, we can make 10 calls/sec total
-MIN_DELAY_BETWEEN_REQUESTS = 0.1  # Minimum delay between requests (seconds) - reduced for speed
-RATE_LIMIT_WINDOW = 10  # Rate limit window in seconds
-MAX_REQUESTS_PER_WINDOW = 50  # Max requests per window per API key (2 calls/sec * 60 sec = 120)
-CALLS_PER_SECOND_PER_KEY = 1  # API limit: 2 calls per second per key
+# API limit: 1 request per 4 seconds per API key (0.25 requests/second)
+# With 13 API keys, we can make 3.25 requests/sec total (13 * 0.25)
+# Each request fetches 1 page with 12 posts
+MIN_DELAY_BETWEEN_REQUESTS = 0.1  # Minimum delay between requests (seconds)
+RATE_LIMIT_WINDOW = 4  # Rate limit window in seconds (matches 1 request per 4 seconds)
+MAX_REQUESTS_PER_WINDOW = 1  # Max requests per window per API key (1 request per 4 seconds)
+CALLS_PER_SECOND_PER_KEY = 0.25  # API limit: 1 request per 4 seconds = 0.25 requests/second per key
 
 # Global rate limiter for each API key
 _rate_limiters: Dict[str, deque] = {}
@@ -71,13 +72,17 @@ def _wait_for_rate_limit(api_key: str):
             while limiter and limiter[0] < now - RATE_LIMIT_WINDOW:
                 limiter.popleft()
     
-    # Ensure minimum delay between requests
+    # Ensure minimum delay between requests (4 seconds between requests per key)
     if limiter:
         time_since_last = now - limiter[-1] if limiter else 0
-        if time_since_last < (1.0 / CALLS_PER_SECOND_PER_KEY):
-            wait_time = (1.0 / CALLS_PER_SECOND_PER_KEY) - time_since_last
-            time.sleep(wait_time)
-            now = time.time()
+        min_interval = 4.0  # 4 seconds between requests (1 request per 4 seconds)
+        if time_since_last < min_interval:
+            wait_time = min_interval - time_since_last
+            # Only sleep if wait time is significant (avoid micro-sleeps)
+            if wait_time > 0.01:
+                logger.debug(f"Waiting {wait_time:.2f} seconds to respect 4-second interval for API key")
+                time.sleep(wait_time)
+                now = time.time()
     
     # Record this API call
     limiter.append(time.time())
@@ -541,13 +546,11 @@ def parse_instagram_post(post_node: Dict, skip_video_url: bool = False) -> Optio
     """
     Parse a single Instagram post from API response.
     Handles both regular posts and reels, with comprehensive timestamp extraction.
+    Video URLs are always extracted from the API response.
     
     Args:
         post_node: Dictionary containing post/reel data from API response
-        skip_video_url: If True, skip video URL extraction (for lazy loading). Default False.
-    
-    Args:
-        post_node: The post node from the API response
+        skip_video_url: Deprecated parameter (kept for backward compatibility). Video URLs are always extracted.
     
     Returns:
         Dictionary with parsed post data, or None if parsing failed
@@ -908,42 +911,40 @@ def parse_instagram_post(post_node: Dict, skip_video_url: bool = False) -> Optio
         image_url = ""
         video_url = ""
         
-        # Skip video URL extraction if skip_video_url is True (for lazy loading)
-        # This reduces initial API calls - video URLs will be fetched on-demand when user views the post
-        if not skip_video_url:
-            # Check for video versions (reels and videos)
-            # Priority 1: Check in post_node first (this is where reels endpoint stores it directly)
-            if "video_versions" in post_node and post_node["video_versions"]:
-                video_versions = post_node["video_versions"]
-                if isinstance(video_versions, list) and len(video_versions) > 0:
-                    video_url = video_versions[0].get("url", "")
-                    if video_url and is_reel:
-                        logger.debug(f"Reel {post_id}: Found video_url in post_node.video_versions")
-            
-            # Priority 2: Check in actual_post_data (merged data from node and media)
-            if not video_url and "video_versions" in actual_post_data and actual_post_data["video_versions"]:
-                video_versions = actual_post_data["video_versions"]
-                if isinstance(video_versions, list) and len(video_versions) > 0:
-                    video_url = video_versions[0].get("url", "")
-                    if video_url and is_reel:
-                        logger.debug(f"Reel {post_id}: Found video_url in actual_post_data.video_versions")
-            
-            # Priority 3: Check in media_data (for nested media structure)
-            if not video_url and media_data and "video_versions" in media_data and media_data["video_versions"]:
-                video_versions = media_data["video_versions"]
-                if isinstance(video_versions, list) and len(video_versions) > 0:
-                    video_url = video_versions[0].get("url", "")
-                    if video_url and is_reel:
-                        logger.debug(f"Reel {post_id}: Found video_url in media_data.video_versions")
-            
-            # Priority 4: For reels, check if there's a direct video_url field
-            if not video_url and is_reel:
-                if "video_url" in actual_post_data and actual_post_data["video_url"]:
-                    video_url = actual_post_data["video_url"]
-                elif "video_url" in post_node and post_node["video_url"]:
-                    video_url = post_node["video_url"]
-                elif media_data and "video_url" in media_data and media_data["video_url"]:
-                    video_url = media_data["video_url"]
+        # Extract video URLs from API response (video URLs are available in the response)
+        # Check for video versions (reels and videos)
+        # Priority 1: Check in post_node first (this is where reels endpoint stores it directly)
+        if "video_versions" in post_node and post_node["video_versions"]:
+            video_versions = post_node["video_versions"]
+            if isinstance(video_versions, list) and len(video_versions) > 0:
+                video_url = video_versions[0].get("url", "")
+                if video_url and is_reel:
+                    logger.debug(f"Reel {post_id}: Found video_url in post_node.video_versions")
+        
+        # Priority 2: Check in actual_post_data (merged data from node and media)
+        if not video_url and "video_versions" in actual_post_data and actual_post_data["video_versions"]:
+            video_versions = actual_post_data["video_versions"]
+            if isinstance(video_versions, list) and len(video_versions) > 0:
+                video_url = video_versions[0].get("url", "")
+                if video_url and is_reel:
+                    logger.debug(f"Reel {post_id}: Found video_url in actual_post_data.video_versions")
+        
+        # Priority 3: Check in media_data (for nested media structure)
+        if not video_url and media_data and "video_versions" in media_data and media_data["video_versions"]:
+            video_versions = media_data["video_versions"]
+            if isinstance(video_versions, list) and len(video_versions) > 0:
+                video_url = video_versions[0].get("url", "")
+                if video_url and is_reel:
+                    logger.debug(f"Reel {post_id}: Found video_url in media_data.video_versions")
+        
+        # Priority 4: For reels, check if there's a direct video_url field
+        if not video_url and is_reel:
+            if "video_url" in actual_post_data and actual_post_data["video_url"]:
+                video_url = actual_post_data["video_url"]
+            elif "video_url" in post_node and post_node["video_url"]:
+                video_url = post_node["video_url"]
+            elif media_data and "video_url" in media_data and media_data["video_url"]:
+                video_url = media_data["video_url"]
         
         # Check for image versions
         if "image_versions2" in actual_post_data:
@@ -1117,9 +1118,90 @@ def parse_instagram_post(post_node: Dict, skip_video_url: bool = False) -> Optio
         return None
 
 
+def _fetch_single_page(username: str, end_cursor: Optional[str] = None) -> Optional[Dict]:
+    """
+    Fetch a single page of posts for a username.
+    Uses a different API key automatically via rate limiter.
+    
+    Args:
+        username: Instagram username (without @)
+        end_cursor: Optional cursor for pagination (None for first page)
+    
+    Returns:
+        Dictionary with 'posts', 'end_cursor', 'has_next_page', 'user_id' or None if failed
+    """
+    url = "https://instagram120.p.rapidapi.com/api/instagram/posts"
+    payload = {
+        "username": username,
+        "maxId": end_cursor if end_cursor else ""
+    }
+    
+    response_data = _make_api_request(url, payload, method="POST")
+    
+    if not response_data:
+        logger.error(f"Failed to fetch page for {username} (cursor: {end_cursor})")
+        return None
+    
+    result = {
+        'posts': [],
+        'end_cursor': None,
+        'has_next_page': False,
+        'user_id': None
+    }
+    
+    # Extract user ID from response
+    if "result" in response_data:
+        user_data = response_data.get("result", {})
+        if isinstance(user_data, dict):
+            result['user_id'] = user_data.get("id")
+    
+    # Extract posts from response
+    if "result" in response_data:
+        api_result = response_data["result"]
+        if isinstance(api_result, dict):
+            edges = api_result.get("edges", [])
+            if not edges:
+                edges = api_result.get("posts", [])
+                if edges:
+                    edges = [{"node": post} if not isinstance(post, dict) or "node" not in post else post for post in edges]
+            
+            if edges:
+                for edge in edges:
+                    if isinstance(edge, dict):
+                        node = edge.get("node", edge)
+                    else:
+                        node = edge
+                    
+                    if isinstance(node, dict):
+                        parsed_post = parse_instagram_post(node)
+                        if parsed_post:
+                            result['posts'].append(parsed_post)
+                
+                # Extract pagination info
+                page_info = api_result.get("page_info", {})
+                if isinstance(page_info, dict):
+                    result['has_next_page'] = page_info.get("has_next_page", False)
+                    result['end_cursor'] = page_info.get("end_cursor") or page_info.get("maxId")
+                else:
+                    result['has_next_page'] = api_result.get("has_more", False)
+                    result['end_cursor'] = api_result.get("next_max_id") or api_result.get("maxId")
+                    if not result['has_next_page']:
+                        result['has_next_page'] = bool(result['end_cursor'])
+        elif isinstance(api_result, list):
+            for post_data in api_result:
+                parsed_post = parse_instagram_post(post_data)
+                if parsed_post:
+                    result['posts'].append(parsed_post)
+            result['has_next_page'] = False
+    
+    return result
+
+
 def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = None, save_callback: Optional[callable] = None) -> List[Dict]:
     """
-    Fetch all posts for a given Instagram username.
+    Fetch all posts for a given Instagram username using concurrent pagination.
+    Uses up to 13 API keys concurrently to fetch multiple pages simultaneously.
+    Each page (12 posts) is fetched using a different API key, allowing 13 pages per 4 seconds.
     
     Args:
         username: Instagram username (without @)
@@ -1133,6 +1215,7 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
         List of parsed post dictionaries (all posts fetched, even if saved via callback)
     """
     from django.conf import settings
+    from queue import Queue
     
     # Clean username: remove @, trim whitespace, convert to lowercase
     username = str(username).strip().lstrip('@').lower()
@@ -1141,15 +1224,12 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
         logger.error("Empty username provided")
         return []
     
-    all_posts = []
-    user_id = None
-    end_cursor = None
-    has_next_page = True
-    
-    # Get test mode limit from settings (default 24 posts for testing)
+    # Get test mode limit from settings
     test_mode_limit = getattr(settings, 'TEST_MODE_POSTS_LIMIT', 24)
     if test_mode_limit and test_mode_limit > 0:
         logger.info(f"Test mode enabled: Fetching only {test_mode_limit} recent posts for {username}")
+    else:
+        logger.info(f"Test mode disabled: Fetching all available posts for {username}")
     
     # Calculate cutoff time if max_age_hours is provided
     cutoff_time = None
@@ -1159,173 +1239,133 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
     else:
         logger.info(f"Fetching all available posts for {username}")
     
-    while has_next_page:
-        url = "https://instagram120.p.rapidapi.com/api/instagram/posts"
-        payload = {
-            "username": username,
-            "maxId": end_cursor if end_cursor else ""
-        }
-        
-        response_data = _make_api_request(url, payload, method="POST")
-        
-        if not response_data:
-            logger.error(f"Failed to fetch posts for {username}")
-            break
-        
-        # Extract user ID from first response
-        if not user_id and "result" in response_data:
-            user_data = response_data.get("result", {})
-            if isinstance(user_data, dict):
-                user_id = user_data.get("id")
-        
-        # Extract posts from response - handle different response formats
-        if "result" in response_data:
-            result = response_data["result"]
-            if isinstance(result, dict):
-                # Check for edges (GraphQL-style response)
-                edges = result.get("edges", [])
-                if not edges:
-                    # Try alternative format - direct posts array
-                    edges = result.get("posts", [])
-                    if edges:
-                        # Convert to edge format for consistency
-                        edges = [{"node": post} if not isinstance(post, dict) or "node" not in post else post for post in edges]
-                
-                if edges:
-                    batch_posts = []  # Collect posts from this API response batch
-                    reels_count = 0  # Track reels included in this batch
-                    
-                    for edge in edges:
-                        # Check test mode limit before processing each post - stop immediately if limit reached
-                        if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
-                            logger.info(f"Reached test mode limit of {test_mode_limit} posts, stopping immediately")
-                            has_next_page = False
-                            break
-                        
-                        # Handle both edge format and direct node format
-                        if isinstance(edge, dict):
-                            node = edge.get("node", edge)  # Fallback to edge itself if no node key
-                        else:
-                            node = edge
-                        
-                        if not isinstance(node, dict):
-                            continue
-                            
-                        parsed_post = parse_instagram_post(node)
-                        if parsed_post:
-                            # Include both posts and reels - don't skip reels
-                            if parsed_post.get("is_reel"):
-                                reels_count += 1
-                                logger.debug(f"Including reel {parsed_post.get('post_id')} in posts")
-                            
-                            # Check test mode limit again after filtering reels - stop if we've reached the limit
-                            if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
-                                logger.info(f"Reached test mode limit of {test_mode_limit} posts, stopping pagination")
-                                has_next_page = False
-                                break
-                            
-                            # If max_age_hours is set, check if post is within time window
-                            if cutoff_time is not None:
-                                if parsed_post.get("taken_at") and parsed_post["taken_at"] < cutoff_time:
-                                    # Post is too old, stop pagination (posts are returned newest first)
-                                    logger.info(f"Reached posts older than {max_age_hours} hours, stopping pagination")
-                                    has_next_page = False
-                                    break
-                            
-                            all_posts.append(parsed_post)
-                            batch_posts.append(parsed_post)  # Add to batch for callback
-                    
-                    # Log batch statistics
-                    total_items = len(edges)
-                    regular_posts_count = len(batch_posts) - reels_count
-                    logger.info(f"API call returned {total_items} items: {regular_posts_count} posts, {reels_count} reels (total: {len(batch_posts)})")
-                    
-                    # Save posts from this batch immediately via callback (if provided)
-                    # This allows incremental saving after each API call
-                    if save_callback and batch_posts:
-                        try:
-                            save_callback(batch_posts)
-                            logger.info(f"Saved {len(batch_posts)} posts to database from this API call")
-                        except Exception as e:
-                            logger.error(f"Error in save_callback for batch: {e}", exc_info=True)
-                            # Continue processing even if callback fails
-                    
-                    # Check test mode limit after processing batch - stop pagination if limit reached
-                    # This ensures we stop even if the inner break didn't trigger
-                    if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
-                        logger.info(f"Reached test mode limit of {test_mode_limit} posts after processing batch, stopping pagination")
-                        has_next_page = False
-                    
-                    # Check for pagination - handle different pagination formats
-                    page_info = result.get("page_info", {})
-                    if isinstance(page_info, dict):
-                        has_next_page = page_info.get("has_next_page", False)
-                        end_cursor = page_info.get("end_cursor") or page_info.get("maxId")
-                    else:
-                        # Try alternative pagination fields
-                        has_next_page = result.get("has_more", False)
-                        end_cursor = result.get("next_max_id") or result.get("maxId")
-                        if not has_next_page:
-                            has_next_page = bool(end_cursor)
-                else:
-                    logger.warning(f"No posts found in response for {username}. Response keys: {list(result.keys())}")
-                    has_next_page = False
-            elif isinstance(result, list):
-                # Handle direct list of posts
-                batch_posts = []  # Collect posts from this API response batch
-                reels_count = 0  # Track reels included in this batch
-                
-                for post_data in result:
-                    # Check test mode limit before processing more posts
-                    if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
-                        logger.info(f"Reached test mode limit of {test_mode_limit} posts, stopping")
-                        has_next_page = False
-                        break
-                    
-                    parsed_post = parse_instagram_post(post_data)
-                    if parsed_post:
-                        # Include both posts and reels - don't skip reels
-                        if parsed_post.get("is_reel"):
-                            reels_count += 1
-                            logger.debug(f"Including reel {parsed_post.get('post_id')} in posts")
-                        
-                        # Check test mode limit again after filtering reels
-                        if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
-                            logger.info(f"Reached test mode limit of {test_mode_limit} posts, stopping")
-                            has_next_page = False
-                            break
-                        
-                        all_posts.append(parsed_post)
-                        batch_posts.append(parsed_post)  # Add to batch for callback
-                
-                # Log batch statistics
-                total_items = len(result)
-                regular_posts_count = len(batch_posts) - reels_count
-                logger.info(f"API call returned {total_items} items: {regular_posts_count} posts, {reels_count} reels (total: {len(batch_posts)})")
-                
-                # Save posts from this batch immediately via callback (if provided)
-                if save_callback and batch_posts:
-                    try:
-                        save_callback(batch_posts)
-                        logger.info(f"Saved {len(batch_posts)} posts to database from this API call")
-                    except Exception as e:
-                        logger.error(f"Error in save_callback for batch: {e}", exc_info=True)
-                        # Continue processing even if callback fails
-                
-                has_next_page = False
-            else:
-                logger.warning(f"Unexpected result format for {username}: {type(result)}")
-                has_next_page = False
-        else:
-            logger.error(f"No 'result' key in API response for {username}. Response keys: {list(response_data.keys())}")
-            has_next_page = False
-        
-        # Small delay between pagination requests
-        # Skip delay if we've reached test mode limit (already have enough posts)
-        if has_next_page and not (test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit):
-            time.sleep(0.2)
+    # Get number of API keys for concurrent fetching
+    api_keys = getattr(settings, 'RAPIDAPI_KEYS', [])
+    num_api_keys = len(api_keys) if api_keys else 13
+    max_concurrent_pages = min(num_api_keys, 13)  # Use up to 13 keys concurrently
     
-    logger.info(f"Fetched {len(all_posts)} posts for {username}")
+    all_posts = []
+    user_id = None
+    
+    # Queue-based concurrent pagination
+    # Queue stores (end_cursor, page_number) tuples
+    page_queue = Queue()
+    page_queue.put((None, 1))  # Start with first page (no cursor)
+    
+    # Track which pages we've fetched and their results
+    fetched_pages = {}  # page_number -> result dict
+    next_page_to_process = 1  # Process pages in order
+    active_fetches = 0  # Track concurrent fetches
+    
+    # Use ThreadPoolExecutor for concurrent page fetching
+    with ThreadPoolExecutor(max_workers=max_concurrent_pages) as executor:
+        futures = {}  # future -> (end_cursor, page_number)
+        
+        # Submit first page immediately
+        if not page_queue.empty():
+            end_cursor, page_num = page_queue.get()
+            future = executor.submit(_fetch_single_page, username, end_cursor)
+            futures[future] = (end_cursor, page_num)
+            active_fetches += 1
+            logger.debug(f"Submitted fetch for page {page_num} (cursor: {end_cursor})")
+        
+        # Process futures as they complete
+        while futures or not page_queue.empty():
+            # Submit new page fetches if we have capacity and pages in queue
+            while not page_queue.empty() and active_fetches < max_concurrent_pages:
+                end_cursor, page_num = page_queue.get()
+                future = executor.submit(_fetch_single_page, username, end_cursor)
+                futures[future] = (end_cursor, page_num)
+                active_fetches += 1
+                logger.debug(f"Submitted fetch for page {page_num} (cursor: {end_cursor})")
+            
+            # Process completed fetches using as_completed
+            if futures:
+                # Use as_completed with a short timeout to check for completed futures
+                try:
+                    for future in as_completed(futures.keys(), timeout=0.1):
+                        if future not in futures:
+                            continue
+                        end_cursor, page_num = futures.pop(future)
+                        active_fetches -= 1
+                        
+                        try:
+                            page_result = future.result()
+                            
+                            if not page_result:
+                                logger.warning(f"Page {page_num} fetch failed")
+                                continue
+                            
+                            # Store user_id from first page
+                            if not user_id and page_result.get('user_id'):
+                                user_id = page_result.get('user_id')
+                            
+                            # Store page result
+                            fetched_pages[page_num] = page_result
+                            
+                            # Process posts from this page
+                            page_posts = page_result.get('posts', [])
+                            batch_posts = []
+                            reels_count = 0
+                            
+                            for parsed_post in page_posts:
+                                # Check test mode limit
+                                if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
+                                    logger.info(f"Reached test mode limit of {test_mode_limit} posts")
+                                    break
+                                
+                                if parsed_post.get("is_reel"):
+                                    reels_count += 1
+                                
+                                # Check time cutoff
+                                if cutoff_time is not None:
+                                    if parsed_post.get("taken_at") and parsed_post["taken_at"] < cutoff_time:
+                                        logger.info(f"Reached posts older than {max_age_hours} hours")
+                                        break
+                                
+                                all_posts.append(parsed_post)
+                                batch_posts.append(parsed_post)
+                            
+                            # Save batch via callback
+                            if save_callback and batch_posts:
+                                try:
+                                    save_callback(batch_posts)
+                                    logger.info(f"Saved {len(batch_posts)} posts from page {page_num}")
+                                except Exception as e:
+                                    logger.error(f"Error in save_callback for page {page_num}: {e}", exc_info=True)
+                            
+                            logger.info(f"Page {page_num}: Fetched {len(batch_posts)} posts ({len(batch_posts) - reels_count} posts, {reels_count} reels)")
+                            
+                            # If there's a next page, add it to queue
+                            if page_result.get('has_next_page') and page_result.get('end_cursor'):
+                                next_cursor = page_result.get('end_cursor')
+                                next_page = page_num + 1
+                                page_queue.put((next_cursor, next_page))
+                                logger.debug(f"Queued page {next_page} with cursor {next_cursor}")
+                            
+                            # Check if we should stop
+                            if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
+                                logger.info(f"Reached test mode limit, stopping pagination")
+                                break
+                            if cutoff_time and any(p.get("taken_at") and p["taken_at"] < cutoff_time for p in batch_posts):
+                                logger.info(f"Reached time cutoff, stopping pagination")
+                                break
+                                
+                        except Exception as e:
+                            logger.error(f"Error processing page {page_num}: {e}", exc_info=True)
+                except TimeoutError:
+                    # No futures completed within timeout, continue loop
+                    pass
+                
+                # Check if we should stop
+                if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
+                    break
+                
+                # Small sleep to avoid busy waiting
+                if not page_queue.empty() or active_fetches > 0:
+                    time.sleep(0.1)
+    
+    logger.info(f"Fetched {len(all_posts)} posts for {username} using concurrent pagination")
     return all_posts
 
 
@@ -1388,9 +1428,8 @@ def _fetch_reels_from_reels_endpoint(username: str, max_age_hours: Optional[int]
         # Reset consecutive error counter on success
         consecutive_429_errors = 0
         
-        # Add delay between requests to avoid rate limits
-        # Reels endpoint is separate from posts endpoint, so we need to be careful
-        time.sleep(0.5)
+        # No delay needed - rate limiter ensures 4-second spacing between requests per API key
+        # Rate limiter will handle proper spacing automatically
         
         # Extract play_count from reels endpoint response
         if "result" in response_data:
@@ -1524,8 +1563,7 @@ def _fetch_reels_from_reels_endpoint(username: str, max_age_hours: Optional[int]
             logger.error(f"No 'result' key in reels endpoint response for {username}")
             has_next_page = False
         
-        if has_next_page:
-            time.sleep(0.2)
+        # No delay needed - rate limiter ensures 4-second spacing between requests per API key
     
     total_play_counts = len(play_count_lookup['post_id_map']) + len(play_count_lookup['post_code_map'])
     logger.info(f"Fetched play_count data for {total_play_counts} reels from reels endpoint for {username}")
@@ -1612,9 +1650,8 @@ def fetch_instagram_reels(username: str, max_age_hours: Optional[int] = None) ->
                         if not isinstance(node, dict):
                             continue
                         
-                        # Parse the reel - skip video URL extraction for lazy loading
-                        # Video URLs will be fetched on-demand when user views the post detail page
-                        parsed_reel = parse_instagram_post(node, skip_video_url=True)
+                        # Parse the reel
+                        parsed_reel = parse_instagram_post(node)
                         
                         # Only include reels (filter by product_type or is_reel flag)
                         if parsed_reel and parsed_reel.get("is_reel"):
@@ -1677,8 +1714,7 @@ def fetch_instagram_reels(username: str, max_age_hours: Optional[int] = None) ->
             elif isinstance(result, list):
                 # Handle direct list of reels
                 for reel_data in result:
-                    # Parse reel - skip video URL extraction for lazy loading
-                    parsed_reel = parse_instagram_post(reel_data, skip_video_url=True)
+                    parsed_reel = parse_instagram_post(reel_data)
                     if parsed_reel:
                         parsed_reel["is_reel"] = True
                         # If max_age_hours is set, check if reel is within time window
@@ -1703,10 +1739,9 @@ def fetch_instagram_reels(username: str, max_age_hours: Optional[int] = None) ->
             logger.error(f"No 'result' key in API response for reels {username}. Response keys: {list(response_data.keys())}")
             has_next_page = False
         
-        # Small delay between pagination requests
+        # No delay needed - rate limiter ensures 4-second spacing between requests per API key
         # Skip delay if we've reached test mode limit (already have enough reels)
-        if has_next_page and not (test_mode_limit and len(all_reels) >= test_mode_limit):
-            time.sleep(0.2)
+        # Rate limiter will handle proper spacing automatically
     
     # Apply test mode limit to final results if needed (safety check)
     if test_mode_limit and len(all_reels) > test_mode_limit:
