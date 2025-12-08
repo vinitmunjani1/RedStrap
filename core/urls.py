@@ -47,5 +47,6 @@ urlpatterns = [
     
     # Unified social dashboard
     path('social/', views.social_dashboard_view, name='social_dashboard'),
+    path('social/analytics/<str:username>/', views.social_user_analytics_view, name='social_user_analytics'),
 ]
 

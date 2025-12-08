@@ -2292,7 +2292,7 @@ def twitter_account_tweets_view(request, account_id):
 @login_required
 def social_dashboard_view(request):
     """
-    Unified dashboard: add IG/Twitter accounts, view posts/tweets, and see analytics in one place.
+    Unified dashboard: add IG/Twitter accounts and list handles with analytics links.
     """
     form = SocialAccountForm(request.POST or None)
     if request.method == 'POST':
@@ -2312,30 +2312,58 @@ def social_dashboard_view(request):
         else:
             messages.error(request, "Please fix the errors in the form.")
 
-    # Instagram data
+    # Build combined handle list (case-insensitive merge of IG/Twitter usernames)
     ig_accounts = list(InstagramAccount.objects.filter(user=request.user))
+    tw_accounts = list(TwitterAccount.objects.filter(user=request.user))
+
+    handles = {}
+    for acc in ig_accounts:
+        key = acc.username.lower()
+        handles.setdefault(key, {'username': acc.username, 'ig': [], 'tw': []})
+        handles[key]['ig'].append(acc)
+    for acc in tw_accounts:
+        key = acc.username.lower()
+        handles.setdefault(key, {'username': acc.username, 'ig': [], 'tw': []})
+        handles[key]['tw'].append(acc)
+
+    handle_cards = sorted(handles.values(), key=lambda x: x['username'].lower())
+
+    context = {
+        'form': form,
+        'handle_cards': handle_cards,
+    }
+    return render(request, 'core/social_dashboard.html', context)
+
+
+@login_required
+def social_user_analytics_view(request, username):
+    """
+    Show combined analytics for a specific username across Instagram and Twitter.
+    """
+    username_clean = str(username).strip().lstrip('@')
+    ig_accounts = list(InstagramAccount.objects.filter(user=request.user, username__iexact=username_clean))
+    tw_accounts = list(TwitterAccount.objects.filter(user=request.user, username__iexact=username_clean))
+
     ig_posts = list(
-        InstagramPost.objects.filter(account__user=request.user)
+        InstagramPost.objects.filter(account__in=ig_accounts)
         .select_related('account')
-        .order_by('-taken_at')[:12]
+        .order_by('-taken_at')
     )
+    tw_tweets = list(
+        TwitterTweet.objects.filter(account__in=tw_accounts)
+        .select_related('account')
+        .order_by('-created_at')
+    )
+
     ig_total_posts = len(ig_posts)
     ig_total_likes = sum(p.like_count for p in ig_posts)
     ig_total_comments = sum(p.comment_count for p in ig_posts)
 
-    # Twitter data
-    tw_accounts = list(TwitterAccount.objects.filter(user=request.user))
-    tw_tweets = list(
-        TwitterTweet.objects.filter(account__user=request.user)
-        .select_related('account')
-        .order_by('-created_at')[:12]
-    )
     tw_total_tweets = len(tw_tweets)
     tw_total_faves = sum(t.favorite_count for t in tw_tweets)
     tw_total_retweets = sum(t.retweet_count for t in tw_tweets)
     tw_total_views = sum(t.view_count for t in tw_tweets)
 
-    # Twitter hashtag/mention aggregates (simple top 5)
     hashtag_counter = Counter()
     mention_counter = Counter()
     for t in tw_tweets:
@@ -2347,14 +2375,14 @@ def social_dashboard_view(request):
     top_mentions = mention_counter.most_common(5)
 
     context = {
-        'form': form,
+        'username_display': username_clean,
         'ig_accounts': ig_accounts,
-        'ig_posts': ig_posts,
+        'tw_accounts': tw_accounts,
+        'ig_posts': ig_posts[:12],
+        'tw_tweets': tw_tweets[:12],
         'ig_total_posts': ig_total_posts,
         'ig_total_likes': ig_total_likes,
         'ig_total_comments': ig_total_comments,
-        'tw_accounts': tw_accounts,
-        'tw_tweets': tw_tweets,
         'tw_total_tweets': tw_total_tweets,
         'tw_total_faves': tw_total_faves,
         'tw_total_retweets': tw_total_retweets,
@@ -2362,5 +2390,5 @@ def social_dashboard_view(request):
         'top_hashtags': top_hashtags,
         'top_mentions': top_mentions,
     }
-    return render(request, 'core/social_dashboard.html', context)
+    return render(request, 'core/social_user_analytics.html', context)
 

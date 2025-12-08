@@ -7,17 +7,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
         <div>
             <h1 class="mb-1"><i class="bi bi-people"></i> Social Dashboard</h1>
-            <small class="text-muted">Manage Instagram & Twitter together</small>
-        </div>
-        <div class="d-flex gap-2">
-            <form method="post" action="{% url 'scrape_instagram' %}" class="d-inline">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-success"><i class="bi bi-download"></i> Fetch IG</button>
-            </form>
-            <form method="post" action="{% url 'scrape_twitter' %}" class="d-inline">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-primary"><i class="bi bi-download"></i> Fetch Twitter</button>
-            </form>
+            <small class="text-muted">Add accounts and jump to analytics</small>
         </div>
     </div>
 
@@ -55,147 +45,40 @@
         </div>
     </div>
 
-    <div class="row g-4">
-        <!-- Instagram Section -->
-        <div class="col-lg-6">
-            <div class="glass-card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h4 class="mb-0"><i class="bi bi-instagram"></i> Instagram</h4>
-                        <div class="d-flex gap-2">
-                            <a href="{% url 'instagram_accounts' %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-gear"></i> Manage</a>
-                        </div>
-                    </div>
-                    <div class="row g-3 mb-3">
-                        <div class="col-4">
-                            <div class="stat-card">
-                                <h5>Posts</h5>
-                                <h2>{{ ig_total_posts }}</h2>
-                            </div>
-                        </div>
-                        <div class="col-4">
-                            <div class="stat-card">
-                                <h5>Likes</h5>
-                                <h2>{{ ig_total_likes|floatformat:0 }}</h2>
-                            </div>
-                        </div>
-                        <div class="col-4">
-                            <div class="stat-card">
-                                <h5>Comments</h5>
-                                <h2>{{ ig_total_comments|floatformat:0 }}</h2>
-                            </div>
-                        </div>
-                    </div>
-                    {% if ig_posts %}
-                        <div class="post-grid">
-                            {% for post in ig_posts %}
-                                <div class="card">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <span class="text-muted small">@{{ post.account.username }}</span>
-                                            <span class="text-muted small">{{ post.taken_at|date:"M d, Y" }}</span>
+    <!-- Handles list -->
+    <div class="glass-card">
+        <div class="card-body">
+            <h4 class="mb-3"><i class="bi bi-person-badge"></i> Accounts</h4>
+            {% if handle_cards %}
+                <div class="row g-3">
+                    {% for h in handle_cards %}
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                            <i class="bi bi-person-fill"></i>
                                         </div>
-                                        {% if post.image_url %}
-                                            <img src="{{ post.image_url }}" class="img-fluid rounded mb-2" alt="Post image">
-                                        {% endif %}
-                                        <p class="text-muted small mb-2">{{ post.caption|truncatewords:20 }}</p>
-                                        <div class="d-flex gap-3 text-muted small">
-                                            <span><i class="bi bi-heart"></i> {{ post.like_count }}</span>
-                                            <span><i class="bi bi-chat"></i> {{ post.comment_count }}</span>
+                                        <div>
+                                            <h5 class="mb-0">@{{ h.username }}</h5>
+                                            <small class="text-muted">
+                                                IG: {{ h.ig|length }} | TW: {{ h.tw|length }}
+                                            </small>
                                         </div>
                                     </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-muted">No Instagram posts yet.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Twitter Section -->
-        <div class="col-lg-6">
-            <div class="glass-card">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h4 class="mb-0"><i class="bi bi-twitter"></i> Twitter</h4>
-                        <div class="d-flex gap-2">
-                            <a href="{% url 'twitter_accounts' %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-gear"></i> Manage</a>
-                        </div>
-                    </div>
-                    <div class="row g-3 mb-3">
-                        <div class="col-3">
-                            <div class="stat-card">
-                                <h5>Tweets</h5>
-                                <h2>{{ tw_total_tweets }}</h2>
-                            </div>
-                        </div>
-                        <div class="col-3">
-                            <div class="stat-card">
-                                <h5>Favs</h5>
-                                <h2>{{ tw_total_faves|floatformat:0 }}</h2>
-                            </div>
-                        </div>
-                        <div class="col-3">
-                            <div class="stat-card">
-                                <h5>RTs</h5>
-                                <h2>{{ tw_total_retweets|floatformat:0 }}</h2>
-                            </div>
-                        </div>
-                        <div class="col-3">
-                            <div class="stat-card">
-                                <h5>Views</h5>
-                                <h2>{{ tw_total_views|floatformat:0 }}</h2>
-                            </div>
-                        </div>
-                    </div>
-                    {% if top_hashtags or top_mentions %}
-                        <div class="mb-3">
-                            {% if top_hashtags %}
-                                <div class="mb-2">
-                                    <strong>Top Hashtags:</strong>
-                                    {% for tag,count in top_hashtags %}
-                                        <span class="badge bg-primary me-1">#{{ tag }} ({{ count }})</span>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-                            {% if top_mentions %}
-                                <div>
-                                    <strong>Top Mentions:</strong>
-                                    {% for mention,count in top_mentions %}
-                                        <span class="badge bg-secondary me-1">@{{ mention }} ({{ count }})</span>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-                        </div>
-                    {% endif %}
-
-                    {% if tw_tweets %}
-                        <div class="list-group">
-                            {% for tweet in tw_tweets %}
-                                <div class="list-group-item d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="text-muted small">@{{ tweet.account.username }}</span>
-                                        <span class="text-muted small">{{ tweet.created_at|date:"M d, Y g:i A" }}</span>
-                                    </div>
-                                    <p class="mb-2" style="white-space: pre-wrap;">{{ tweet.text|truncatewords:30 }}</p>
-                                    <div class="d-flex gap-3 text-muted small">
-                                        <span><i class="bi bi-heart"></i> {{ tweet.favorite_count }}</span>
-                                        <span><i class="bi bi-arrow-repeat"></i> {{ tweet.retweet_count }}</span>
-                                        <span><i class="bi bi-chat"></i> {{ tweet.reply_count }}</span>
-                                        {% if tweet.view_count > 0 %}
-                                            <span><i class="bi bi-eye"></i> {{ tweet.view_count }}</span>
-                                        {% endif %}
+                                    <div class="mt-auto d-flex gap-2">
+                                        <a href="{% url 'social_user_analytics' h.username %}" class="btn btn-outline-primary w-100">
+                                            <i class="bi bi-graph-up"></i> Analytics
+                                        </a>
                                     </div>
                                 </div>
-                            {% endfor %}
+                            </div>
                         </div>
-                    {% else %}
-                        <p class="text-muted">No tweets yet.</p>
-                    {% endif %}
+                    {% endfor %}
                 </div>
-            </div>
+            {% else %}
+                <p class="text-muted mb-0">No accounts yet. Add an Instagram or Twitter username above.</p>
+            {% endif %}
         </div>
     </div>
 </div>
