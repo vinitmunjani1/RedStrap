@@ -2,7 +2,7 @@
 Django views for Instagram and Reddit scraping application.
 """
 import logging
-from collections import defaultdict
+from collections import defaultdict, Counter
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
@@ -27,7 +27,7 @@ from .models import (
     Subreddit, RedditPost, RedditKeyword,
     TwitterAccount, TwitterTweet
 )
-from .forms import InstagramAccountForm, SubredditForm, TwitterAccountForm
+from .forms import InstagramAccountForm, SubredditForm, TwitterAccountForm, SocialAccountForm
 from .services import instagram_service, reddit_service, keyword_service, twitter_service
 
 
@@ -2287,4 +2287,80 @@ def twitter_account_tweets_view(request, account_id):
         'count': tweets.count(),
     }
     return render(request, 'core/twitter_account_tweets.html', context)
+
+
+@login_required
+def social_dashboard_view(request):
+    """
+    Unified dashboard: add IG/Twitter accounts, view posts/tweets, and see analytics in one place.
+    """
+    form = SocialAccountForm(request.POST or None)
+    if request.method == 'POST':
+        if form.is_valid():
+            ig_username = form.cleaned_data.get('instagram_username')
+            tw_username = form.cleaned_data.get('twitter_username')
+            try:
+                if ig_username:
+                    InstagramAccount.objects.get_or_create(user=request.user, username=ig_username)
+                if tw_username:
+                    TwitterAccount.objects.get_or_create(user=request.user, username=tw_username)
+                messages.success(request, "Accounts added successfully.")
+                return redirect('social_dashboard')
+            except Exception as e:
+                logger.error(f"Error adding social accounts: {e}", exc_info=True)
+                messages.error(request, f"Error adding accounts: {str(e)}")
+        else:
+            messages.error(request, "Please fix the errors in the form.")
+
+    # Instagram data
+    ig_accounts = list(InstagramAccount.objects.filter(user=request.user))
+    ig_posts = list(
+        InstagramPost.objects.filter(account__user=request.user)
+        .select_related('account')
+        .order_by('-taken_at')[:12]
+    )
+    ig_total_posts = len(ig_posts)
+    ig_total_likes = sum(p.like_count for p in ig_posts)
+    ig_total_comments = sum(p.comment_count for p in ig_posts)
+
+    # Twitter data
+    tw_accounts = list(TwitterAccount.objects.filter(user=request.user))
+    tw_tweets = list(
+        TwitterTweet.objects.filter(account__user=request.user)
+        .select_related('account')
+        .order_by('-created_at')[:12]
+    )
+    tw_total_tweets = len(tw_tweets)
+    tw_total_faves = sum(t.favorite_count for t in tw_tweets)
+    tw_total_retweets = sum(t.retweet_count for t in tw_tweets)
+    tw_total_views = sum(t.view_count for t in tw_tweets)
+
+    # Twitter hashtag/mention aggregates (simple top 5)
+    hashtag_counter = Counter()
+    mention_counter = Counter()
+    for t in tw_tweets:
+        for h in t.hashtags or []:
+            hashtag_counter[h.lower()] += 1
+        for m in t.mentions or []:
+            mention_counter[m.lower()] += 1
+    top_hashtags = hashtag_counter.most_common(5)
+    top_mentions = mention_counter.most_common(5)
+
+    context = {
+        'form': form,
+        'ig_accounts': ig_accounts,
+        'ig_posts': ig_posts,
+        'ig_total_posts': ig_total_posts,
+        'ig_total_likes': ig_total_likes,
+        'ig_total_comments': ig_total_comments,
+        'tw_accounts': tw_accounts,
+        'tw_tweets': tw_tweets,
+        'tw_total_tweets': tw_total_tweets,
+        'tw_total_faves': tw_total_faves,
+        'tw_total_retweets': tw_total_retweets,
+        'tw_total_views': tw_total_views,
+        'top_hashtags': top_hashtags,
+        'top_mentions': top_mentions,
+    }
+    return render(request, 'core/social_dashboard.html', context)
 

@@ -63,6 +63,46 @@ class SubredditForm(forms.ModelForm):
         return name
 
 
+class SocialAccountForm(forms.Form):
+    """
+    Combined form to add Instagram and Twitter usernames in one action.
+    Either field can be provided; at least one is required.
+    """
+    instagram_username = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Instagram username (without @)',
+        }),
+        help_text="Optional. Enter Instagram username without @"
+    )
+    twitter_username = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Twitter username (without @)',
+        }),
+        help_text="Optional. Enter Twitter username without @"
+    )
+
+    def clean(self):
+        """
+        Ensure at least one handle is provided; normalize both if present.
+        """
+        cleaned_data = super().clean()
+        ig = (cleaned_data.get('instagram_username') or '').strip().lstrip('@')
+        tw = (cleaned_data.get('twitter_username') or '').strip().lstrip('@')
+
+        if not ig and not tw:
+            raise forms.ValidationError("Provide at least one username (Instagram or Twitter).")
+
+        cleaned_data['instagram_username'] = ig.lower() if ig else ''
+        cleaned_data['twitter_username'] = tw
+        return cleaned_data
+
+
 class TwitterAccountForm(forms.ModelForm):
     """
     Form for adding a new Twitter account to monitor.

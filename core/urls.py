@@ -44,5 +44,8 @@ urlpatterns = [
     path('twitter/fetch/<int:account_id>/', views.fetch_single_twitter_account_tweets_view, name='fetch_single_twitter_account_tweets'),
     path('twitter/tweets/', views.twitter_tweets_view, name='twitter_tweets'),
     path('twitter/account/<int:account_id>/tweets/', views.twitter_account_tweets_view, name='twitter_account_tweets'),
+    
+    # Unified social dashboard
+    path('social/', views.social_dashboard_view, name='social_dashboard'),
 ]
 
