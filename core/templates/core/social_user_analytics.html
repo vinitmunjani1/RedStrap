@@ -14,145 +14,289 @@
         </a>
     </div>
 
-    <div class="row g-4">
+    <!-- Tabs -->
+    <ul class="nav nav-pills mb-3" id="analyticsTabs">
+        <li class="nav-item">
+            <button class="nav-link active" id="tab-ig" type="button" data-target="ig-pane">
+                <i class="bi bi-instagram"></i> Instagram
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" id="tab-tw" type="button" data-target="tw-pane">
+                <i class="bi bi-twitter"></i> Tweets
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
         <!-- Instagram Analytics -->
-        <div class="col-lg-6">
+        <div class="tab-pane active" id="ig-pane">
             <div class="glass-card h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h4 class="mb-0"><i class="bi bi-instagram"></i> Instagram</h4>
                         <div class="text-muted small">Accounts: {{ ig_accounts|length }}</div>
                     </div>
-                    <div class="row g-3 mb-3">
-                        <div class="col-4">
-                            <div class="stat-card">
-                                <h5>Posts</h5>
-                                <h2>{{ ig_total_posts }}</h2>
+
+                    <ul class="nav nav-pills mb-3 sub-tab-group" data-group="ig">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-target="ig-analytics">Analytics</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-target="ig-posts">All Posts</button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <div class="tab-pane active" id="ig-analytics">
+                            <div class="row g-3 mb-3">
+                                <div class="col-4">
+                                    <div class="stat-card">
+                                        <h5>Posts</h5>
+                                        <h2>{{ ig_total_posts }}</h2>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="stat-card">
+                                        <h5>Likes</h5>
+                                        <h2>{{ ig_total_likes|floatformat:0 }}</h2>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="stat-card">
+                                        <h5>Comments</h5>
+                                        <h2>{{ ig_total_comments|floatformat:0 }}</h2>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-4">
-                            <div class="stat-card">
-                                <h5>Likes</h5>
-                                <h2>{{ ig_total_likes|floatformat:0 }}</h2>
-                            </div>
-                        </div>
-                        <div class="col-4">
-                            <div class="stat-card">
-                                <h5>Comments</h5>
-                                <h2>{{ ig_total_comments|floatformat:0 }}</h2>
-                            </div>
-                        </div>
-                    </div>
-                    {% if ig_posts %}
-                        <div class="post-grid">
-                            {% for post in ig_posts %}
-                                <div class="card">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <span class="text-muted small">@{{ post.account.username }}</span>
-                                            <span class="text-muted small">{{ post.taken_at|date:"M d, Y" }}</span>
-                                        </div>
-                                        {% if post.image_url %}
-                                            <img src="{{ post.image_url }}" class="img-fluid rounded mb-2" alt="Post image">
-                                        {% endif %}
-                                        <p class="text-muted small mb-2">{{ post.caption|truncatewords:20 }}</p>
-                                        <div class="d-flex gap-3 text-muted small">
-                                            <span><i class="bi bi-heart"></i> {{ post.like_count }}</span>
-                                            <span><i class="bi bi-chat"></i> {{ post.comment_count }}</span>
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <div class="glass-card">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <strong>Posts per Weekday</strong>
+                                            </div>
+                                            <canvas id="igWeekdayChart" style="max-height: 240px;"></canvas>
                                         </div>
                                     </div>
                                 </div>
-                            {% endfor %}
+                            </div>
                         </div>
-                    {% else %}
-                        <p class="text-muted mb-0">No Instagram posts found for @{{ username_display }}.</p>
-                    {% endif %}
+                        <div class="tab-pane" id="ig-posts">
+                            {% if ig_posts %}
+                                <div class="post-grid">
+                                    {% for post in ig_posts %}
+                                        <div class="card">
+                                            <div class="card-body">
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <span class="text-muted small">@{{ post.account.username }}</span>
+                                                    <span class="text-muted small">{{ post.taken_at|date:"M d, Y" }}</span>
+                                                </div>
+                                                {% if post.image_url %}
+                                                    <img src="{{ post.image_url }}" class="img-fluid rounded mb-2" alt="Post image">
+                                                {% endif %}
+                                                <p class="text-muted small mb-2">{{ post.caption|truncatewords:20 }}</p>
+                                                <div class="d-flex gap-3 text-muted small">
+                                                    <span><i class="bi bi-heart"></i> {{ post.like_count }}</span>
+                                                    <span><i class="bi bi-chat"></i> {{ post.comment_count }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-muted mb-0">No Instagram posts found for @{{ username_display }}.</p>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Twitter Analytics -->
-        <div class="col-lg-6">
+        <div class="tab-pane" id="tw-pane">
             <div class="glass-card h-100">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h4 class="mb-0"><i class="bi bi-twitter"></i> Twitter</h4>
                         <div class="text-muted small">Accounts: {{ tw_accounts|length }}</div>
                     </div>
-                    <div class="row g-3 mb-3">
-                        <div class="col-3">
-                            <div class="stat-card">
-                                <h5>Tweets</h5>
-                                <h2>{{ tw_total_tweets }}</h2>
+
+                    <ul class="nav nav-pills mb-3 sub-tab-group" data-group="tw">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-target="tw-analytics">Analytics</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-target="tw-tweets">All Tweets</button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <div class="tab-pane active" id="tw-analytics">
+                            <div class="row g-3 mb-3">
+                                <div class="col-3">
+                                    <div class="stat-card">
+                                        <h5>Tweets</h5>
+                                        <h2>{{ tw_total_tweets }}</h2>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="stat-card">
+                                        <h5>Favs</h5>
+                                        <h2>{{ tw_total_faves|floatformat:0 }}</h2>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="stat-card">
+                                        <h5>RTs</h5>
+                                        <h2>{{ tw_total_retweets|floatformat:0 }}</h2>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="stat-card">
+                                        <h5>Views</h5>
+                                        <h2>{{ tw_total_views|floatformat:0 }}</h2>
+                                    </div>
+                                </div>
                             </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-12">
+                                    <div class="glass-card">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <strong>Tweets per Weekday</strong>
+                                            </div>
+                                            <canvas id="twWeekdayChart" style="max-height: 240px;"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% if top_hashtags or top_mentions %}
+                                <div class="mb-3">
+                                    {% if top_hashtags %}
+                                        <div class="mb-2">
+                                            <strong>Top Hashtags:</strong>
+                                            {% for tag,count in top_hashtags %}
+                                                <span class="badge bg-primary me-1">#{{ tag }} ({{ count }})</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    {% if top_mentions %}
+                                        <div>
+                                            <strong>Top Mentions:</strong>
+                                            {% for mention,count in top_mentions %}
+                                                <span class="badge bg-secondary me-1">@{{ mention }} ({{ count }})</span>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
                         </div>
-                        <div class="col-3">
-                            <div class="stat-card">
-                                <h5>Favs</h5>
-                                <h2>{{ tw_total_faves|floatformat:0 }}</h2>
-                            </div>
-                        </div>
-                        <div class="col-3">
-                            <div class="stat-card">
-                                <h5>RTs</h5>
-                                <h2>{{ tw_total_retweets|floatformat:0 }}</h2>
-                            </div>
-                        </div>
-                        <div class="col-3">
-                            <div class="stat-card">
-                                <h5>Views</h5>
-                                <h2>{{ tw_total_views|floatformat:0 }}</h2>
-                            </div>
+
+                        <div class="tab-pane" id="tw-tweets">
+                            {% if tw_tweets %}
+                                <div class="list-group">
+                                    {% for tweet in tw_tweets %}
+                                        <div class="list-group-item d-flex flex-column">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="text-muted small">@{{ tweet.account.username }}</span>
+                                                <span class="text-muted small">{{ tweet.created_at|date:"M d, Y g:i A" }}</span>
+                                            </div>
+                                            <p class="mb-2" style="white-space: pre-wrap;">{{ tweet.text|truncatewords:30 }}</p>
+                                            <div class="d-flex gap-3 text-muted small">
+                                                <span><i class="bi bi-heart"></i> {{ tweet.favorite_count }}</span>
+                                                <span><i class="bi bi-arrow-repeat"></i> {{ tweet.retweet_count }}</span>
+                                                <span><i class="bi bi-chat"></i> {{ tweet.reply_count }}</span>
+                                                {% if tweet.view_count > 0 %}
+                                                    <span><i class="bi bi-eye"></i> {{ tweet.view_count }}</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-muted mb-0">No tweets found for @{{ username_display }}.</p>
+                            {% endif %}
                         </div>
                     </div>
-                    {% if top_hashtags or top_mentions %}
-                        <div class="mb-3">
-                            {% if top_hashtags %}
-                                <div class="mb-2">
-                                    <strong>Top Hashtags:</strong>
-                                    {% for tag,count in top_hashtags %}
-                                        <span class="badge bg-primary me-1">#{{ tag }} ({{ count }})</span>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-                            {% if top_mentions %}
-                                <div>
-                                    <strong>Top Mentions:</strong>
-                                    {% for mention,count in top_mentions %}
-                                        <span class="badge bg-secondary me-1">@{{ mention }} ({{ count }})</span>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-                        </div>
-                    {% endif %}
-
-                    {% if tw_tweets %}
-                        <div class="list-group">
-                            {% for tweet in tw_tweets %}
-                                <div class="list-group-item d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="text-muted small">@{{ tweet.account.username }}</span>
-                                        <span class="text-muted small">{{ tweet.created_at|date:"M d, Y g:i A" }}</span>
-                                    </div>
-                                    <p class="mb-2" style="white-space: pre-wrap;">{{ tweet.text|truncatewords:30 }}</p>
-                                    <div class="d-flex gap-3 text-muted small">
-                                        <span><i class="bi bi-heart"></i> {{ tweet.favorite_count }}</span>
-                                        <span><i class="bi bi-arrow-repeat"></i> {{ tweet.retweet_count }}</span>
-                                        <span><i class="bi bi-chat"></i> {{ tweet.reply_count }}</span>
-                                        {% if tweet.view_count > 0 %}
-                                            <span><i class="bi bi-eye"></i> {{ tweet.view_count }}</span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-muted mb-0">No tweets found for @{{ username_display }}.</p>
-                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const tabs = document.querySelectorAll('#analyticsTabs .nav-link');
+    const panes = document.querySelectorAll('.tab-pane');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            panes.forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            const target = document.getElementById(tab.dataset.target);
+            if (target) target.classList.add('active');
+        });
+    });
+
+    // Sub-tabs for IG/TW sections
+    const subGroups = document.querySelectorAll('.sub-tab-group');
+    subGroups.forEach(group => {
+        const tabs = group.querySelectorAll('.nav-link');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const targetId = tab.dataset.target;
+                const pane = document.getElementById(targetId);
+                const allPanes = group.parentElement.querySelectorAll('.tab-pane');
+                allPanes.forEach(p => p.classList.remove('active'));
+                if (pane) pane.classList.add('active');
+            });
+        });
+    });
+
+    const igWeekdayData = {{ ig_weekday_counts|default:"[]"|safe }};
+    const twWeekdayData = {{ tw_weekday_counts|default:"[]"|safe }};
+    const weekdayLabels = {{ weekday_labels|default:"[]"|safe }};
+
+    function renderBarChart(canvasId, label, dataArray) {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return;
+        const safeData = Array.isArray(dataArray) && dataArray.length === weekdayLabels.length
+            ? dataArray
+            : Array(weekdayLabels.length).fill(0);
+        const maxVal = Math.max(...safeData, 1);
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: weekdayLabels,
+                datasets: [{
+                    label: label,
+                    data: safeData,
+                    backgroundColor: 'rgba(129, 140, 248, 0.6)',
+                    borderColor: 'rgba(129, 140, 248, 1)',
+                    borderWidth: 1,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: maxVal,
+                        ticks: { precision: 0 }
+                    }
+                }
+            }
+        });
+    }
+
+    renderBarChart('igWeekdayChart', 'Posts per Weekday', igWeekdayData);
+    renderBarChart('twWeekdayChart', 'Tweets per Weekday', twWeekdayData);
+});
+</script>
 {% endblock %}
 

@@ -2355,14 +2355,24 @@ def social_user_analytics_view(request, username):
         .order_by('-created_at')
     )
 
+    def weekday_counts(items, dt_getter):
+        counts = [0] * 7
+        for item in items:
+            dt = dt_getter(item)
+            if dt:
+                counts[dt.weekday()] += 1
+        return counts
+
     ig_total_posts = len(ig_posts)
     ig_total_likes = sum(p.like_count for p in ig_posts)
     ig_total_comments = sum(p.comment_count for p in ig_posts)
+    ig_weekday_counts = weekday_counts(ig_posts, lambda p: p.taken_at)
 
     tw_total_tweets = len(tw_tweets)
     tw_total_faves = sum(t.favorite_count for t in tw_tweets)
     tw_total_retweets = sum(t.retweet_count for t in tw_tweets)
     tw_total_views = sum(t.view_count for t in tw_tweets)
+    tw_weekday_counts = weekday_counts(tw_tweets, lambda t: t.created_at)
 
     hashtag_counter = Counter()
     mention_counter = Counter()
@@ -2389,6 +2399,9 @@ def social_user_analytics_view(request, username):
         'tw_total_views': tw_total_views,
         'top_hashtags': top_hashtags,
         'top_mentions': top_mentions,
+        'ig_weekday_counts': ig_weekday_counts,
+        'tw_weekday_counts': tw_weekday_counts,
+        'weekday_labels': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     }
     return render(request, 'core/social_user_analytics.html', context)
 
