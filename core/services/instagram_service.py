@@ -108,7 +108,7 @@ def _save_response_to_file(response_data: Dict, endpoint_type: str, username: st
         
         # Create endpoint-specific subdirectory
         endpoint_dir = DEBUG_RESPONSES_DIR / endpoint_type
-        endpoint_dir.mkdir(parents=True, exist_ok=True)
+        endpoint_dir.mkdir(parents=True, exist_ok=True)     
         
         # Generate filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
@@ -422,6 +422,95 @@ def _fetch_reel_play_count(post_code: str) -> Optional[int]:
     except Exception as e:
         logger.error(f"Error fetching play_count for reel code {post_code}: {e}", exc_info=True)
         return None
+
+
+def _fetch_carousel_items(post_code: str) -> List[Dict]:
+    """
+    Fetch carousel items for a carousel post using the post detail endpoint.
+    Makes an additional API call to get all carousel media items.
+    
+    Args:
+        post_code: Instagram post shortcode (e.g., "ABC123xyz")
+    
+    Returns:
+        List of carousel item dictionaries with 'image_url', 'video_url', and 'is_video' keys.
+        Returns empty list if not a carousel or if fetch fails.
+    """
+    if not post_code:
+        return []
+    
+    try:
+        url = "https://instagram120.p.rapidapi.com/api/instagram/post"
+        payload = {
+            "shortcode": post_code
+        }
+        
+        response_data = _make_api_request(url, payload, method="POST")
+        
+        if not response_data:
+            logger.warning(f"Could not fetch carousel items for post code: {post_code}")
+            return []
+        
+        carousel_items = []
+        
+        # Parse the response to extract carousel items
+        result = response_data.get("result", response_data)
+        if isinstance(result, dict):
+            # Check for carousel_media or children array
+            carousel_media = result.get("carousel_media") or result.get("children") or result.get("media", {}).get("carousel_media")
+            
+            if carousel_media and isinstance(carousel_media, list):
+                for item in carousel_media:
+                    if isinstance(item, dict):
+                        item_image_url = ""
+                        item_video_url = ""
+                        item_is_video = False
+                        
+                        # Extract image URL
+                        if "image_versions2" in item:
+                            image_versions = item.get("image_versions2", {})
+                            if isinstance(image_versions, dict) and "candidates" in image_versions:
+                                candidates = image_versions["candidates"]
+                                if isinstance(candidates, list) and len(candidates) > 0:
+                                    item_image_url = candidates[0].get("url", "")
+                        
+                        # Extract video URL
+                        if "video_versions" in item and item.get("video_versions"):
+                            video_versions = item["video_versions"]
+                            if isinstance(video_versions, list) and len(video_versions) > 0:
+                                item_video_url = video_versions[0].get("url", "")
+                                item_is_video = True
+                        
+                        # Check for direct video_url field
+                        if not item_video_url and item.get("video_url"):
+                            item_video_url = item["video_url"]
+                            item_is_video = True
+                        
+                        # If no image but has video, try to get thumbnail
+                        if not item_image_url and item_video_url:
+                            if "image_versions2" in item:
+                                image_versions = item.get("image_versions2", {})
+                                if isinstance(image_versions, dict) and "candidates" in image_versions:
+                                    candidates = image_versions["candidates"]
+                                    if isinstance(candidates, list) and len(candidates) > 0:
+                                        item_image_url = candidates[0].get("url", "")
+                        
+                        carousel_items.append({
+                            "image_url": item_image_url,
+                            "video_url": item_video_url,
+                            "is_video": item_is_video
+                        })
+        
+        if carousel_items:
+            logger.info(f"Successfully fetched {len(carousel_items)} carousel items for post {post_code}")
+        else:
+            logger.warning(f"No carousel items found in post detail response for code: {post_code}")
+        
+        return carousel_items
+            
+    except Exception as e:
+        logger.error(f"Error fetching carousel items for post code {post_code}: {e}", exc_info=True)
+        return []
 
 
 def _fetch_reel_video_url(post_code: str) -> Optional[str]:
@@ -1091,7 +1180,61 @@ def parse_instagram_post(post_node: Dict, skip_video_url: bool = False) -> Optio
         
         # Check if it's a carousel - handle None values explicitly
         carousel_media_count = safe_int(actual_post_data.get("carousel_media_count"), 0)
+        # Also check for carousel_media array or children array (alternative indicators)
+        carousel_media = actual_post_data.get("carousel_media") or post_node.get("carousel_media") or actual_post_data.get("children")
+        if carousel_media:
+            if isinstance(carousel_media, list) and len(carousel_media) > 1:
+                carousel_media_count = len(carousel_media)
+        
         is_carousel = bool(carousel_media_count > 1)  # Ensure boolean
+        
+        # Extract carousel items if this is a carousel
+        carousel_items = []
+        if is_carousel:
+            # Try to extract carousel items from the API response
+            carousel_media_list = carousel_media if isinstance(carousel_media, list) else []
+            
+            if carousel_media_list:
+                # Extract items from carousel_media array in response
+                for item in carousel_media_list:
+                    if isinstance(item, dict):
+                        item_image_url = ""
+                        item_video_url = ""
+                        item_is_video = False
+                        
+                        # Extract image URL
+                        if "image_versions2" in item:
+                            image_versions = item["image_versions2"]
+                            if isinstance(image_versions, dict) and "candidates" in image_versions:
+                                candidates = image_versions["candidates"]
+                                if isinstance(candidates, list) and len(candidates) > 0:
+                                    item_image_url = candidates[0].get("url", "")
+                        
+                        # Extract video URL
+                        if "video_versions" in item and item["video_versions"]:
+                            video_versions = item["video_versions"]
+                            if isinstance(video_versions, list) and len(video_versions) > 0:
+                                item_video_url = video_versions[0].get("url", "")
+                                item_is_video = True
+                        
+                        # If no image but has video, try to get thumbnail
+                        if not item_image_url and item_video_url and "image_versions2" in item:
+                            image_versions = item["image_versions2"]
+                            if isinstance(image_versions, dict) and "candidates" in image_versions:
+                                candidates = image_versions["candidates"]
+                                if isinstance(candidates, list) and len(candidates) > 0:
+                                    item_image_url = candidates[0].get("url", "")
+                        
+                        carousel_items.append({
+                            "image_url": item_image_url,
+                            "video_url": item_video_url,
+                            "is_video": item_is_video
+                        })
+            
+            # If carousel items weren't found in the response, fetch them via post detail endpoint
+            if not carousel_items and post_code:
+                logger.info(f"Carousel items not in initial response, fetching from post detail endpoint for {post_code}")
+                carousel_items = _fetch_carousel_items(post_code)
         
         # Ensure all boolean fields are proper booleans (not dicts or other types)
         is_video_value = bool(video_url) or bool(is_reel)
@@ -1109,6 +1252,7 @@ def parse_instagram_post(post_node: Dict, skip_video_url: bool = False) -> Optio
             "is_reel": is_reel_value,
             "is_carousel": is_carousel_value,
             "carousel_media_count": carousel_media_count,
+            "carousel_items": carousel_items,  # Add carousel items to parsed data
             "like_count": like_count,
             "comment_count": comment_count,
             "play_count": play_count,
@@ -1255,6 +1399,7 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
     
     all_posts = []
     user_id = None
+    should_stop = False  # Flag to stop pagination when time cutoff is reached
     
     # Queue-based concurrent pagination
     # Queue stores (end_cursor, page_number) tuples
@@ -1279,7 +1424,7 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
             logger.debug(f"Submitted fetch for page {page_num} (cursor: {end_cursor})")
         
         # Process futures as they complete
-        while futures or not page_queue.empty():
+        while (futures or not page_queue.empty()) and not should_stop:
             # Submit new page fetches if we have capacity and pages in queue
             while not page_queue.empty() and active_fetches < max_concurrent_pages:
                 end_cursor, page_num = page_queue.get()
@@ -1316,6 +1461,7 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
                             page_posts = page_result.get('posts', [])
                             batch_posts = []
                             reels_count = 0
+                            reached_time_cutoff = False
                             
                             for parsed_post in page_posts:
                                 # Check test mode limit
@@ -1326,10 +1472,27 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
                                 if parsed_post.get("is_reel"):
                                     reels_count += 1
                                 
-                                # Check time cutoff
+                                # For carousel posts, fetch carousel items if not already present
+                                if parsed_post.get("is_carousel"):
+                                    carousel_items = parsed_post.get("carousel_items", [])
+                                    if not carousel_items:
+                                        post_code = parsed_post.get("post_code", "")
+                                        if post_code:
+                                            logger.info(f"Fetching carousel items for post {parsed_post.get('post_id')} (code: {post_code})")
+                                            carousel_items = _fetch_carousel_items(post_code)
+                                            if carousel_items:
+                                                parsed_post["carousel_items"] = carousel_items
+                                                logger.info(f"Successfully fetched {len(carousel_items)} carousel items for post {parsed_post.get('post_id')}")
+                                            else:
+                                                logger.warning(f"Failed to fetch carousel items for post {parsed_post.get('post_id')}, but continuing...")
+                                
+                                # Check time cutoff - Instagram returns posts in reverse chronological order
+                                # So if we encounter an old post, all subsequent posts will also be old
                                 if cutoff_time is not None:
                                     if parsed_post.get("taken_at") and parsed_post["taken_at"] < cutoff_time:
-                                        logger.info(f"Reached posts older than {max_age_hours} hours")
+                                        logger.info(f"Reached posts older than {max_age_hours} hours (post taken_at: {parsed_post.get('taken_at')}, cutoff: {cutoff_time})")
+                                        reached_time_cutoff = True
+                                        should_stop = True  # Stop all pagination
                                         break
                                 
                                 all_posts.append(parsed_post)
@@ -1344,6 +1507,12 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
                                     logger.error(f"Error in save_callback for page {page_num}: {e}", exc_info=True)
                             
                             logger.info(f"Page {page_num}: Fetched {len(batch_posts)} posts ({len(batch_posts) - reels_count} posts, {reels_count} reels)")
+                            
+                            # Check if we should stop due to time cutoff before queuing next page
+                            if reached_time_cutoff:
+                                logger.info(f"Reached time cutoff on page {page_num}, stopping pagination")
+                                # Don't queue next page if we've reached the time cutoff
+                                break
                             
                             # If there's a next page, add it to queue
                             if page_result.get('has_next_page') and page_result.get('end_cursor'):
@@ -1361,9 +1530,6 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
                             # Check if we should stop
                             if test_mode_limit and test_mode_limit > 0 and len(all_posts) >= test_mode_limit:
                                 logger.info(f"Reached test mode post limit of {test_mode_limit} posts, stopping pagination")
-                                break
-                            if cutoff_time and any(p.get("taken_at") and p["taken_at"] < cutoff_time for p in batch_posts):
-                                logger.info(f"Reached time cutoff, stopping pagination")
                                 break
                                 
                         except Exception as e:

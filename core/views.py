@@ -24,10 +24,11 @@ import time
 logger = logging.getLogger(__name__)
 from .models import (
     InstagramAccount, InstagramPost, InstagramCarouselItem, InstagramKeyword,
-    Subreddit, RedditPost, RedditKeyword
+    Subreddit, RedditPost, RedditKeyword,
+    TwitterAccount, TwitterTweet
 )
-from .forms import InstagramAccountForm, SubredditForm
-from .services import instagram_service, reddit_service, keyword_service
+from .forms import InstagramAccountForm, SubredditForm, TwitterAccountForm
+from .services import instagram_service, reddit_service, keyword_service, twitter_service
 
 
 def register_view(request):
@@ -466,10 +467,11 @@ def account_analytics_view(request, account_id):
         'top_posts_by_likes': list(top_posts_by_likes),  # Top 5 by likes
         'top_posts_by_comments': list(top_posts_by_comments),  # Top 5 by comments
         'is_reels': False,
-        'chart_labels': json.dumps(chart_labels) if chart_labels else json.dumps([]),
-        'avg_likes_per_hour_data': json.dumps(avg_likes_per_hour_data) if avg_likes_per_hour_data else json.dumps([]),
-        'posts_per_day_labels': json.dumps(posts_per_day_labels) if posts_per_day_labels else json.dumps([]),
-        'posts_per_day_data': json.dumps(posts_per_day_counts) if posts_per_day_counts else json.dumps([]),
+        # Pass as Python lists - Django's json_script filter will handle JSON encoding safely
+        'chart_labels': chart_labels if chart_labels else [],
+        'avg_likes_per_hour_data': avg_likes_per_hour_data if avg_likes_per_hour_data else [],
+        'posts_per_day_labels': posts_per_day_labels if posts_per_day_labels else [],
+        'posts_per_day_data': posts_per_day_counts if posts_per_day_counts else [],
         # Additional metrics for reference (separate counts)
         'total_reels': int(total_reels),  # Reels count
         'total_regular_posts': int(total_regular_posts),  # Regular posts count (non-reels)
@@ -663,10 +665,11 @@ def _fetch_posts_with_progress(user, task_id):
                 
                 # Fetch posts (concurrently with other accounts)
                 if has_posts:
-                    # Fetch only 2 pages (24 posts) when posts exist in database
-                    logger.info(f"Account {username} has existing posts, fetching 2 pages (24 posts) only")
+                    # Fetch posts from last 24 hours when posts exist in database
+                    # This ensures we get all new posts regardless of which page they're on
+                    logger.info(f"Account {username} has existing posts, fetching posts from last 24 hours")
                     posts_data = instagram_service.get_all_posts_for_username(
-                        username, max_pages=2, save_callback=save_posts_batch
+                        username, max_age_hours=24, save_callback=save_posts_batch
                     )
                 else:
                     # No posts in database: fetch all posts (up to 600 limit from TEST_MODE_POSTS_LIMIT)
@@ -1001,11 +1004,12 @@ def scrape_instagram_view(request):
             
             # Fetch posts with callback to save incrementally
             if has_posts:
-                # Fetch only 2 pages (24 posts) when posts exist in database
-                logger.info(f"Account {username} has existing posts, fetching 2 pages (24 posts) only")
+                # Fetch posts from last 24 hours when posts exist in database
+                # This ensures we get all new posts regardless of which page they're on
+                logger.info(f"Account {username} has existing posts, fetching posts from last 24 hours")
                 posts_data = instagram_service.get_all_posts_for_username(
                     username, 
-                    max_pages=2,
+                    max_age_hours=24,  # Fetch posts from last 24 hours
                     save_callback=save_posts_batch
                 )
             else:
@@ -1227,10 +1231,15 @@ def fetch_single_account_posts_view(request, account_id):
                 
                 # Fetch posts
                 if has_posts:
+                    # Fetch posts from last 24 hours when posts exist in database
+                    # This ensures we get all new posts regardless of which page they're on
+                    logger.info(f"Account {username} has existing posts, fetching posts from last 24 hours")
                     posts_data = instagram_service.get_all_posts_for_username(
-                        username, max_pages=2, save_callback=save_posts_batch
+                        username, max_age_hours=24, save_callback=save_posts_batch
                     )
                 else:
+                    # No posts in database: fetch all posts (up to 600 limit from TEST_MODE_POSTS_LIMIT)
+                    logger.info(f"Account {username} has no posts in database, fetching all available posts (up to 600)")
                     posts_data = instagram_service.get_all_posts_for_username(
                         username, save_callback=save_posts_batch
                     )
@@ -1439,10 +1448,15 @@ def fetch_single_account_posts_view(request, account_id):
         
         # Fetch posts
         if has_posts:
+            # Fetch posts from last 24 hours when posts exist in database
+            # This ensures we get all new posts regardless of which page they're on
+            logger.info(f"Account {username} has existing posts, fetching posts from last 24 hours")
             posts_data = instagram_service.get_all_posts_for_username(
-                username, max_pages=2, save_callback=save_posts_batch
+                username, max_age_hours=24, save_callback=save_posts_batch
             )
         else:
+            # No posts in database: fetch all posts (up to 600 limit from TEST_MODE_POSTS_LIMIT)
+            logger.info(f"Account {username} has no posts in database, fetching all available posts (up to 600)")
             posts_data = instagram_service.get_all_posts_for_username(
                 username, save_callback=save_posts_batch
             )
@@ -1959,4 +1973,318 @@ def instagram_keywords_view(request):
         'posts_data': posts_data,
     }
     return render(request, 'core/instagram_keywords.html', context)
+
+
+# ========== Twitter Views ==========
+
+@login_required
+def twitter_accounts_view(request):
+    """View all Twitter accounts with stats."""
+    accounts = TwitterAccount.objects.filter(user=request.user).annotate(
+        tweets_count=Count('tweets')
+    )
+    
+    # Prepare data for each account
+    accounts_data = []
+    for account in accounts:
+        tweets = TwitterTweet.objects.filter(account=account)
+        
+        # Calculate basic metrics
+        total_tweets = tweets.count()
+        total_favorites = tweets.aggregate(Sum('favorite_count'))['favorite_count__sum'] or 0
+        total_retweets = tweets.aggregate(Sum('retweet_count'))['retweet_count__sum'] or 0
+        avg_favorites = tweets.aggregate(Avg('favorite_count'))['favorite_count__avg'] or 0 if total_tweets > 0 else 0
+        
+        accounts_data.append({
+            'account': account,
+            'total_tweets': total_tweets,
+            'total_favorites': total_favorites,
+            'total_retweets': total_retweets,
+            'avg_favorites': avg_favorites,
+        })
+    
+    return render(request, 'core/twitter_accounts.html', {'accounts_data': accounts_data})
+
+
+@login_required
+def add_twitter_account_view(request):
+    """Add a new Twitter account to monitor."""
+    if request.method == 'POST':
+        form = TwitterAccountForm(request.POST)
+        if form.is_valid():
+            username = form.cleaned_data['username']
+            
+            # Check if account already exists
+            if TwitterAccount.objects.filter(user=request.user, username=username).exists():
+                messages.error(request, f'Twitter account @{username} is already being monitored.')
+                return redirect('twitter_accounts')
+            
+            # Fetch user info from Twitter API to get rest_id
+            try:
+                user_info = twitter_service.get_user_by_username(username)
+                if not user_info:
+                    messages.error(request, f'Could not find Twitter account @{username}. Please check the username and try again.')
+                    return redirect('twitter_accounts')
+                
+                # Create account with fetched info
+                account = TwitterAccount(
+                    user=request.user,
+                    username=username,
+                    rest_id=user_info.get('rest_id', ''),
+                    name=user_info.get('name', ''),
+                    description=user_info.get('description', ''),
+                    followers_count=user_info.get('followers_count', 0),
+                    following_count=user_info.get('following_count', 0),
+                    tweet_count=user_info.get('tweet_count', 0),
+                    verified=user_info.get('verified', False),
+                    profile_image_url=user_info.get('profile_image_url', ''),
+                    profile_banner_url=user_info.get('profile_banner_url', ''),
+                )
+                account.save()
+                messages.success(request, f'Twitter account @{username} added successfully!')
+                return redirect('twitter_accounts')
+            except Exception as e:
+                logger.error(f"Error adding Twitter account {username}: {e}", exc_info=True)
+                messages.error(request, f'Error adding Twitter account: {str(e)}')
+    else:
+        form = TwitterAccountForm()
+    
+    return render(request, 'core/add_twitter.html', {'form': form})
+
+
+@login_required
+def delete_twitter_account_view(request, account_id):
+    """Delete a Twitter account."""
+    account = get_object_or_404(TwitterAccount, id=account_id, user=request.user)
+    if request.method == 'POST':
+        username = account.username
+        account.delete()
+        messages.success(request, f'Twitter account @{username} deleted successfully!')
+    return redirect('twitter_accounts')
+
+
+@login_required
+def fetch_single_twitter_account_tweets_view(request, account_id):
+    """Fetch tweets for a single Twitter account with progress tracking."""
+    account = get_object_or_404(TwitterAccount, id=account_id, user=request.user)
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        # AJAX request - return JSON response
+        task_id = str(uuid.uuid4())
+        
+        # Start background thread to fetch tweets
+        thread = threading.Thread(
+            target=_fetch_twitter_tweets_with_progress,
+            args=(request.user, account, task_id),
+            daemon=True
+        )
+        thread.start()
+        
+        return JsonResponse({'task_id': task_id, 'status': 'started'})
+    else:
+        # Regular request - start fetch and redirect
+        task_id = str(uuid.uuid4())
+        thread = threading.Thread(
+            target=_fetch_twitter_tweets_with_progress,
+            args=(request.user, account, task_id),
+            daemon=True
+        )
+        thread.start()
+        messages.info(request, f'Started fetching tweets for @{account.username}. This may take a few moments.')
+        return redirect('twitter_accounts')
+
+
+def _fetch_twitter_tweets_with_progress(user, account, task_id):
+    """Background function to fetch tweets with progress tracking."""
+    try:
+        _update_progress(task_id, status='fetching', message=f'Fetching tweets for @{account.username}...', progress=0)
+        
+        # Check if account has existing tweets
+        has_tweets = TwitterTweet.objects.filter(account=account).exists()
+        
+        # Determine fetching strategy
+        if has_tweets:
+            # Fetch tweets from last 24 hours
+            max_age_hours = 24
+            logger.info(f"Account @{account.username} has existing tweets, fetching tweets from last 24 hours")
+        else:
+            # No tweets in database: fetch all available tweets (up to limit)
+            max_age_hours = None
+            logger.info(f"Account @{account.username} has no tweets in database, fetching all available tweets")
+        
+        # Fetch tweets
+        tweets_data = twitter_service.get_all_tweets_for_user(
+            account.username,
+            max_age_hours=max_age_hours,
+            save_callback=lambda batch: _save_twitter_tweets_batch(account, batch, task_id)
+        )
+        
+        # Update progress
+        _update_progress(task_id, status='completed', message=f'Fetched {len(tweets_data)} tweets for @{account.username}', progress=100)
+        
+        # Update account last_scraped_at
+        account.last_scraped_at = timezone.now()
+        account.save()
+        
+    except Exception as e:
+        logger.error(f"Error fetching tweets for @{account.username}: {e}", exc_info=True)
+        _update_progress(task_id, status='error', message=f'Error: {str(e)}', progress=0)
+
+
+def _save_twitter_tweets_batch(account, tweets_batch, task_id):
+    """Save a batch of tweets to the database."""
+    saved_count = 0
+    new_count = 0
+    
+    for tweet_data in tweets_batch:
+        tweet, created = TwitterTweet.objects.update_or_create(
+            account=account,
+            tweet_id=tweet_data['tweet_id'],
+            defaults={
+                'text': tweet_data.get('text', ''),
+                'created_at': tweet_data.get('created_at'),
+                'favorite_count': tweet_data.get('favorite_count', 0),
+                'retweet_count': tweet_data.get('retweet_count', 0),
+                'reply_count': tweet_data.get('reply_count', 0),
+                'quote_count': tweet_data.get('quote_count', 0),
+                'view_count': tweet_data.get('view_count', 0),
+                'media': tweet_data.get('media', []),
+                'hashtags': tweet_data.get('hashtags', []),
+                'mentions': tweet_data.get('mentions', []),
+                'urls': tweet_data.get('urls', []),
+                'is_retweet': tweet_data.get('is_retweet', False),
+                'is_quote': tweet_data.get('is_quote', False),
+                'lang': tweet_data.get('lang', ''),
+            }
+        )
+        
+        saved_count += 1
+        if created:
+            new_count += 1
+    
+    # Update progress
+    _update_progress(task_id, message=f'Saved {saved_count} tweets ({new_count} new)', progress=50)
+    logger.info(f"Saved {saved_count} tweets for @{account.username} ({new_count} new)")
+
+
+@login_required
+def scrape_twitter_view(request):
+    """Fetch tweets for all Twitter accounts."""
+    if request.method != 'POST':
+        messages.error(request, 'Invalid request method.')
+        return redirect('twitter_accounts')
+    
+    accounts = TwitterAccount.objects.filter(user=request.user)
+    if not accounts.exists():
+        messages.warning(request, 'No Twitter accounts added yet.')
+        return redirect('twitter_accounts')
+    
+    task_id = str(uuid.uuid4())
+    
+    # Start background thread
+    thread = threading.Thread(
+        target=_fetch_all_twitter_accounts_tweets,
+        args=(request.user, task_id),
+        daemon=True
+    )
+    thread.start()
+    
+    messages.info(request, f'Started fetching tweets for {accounts.count()} Twitter account(s). This may take a few moments.')
+    return redirect('twitter_accounts')
+
+
+def _fetch_all_twitter_accounts_tweets(user, task_id):
+    """Fetch tweets for all Twitter accounts concurrently."""
+    try:
+        accounts = list(TwitterAccount.objects.filter(user=user))
+        total_accounts = len(accounts)
+        
+        _update_progress(task_id, status='fetching', message=f'Fetching tweets for {total_accounts} account(s)...', progress=0)
+        
+        def fetch_account_tweets(account):
+            """Fetch tweets for a single account."""
+            try:
+                has_tweets = TwitterTweet.objects.filter(account=account).exists()
+                
+                if has_tweets:
+                    max_age_hours = 24
+                else:
+                    max_age_hours = None
+                
+                tweets_data = twitter_service.get_all_tweets_for_user(
+                    account.username,
+                    max_age_hours=max_age_hours,
+                    save_callback=lambda batch: _save_twitter_tweets_batch(account, batch, task_id)
+                )
+                
+                account.last_scraped_at = timezone.now()
+                account.save()
+                
+                return len(tweets_data)
+            except Exception as e:
+                logger.error(f"Error fetching tweets for @{account.username}: {e}", exc_info=True)
+                return 0
+        
+        # Fetch tweets concurrently
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {executor.submit(fetch_account_tweets, account): account for account in accounts}
+            total_tweets = 0
+            
+            for future in as_completed(futures):
+                account = futures[future]
+                try:
+                    count = future.result()
+                    total_tweets += count
+                    logger.info(f"Fetched {count} tweets for @{account.username}")
+                except Exception as e:
+                    logger.error(f"Error processing @{account.username}: {e}", exc_info=True)
+        
+        _update_progress(task_id, status='completed', message=f'Fetched tweets for {total_accounts} account(s)', progress=100)
+        
+    except Exception as e:
+        logger.error(f"Error in _fetch_all_twitter_accounts_tweets: {e}", exc_info=True)
+        _update_progress(task_id, status='error', message=f'Error: {str(e)}', progress=0)
+
+
+@login_required
+def twitter_tweets_view(request):
+    """View all tweets from all Twitter accounts."""
+    # Get all tweets for the user
+    tweets = TwitterTweet.objects.filter(account__user=request.user).select_related('account').order_by('-created_at')
+    
+    # Group tweets by account
+    tweets_by_account = defaultdict(list)
+    for tweet in tweets:
+        tweets_by_account[tweet.account].append(tweet)
+    
+    # Convert to list of dictionaries
+    account_tweets_list = []
+    for account, account_tweets in tweets_by_account.items():
+        account_tweets_list.append({
+            'account': account,
+            'tweets': account_tweets,
+            'count': len(account_tweets)
+        })
+    
+    # Sort by most recent tweet
+    account_tweets_list.sort(key=lambda x: x['tweets'][0].created_at if x['tweets'] else timezone.now(), reverse=True)
+    
+    context = {
+        'account_tweets_list': account_tweets_list,
+    }
+    return render(request, 'core/twitter_tweets.html', context)
+
+
+@login_required
+def twitter_account_tweets_view(request, account_id):
+    """View tweets for a single Twitter account."""
+    account = get_object_or_404(TwitterAccount, id=account_id, user=request.user)
+    tweets = TwitterTweet.objects.filter(account=account).order_by('-created_at')
+    
+    context = {
+        'account': account,
+        'tweets': tweets,
+        'count': tweets.count(),
+    }
+    return render(request, 'core/twitter_account_tweets.html', context)
 

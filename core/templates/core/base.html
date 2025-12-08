@@ -663,6 +663,10 @@
                         <!-- Instagram Accounts Link -->
                         <a class="nav-link" href="{% url 'instagram_accounts' %}"><i class="bi bi-instagram"></i> Instagram</a>
                         
+                        <!-- Twitter Links -->
+                        <a class="nav-link" href="{% url 'twitter_accounts' %}"><i class="bi bi-twitter"></i> Twitter</a>
+                        <a class="nav-link" href="{% url 'twitter_tweets' %}"><i class="bi bi-chat-quote"></i> Tweets</a>
+                        
                         <a class="nav-link" href="{% url 'logout' %}"><i class="bi bi-box-arrow-right"></i> Logout</a>
                     {% else %}
                         <a class="nav-link" href="{% url 'login' %}"><i class="bi bi-box-arrow-in-right"></i> Login</a>

@@ -113,3 +113,5 @@ def run_fetch_posts_job():
         logger.error(f"Error in scheduled post fetch job: {e}", exc_info=True)
         # Don't re-raise - allow scheduler to continue running
 
+
+

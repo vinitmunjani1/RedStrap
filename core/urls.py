@@ -35,5 +35,14 @@ urlpatterns = [
     path('reddit/scrape/', views.scrape_reddit_view, name='scrape_reddit'),
     path('reddit/extract-keywords/', views.extract_keywords_view, name='extract_keywords'),
     path('reddit/keywords/', views.reddit_keywords_view, name='reddit_keywords'),
+    
+    # Twitter
+    path('twitter/', views.twitter_accounts_view, name='twitter_accounts'),
+    path('twitter/add/', views.add_twitter_account_view, name='add_twitter'),
+    path('twitter/delete/<int:account_id>/', views.delete_twitter_account_view, name='delete_twitter'),
+    path('twitter/scrape/', views.scrape_twitter_view, name='scrape_twitter'),
+    path('twitter/fetch/<int:account_id>/', views.fetch_single_twitter_account_tweets_view, name='fetch_single_twitter_account_tweets'),
+    path('twitter/tweets/', views.twitter_tweets_view, name='twitter_tweets'),
+    path('twitter/account/<int:account_id>/tweets/', views.twitter_account_tweets_view, name='twitter_account_tweets'),
 ]
 

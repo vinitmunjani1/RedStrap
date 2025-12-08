@@ -171,3 +171,75 @@ class RedditKeyword(models.Model):
     def __str__(self):
         return f"{self.keyword} (similarity: {self.similarity:.2f})"
 
+
+class TwitterAccount(models.Model):
+    """
+    Represents a Twitter account to monitor.
+    Each account belongs to a user and can have multiple tweets.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='twitter_accounts')
+    username = models.CharField(max_length=255, help_text="Twitter username without @")
+    rest_id = models.CharField(max_length=255, blank=True, help_text="Twitter user rest_id (used for API calls)")
+    name = models.CharField(max_length=255, blank=True, help_text="Twitter display name")
+    description = models.TextField(blank=True, help_text="Twitter profile description")
+    followers_count = models.IntegerField(default=0, help_text="Number of followers")
+    following_count = models.IntegerField(default=0, help_text="Number of accounts following")
+    tweet_count = models.IntegerField(default=0, help_text="Total number of tweets")
+    verified = models.BooleanField(default=False, help_text="Whether the account is verified")
+    profile_image_url = models.URLField(max_length=500, blank=True, help_text="Profile image URL")
+    profile_banner_url = models.URLField(max_length=500, blank=True, help_text="Profile banner URL")
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_scraped_at = models.DateTimeField(null=True, blank=True, help_text="Last time tweets were fetched for this account")
+    
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = [['username', 'user']]
+    
+    def __str__(self):
+        return f"@{self.username} (user: {self.user.username})"
+    
+    @property
+    def twitter_url(self):
+        """Generate the Twitter URL for this account."""
+        return f"https://twitter.com/{self.username}"
+
+
+class TwitterTweet(models.Model):
+    """
+    Represents a single Twitter tweet.
+    Stores tweet metadata including text, media URLs, engagement metrics, and timestamps.
+    """
+    account = models.ForeignKey(TwitterAccount, on_delete=models.CASCADE, related_name='tweets')
+    tweet_id = models.CharField(max_length=255, db_index=True, help_text="Unique Twitter tweet ID")
+    text = models.TextField(help_text="Tweet text content")
+    created_at = models.DateTimeField(help_text="When the tweet was originally created on Twitter")
+    favorite_count = models.IntegerField(default=0, help_text="Number of favorites/likes on the tweet")
+    retweet_count = models.IntegerField(default=0, help_text="Number of retweets")
+    reply_count = models.IntegerField(default=0, help_text="Number of replies")
+    quote_count = models.IntegerField(default=0, help_text="Number of quote tweets")
+    view_count = models.IntegerField(default=0, help_text="Number of views on the tweet")
+    media = models.JSONField(default=list, blank=True, help_text="List of media attachments (photos, videos, etc.)")
+    hashtags = models.JSONField(default=list, blank=True, help_text="List of hashtags in the tweet")
+    mentions = models.JSONField(default=list, blank=True, help_text="List of mentioned usernames")
+    urls = models.JSONField(default=list, blank=True, help_text="List of URLs in the tweet")
+    is_retweet = models.BooleanField(default=False, help_text="Whether this is a retweet")
+    is_quote = models.BooleanField(default=False, help_text="Whether this is a quote tweet")
+    lang = models.CharField(max_length=10, blank=True, help_text="Tweet language code")
+    created_at_db = models.DateTimeField(auto_now_add=True, help_text="When this tweet was added to our database")
+    keywords_extracted = models.BooleanField(default=False, help_text="Whether keywords have been extracted from this tweet")
+    
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = [['account', 'tweet_id']]
+        indexes = [
+            models.Index(fields=['keywords_extracted', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"Tweet {self.tweet_id} by @{self.account.username}"
+    
+    @property
+    def twitter_url(self):
+        """Generate the Twitter URL for this tweet."""
+        return f"https://twitter.com/{self.account.username}/status/{self.tweet_id}"
+

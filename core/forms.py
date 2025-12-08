@@ -2,7 +2,7 @@
 Django forms for adding Instagram accounts and subreddits.
 """
 from django import forms
-from .models import InstagramAccount, Subreddit
+from .models import InstagramAccount, Subreddit, TwitterAccount
 
 
 class InstagramAccountForm(forms.ModelForm):
@@ -61,4 +61,33 @@ class SubredditForm(forms.ModelForm):
         if not name:
             raise forms.ValidationError("Subreddit name cannot be empty")
         return name
+
+
+class TwitterAccountForm(forms.ModelForm):
+    """
+    Form for adding a new Twitter account to monitor.
+    """
+    username = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter Twitter username (without @)',
+        }),
+        help_text="Enter the Twitter username without the @ symbol"
+    )
+
+    class Meta:
+        model = TwitterAccount
+        fields = ['username']
+        
+    def clean_username(self):
+        """
+        Clean and validate username: remove @ if present, strip whitespace.
+        """
+        username = self.cleaned_data.get('username', '').strip()
+        # Remove @ symbol if user included it
+        username = username.lstrip('@')
+        if not username:
+            raise forms.ValidationError("Username cannot be empty")
+        return username
 

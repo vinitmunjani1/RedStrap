@@ -155,329 +155,434 @@
 </div>
 {% endif %}
 
+<!-- JSON data for charts (Django's safe way to pass data to JavaScript) -->
+{{ chart_labels|json_script:"chart-labels-data" }}
+{{ avg_likes_per_hour_data|json_script:"avg-likes-data" }}
+{{ posts_per_day_labels|json_script:"posts-per-day-labels-data" }}
+{{ posts_per_day_data|json_script:"posts-per-day-data" }}
+
 <script>
+    /* eslint-disable */
+    /* jshint ignore:start */
     // Wait for DOM and Chart.js to be ready
-    document.addEventListener('DOMContentLoaded', function() {
+    // Note: This file contains Django template syntax which will be processed server-side
+    // Linter errors for template syntax are expected and can be ignored.
+    function initializeCharts() {
         // Check if Chart.js is loaded
         if (typeof Chart === 'undefined') {
-            console.error('Chart.js is not loaded');
+            console.error('Chart.js is not loaded, retrying...');
+            setTimeout(initializeCharts, 100);
             return;
         }
+        
+        console.log('Chart.js is loaded, initializing charts...');
         
         // Chart.js configuration for dark theme
         Chart.defaults.color = '#cbd5e1';
         Chart.defaults.borderColor = '#334155';
         Chart.defaults.backgroundColor = 'rgba(99, 102, 241, 0.5)';
 
-{% if not is_reels %}
-    // Average Likes per Hour Histogram
-    const avgLikesCtx = document.getElementById('avgLikesPerHourChart');
-    if (avgLikesCtx) {
-        try {
-            const chartLabels = {{ chart_labels|safe }};
-            const avgLikesData = {{ avg_likes_per_hour_data|safe }};
-            
-            // Validate data
-            if (!Array.isArray(chartLabels) || !Array.isArray(avgLikesData)) {
-                console.error('Invalid chart data format for avgLikesPerHourChart', {
-                    chartLabels: typeof chartLabels,
-                    avgLikesData: typeof avgLikesData
-                });
-            } else if (chartLabels.length === 0) {
-                console.warn('No data available for avgLikesPerHourChart');
-            } else {
-                console.log('Creating avgLikesPerHourChart with', chartLabels.length, 'data points');
-                new Chart(avgLikesCtx, {
-            type: 'bar',
-            data: {
-                labels: chartLabels,
-                datasets: [{
-                    label: 'Avg Likes/Hour',
-                    data: avgLikesData,
-                    backgroundColor: 'rgba(99, 102, 241, 0.6)',
-                    borderColor: 'rgba(99, 102, 241, 1)',
-                    borderWidth: 2,
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(30, 41, 59, 0.95)',
-                        titleColor: '#f1f5f9',
-                        bodyColor: '#cbd5e1',
-                        borderColor: '#334155',
-                        borderWidth: 1
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            color: '#94a3b8'
-                        },
-                        grid: {
-                            color: '#334155'
-                        }
-                    },
-                    x: {
-                        ticks: {
-                            color: '#94a3b8',
-                            maxRotation: 90,
-                            minRotation: 90,
-                            font: {
-                                size: 10
-                            }
-                        },
-                        grid: {
-                            color: '#334155'
-                        }
-                    }
-                }
-            }
-        });
-            }
-        } catch (error) {
-            console.error('Error creating avgLikesPerHourChart:', error);
-        }
-    }
+        // Pass is_reels from Django template to JavaScript
+        // Django template syntax below - linter warnings are expected
+        const isReels = {% if is_reels %}true{% else %}false{% endif %};
 
-    // Posts per Day Histogram
-    const postsPerDayCtx = document.getElementById('postsPerDayChart');
-    if (postsPerDayCtx) {
-        try {
-            const chartLabels = {{ posts_per_day_labels|safe }};
-            const postsData = {{ posts_per_day_data|safe }};
-            
-            // Validate data
-            if (!Array.isArray(chartLabels) || !Array.isArray(postsData)) {
-                console.error('Invalid chart data format for postsPerDayChart', {
-                    chartLabels: typeof chartLabels,
-                    postsData: typeof postsData
-                });
-            } else if (chartLabels.length === 0) {
-                console.warn('No data available for postsPerDayChart');
-            } else {
-                console.log('Creating postsPerDayChart with', chartLabels.length, 'data points');
-                new Chart(postsPerDayCtx, {
-            type: 'bar',
-            data: {
-                labels: chartLabels,
-                datasets: [{
-                    label: 'Posts per Weekday',
-                    data: postsData,
-                    backgroundColor: 'rgba(6, 182, 212, 0.6)',
-                    borderColor: 'rgba(6, 182, 212, 1)',
-                    borderWidth: 2,
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(30, 41, 59, 0.95)',
-                        titleColor: '#f1f5f9',
-                        bodyColor: '#cbd5e1',
-                        borderColor: '#334155',
-                        borderWidth: 1
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            color: '#94a3b8',
-                            stepSize: 1
-                        },
-                        grid: {
-                            color: '#334155'
-                        }
-                    },
-                    x: {
-                        ticks: {
-                            color: '#94a3b8',
-                            maxRotation: 45,
-                            minRotation: 45,
-                            font: {
-                                size: 11
-                            }
-                        },
-                        grid: {
-                            color: '#334155'
-                        }
-                    }
+        {% if not is_reels %}
+        // Average Likes per Hour Histogram
+        const avgLikesCtx = document.getElementById('avgLikesPerHourChart');
+        if (!avgLikesCtx) {
+            console.error('Canvas element avgLikesPerHourChart not found');
+        } else {
+            try {
+                // Get data from json_script tags (Django's safe way to pass JSON to JS)
+                const chartLabelsData = document.getElementById('chart-labels-data');
+                const avgLikesDataData = document.getElementById('avg-likes-data');
+                
+                if (!chartLabelsData || !avgLikesDataData) {
+                    console.error('Chart data elements not found');
+                    return;
                 }
-            }
-        });
-            }
-        } catch (error) {
-            console.error('Error creating postsPerDayChart:', error);
-        }
-    }
-{% endif %}
-
-{% if is_reels %}
-    // Average Views per Hour Histogram for Reels
-    const avgPlaysCtx = document.getElementById('avgPlaysPerHourChart');
-    if (avgPlaysCtx) {
-        try {
-            const chartLabels = {{ chart_labels|safe }};
-            const avgPlaysData = {{ avg_plays_per_hour_data|safe }};
+                
+                const chartLabels = JSON.parse(chartLabelsData.textContent);
+                const avgLikesData = JSON.parse(avgLikesDataData.textContent);
             
-            // Debug logging
-            console.log('Reels chart data:', {
-                labels: chartLabels,
-                data: avgPlaysData
-            });
+                // Debug logging
+                console.log('avgLikesPerHourChart - Raw data:', {
+                    chartLabels: chartLabels,
+                    avgLikesData: avgLikesData,
+                    chartLabelsType: typeof chartLabels,
+                    avgLikesDataType: typeof avgLikesData
+                });
             
-            // Ensure data is valid
-            if (!Array.isArray(chartLabels) || !Array.isArray(avgPlaysData)) {
-                console.error('Invalid chart data format');
-                return;
-            }
-            
-            new Chart(avgPlaysCtx, {
-            type: 'bar',
-            data: {
-                labels: chartLabels,
-                datasets: [{
-                    label: 'Avg Views/Hour',
-                    data: avgPlaysData,
-                    backgroundColor: 'rgba(139, 92, 246, 0.6)',
-                    borderColor: 'rgba(139, 92, 246, 1)',
-                    borderWidth: 2,
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(30, 41, 59, 0.95)',
-                        titleColor: '#f1f5f9',
-                        bodyColor: '#cbd5e1',
-                        borderColor: '#334155',
-                        borderWidth: 1
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            color: '#94a3b8'
+                // Validate data
+                if (!Array.isArray(chartLabels) || !Array.isArray(avgLikesData)) {
+                    console.error('Invalid chart data format for avgLikesPerHourChart', {
+                        chartLabels: chartLabels,
+                        avgLikesData: avgLikesData,
+                        chartLabelsType: typeof chartLabels,
+                        avgLikesDataType: typeof avgLikesData
+                    });
+                } else if (chartLabels.length === 0 || avgLikesData.length === 0) {
+                    console.warn('No data available for avgLikesPerHourChart', {
+                        labelsLength: chartLabels.length,
+                        dataLength: avgLikesData.length
+                    });
+                } else {
+                    console.log('Creating avgLikesPerHourChart with', chartLabels.length, 'data points');
+                    new Chart(avgLikesCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: chartLabels,
+                            datasets: [{
+                                label: 'Avg Likes/Hour',
+                                data: avgLikesData,
+                                backgroundColor: 'rgba(99, 102, 241, 0.6)',
+                                borderColor: 'rgba(99, 102, 241, 1)',
+                                borderWidth: 2,
+                                borderRadius: 4
+                            }]
                         },
-                        grid: {
-                            color: '#334155'
-                        }
-                    },
-                    x: {
-                        ticks: {
-                            color: '#94a3b8',
-                            maxRotation: 90,
-                            minRotation: 90,
-                            font: {
-                                size: 9
-                            },
-                            // Show every 2 hours to avoid crowding
-                            stepSize: 1,
-                            callback: function(value, index) {
-                                // Only show every 2nd label to reduce clutter
-                                if (index % 2 === 0) {
-                                    return this.getLabelForValue(value);
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                                    titleColor: '#f1f5f9',
+                                    bodyColor: '#cbd5e1',
+                                    borderColor: '#334155',
+                                    borderWidth: 1
                                 }
-                                return '';
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        color: '#94a3b8'
+                                    },
+                                    grid: {
+                                        color: '#334155'
+                                    }
+                                },
+                                x: {
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        maxRotation: 90,
+                                        minRotation: 90,
+                                        font: {
+                                            size: 10
+                                        }
+                                    },
+                                    grid: {
+                                        color: '#334155'
+                                    }
+                                }
                             }
-                        },
-                        grid: {
-                            color: '#334155'
                         }
+                    });
+                }
+            } catch (error) {
+                console.error('Error creating avgLikesPerHourChart:', error);
+            }
+        }
+
+        // Posts per Day Histogram
+        const postsPerDayCtx = document.getElementById('postsPerDayChart');
+        if (!postsPerDayCtx) {
+            console.error('Canvas element postsPerDayChart not found');
+        } else {
+            try {
+                // Get data from json_script tags (Django's safe way to pass JSON to JS)
+                const postsPerDayLabelsData = document.getElementById('posts-per-day-labels-data');
+                const postsPerDayDataData = document.getElementById('posts-per-day-data');
+                
+                if (!postsPerDayLabelsData || !postsPerDayDataData) {
+                    console.error('Posts per day chart data elements not found');
+                    return;
+                }
+                
+                const chartLabels = JSON.parse(postsPerDayLabelsData.textContent);
+                const postsData = JSON.parse(postsPerDayDataData.textContent);
+                
+                // Debug logging
+                console.log('postsPerDayChart - Raw data:', {
+                    chartLabels: chartLabels,
+                    postsData: postsData,
+                    chartLabelsType: typeof chartLabels,
+                    postsDataType: typeof postsData
+                });
+                
+                // Validate data
+                if (!Array.isArray(chartLabels) || !Array.isArray(postsData)) {
+                    console.error('Invalid chart data format for postsPerDayChart', {
+                        chartLabels: chartLabels,
+                        postsData: postsData,
+                        chartLabelsType: typeof chartLabels,
+                        postsDataType: typeof postsData
+                    });
+                } else if (chartLabels.length === 0 || postsData.length === 0) {
+                    console.warn('No data available for postsPerDayChart', {
+                        labelsLength: chartLabels.length,
+                        dataLength: postsData.length
+                    });
+                } else {
+                    console.log('Creating postsPerDayChart with', chartLabels.length, 'data points');
+                    new Chart(postsPerDayCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: chartLabels,
+                            datasets: [{
+                                label: 'Posts per Weekday',
+                                data: postsData,
+                                backgroundColor: 'rgba(6, 182, 212, 0.6)',
+                                borderColor: 'rgba(6, 182, 212, 1)',
+                                borderWidth: 2,
+                                borderRadius: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                                    titleColor: '#f1f5f9',
+                                    bodyColor: '#cbd5e1',
+                                    borderColor: '#334155',
+                                    borderWidth: 1
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        stepSize: 1
+                                    },
+                                    grid: {
+                                        color: '#334155'
+                                    }
+                                },
+                                x: {
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        maxRotation: 45,
+                                        minRotation: 45,
+                                        font: {
+                                            size: 11
+                                        }
+                                    },
+                                    grid: {
+                                        color: '#334155'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error creating postsPerDayChart:', error);
+            }
+        }
+        {% endif %}
+
+        if (isReels) {
+            // Average Views per Hour Histogram for Reels
+            const avgPlaysCtx = document.getElementById('avgPlaysPerHourChart');
+            if (avgPlaysCtx) {
+                try {
+                    // Get data from json_script tags (Django's safe way to pass JSON to JS)
+                    const reelsChartLabelsData = document.getElementById('reels-chart-labels-data');
+                    const reelsAvgPlaysData = document.getElementById('reels-avg-plays-data');
+                    
+                    if (!reelsChartLabelsData || !reelsAvgPlaysData) {
+                        console.error('Reels chart data elements not found');
+                        return;
                     }
+                    
+                    const chartLabels = JSON.parse(reelsChartLabelsData.textContent);
+                    const avgPlaysData = JSON.parse(reelsAvgPlaysData.textContent);
+                    
+                    // Debug logging
+                    console.log('Reels chart data:', {
+                        labels: chartLabels,
+                        data: avgPlaysData
+                    });
+                    
+                    // Ensure data is valid
+                    if (!Array.isArray(chartLabels) || !Array.isArray(avgPlaysData)) {
+                        console.error('Invalid chart data format');
+                        return;
+                    }
+                    
+                    new Chart(avgPlaysCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: chartLabels,
+                            datasets: [{
+                                label: 'Avg Views/Hour',
+                                data: avgPlaysData,
+                                backgroundColor: 'rgba(139, 92, 246, 0.6)',
+                                borderColor: 'rgba(139, 92, 246, 1)',
+                                borderWidth: 2,
+                                borderRadius: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                                    titleColor: '#f1f5f9',
+                                    bodyColor: '#cbd5e1',
+                                    borderColor: '#334155',
+                                    borderWidth: 1
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        color: '#94a3b8'
+                                    },
+                                    grid: {
+                                        color: '#334155'
+                                    }
+                                },
+                                x: {
+                                    ticks: {
+                                        color: '#94a3b8',
+                                        maxRotation: 90,
+                                        minRotation: 90,
+                                        font: {
+                                            size: 9
+                                        },
+                                        // Show every 2 hours to avoid crowding
+                                        stepSize: 1,
+                                        callback: function(value, index) {
+                                            // Only show every 2nd label to reduce clutter
+                                            if (index % 2 === 0) {
+                                                return this.getLabelForValue(value);
+                                            }
+                                            return '';
+                                        }
+                                    },
+                                    grid: {
+                                        color: '#334155'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error creating average plays per hour chart:', error);
                 }
             }
+
+            // Reels per Weekday Histogram
+            const reelsPerDayCtx = document.getElementById('reelsPerDayChart');
+            if (reelsPerDayCtx) {
+                // Get data from json_script tags (Django's safe way to pass JSON to JS)
+                // Note: Reels analytics uses same variable names as posts analytics
+                const reelsPerDayLabelsData = document.getElementById('posts-per-day-labels-data');
+                const reelsPerDayDataData = document.getElementById('posts-per-day-data');
+                
+                if (!reelsPerDayLabelsData || !reelsPerDayDataData) {
+                    console.error('Reels per day chart data elements not found');
+                    return;
+                }
+                
+                const weekdayLabels = JSON.parse(reelsPerDayLabelsData.textContent);
+                const reelsData = JSON.parse(reelsPerDayDataData.textContent);
+                
+                new Chart(reelsPerDayCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: weekdayLabels,
+                        datasets: [{
+                            label: 'Reels Count',
+                            data: reelsData,
+                            backgroundColor: 'rgba(6, 182, 212, 0.6)',
+                            borderColor: 'rgba(6, 182, 212, 1)',
+                            borderWidth: 2,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                                titleColor: '#f1f5f9',
+                                bodyColor: '#cbd5e1',
+                                borderColor: '#334155',
+                                borderWidth: 1
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    color: '#94a3b8',
+                                    stepSize: 1
+                                },
+                                grid: {
+                                    color: '#334155'
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    color: '#94a3b8',
+                                    maxRotation: 90,
+                                    minRotation: 90,
+                                    font: {
+                                        size: 10
+                                    }
+                                },
+                                grid: {
+                                    color: '#334155'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        } // End if (isReels)
+    } // End initializeCharts function
+    
+    // Wait for both DOM and Chart.js to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            // Wait a bit for Chart.js to load if it's not ready yet
+            if (typeof Chart === 'undefined') {
+                setTimeout(initializeCharts, 100);
+            } else {
+                initializeCharts();
+            }
         });
-        } catch (error) {
-            console.error('Error creating average plays per hour chart:', error);
+    } else {
+        // DOM is already loaded
+        if (typeof Chart === 'undefined') {
+            setTimeout(initializeCharts, 100);
+        } else {
+            initializeCharts();
         }
     }
-
-    // Reels per Weekday Histogram
-    const reelsPerDayCtx = document.getElementById('reelsPerDayChart');
-    if (reelsPerDayCtx) {
-        const weekdayLabels = {{ weekday_labels|safe }};
-        const reelsData = {{ reels_per_day_data|safe }};
-        
-        new Chart(reelsPerDayCtx, {
-            type: 'bar',
-            data: {
-                labels: weekdayLabels,
-                datasets: [{
-                    label: 'Reels Count',
-                    data: reelsData,
-                    backgroundColor: 'rgba(6, 182, 212, 0.6)',
-                    borderColor: 'rgba(6, 182, 212, 1)',
-                    borderWidth: 2,
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(30, 41, 59, 0.95)',
-                        titleColor: '#f1f5f9',
-                        bodyColor: '#cbd5e1',
-                        borderColor: '#334155',
-                        borderWidth: 1
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            color: '#94a3b8',
-                            stepSize: 1
-                        },
-                        grid: {
-                            color: '#334155'
-                        }
-                    },
-                    x: {
-                        ticks: {
-                            color: '#94a3b8',
-                            maxRotation: 90,
-                            minRotation: 90,
-                            font: {
-                                size: 10
-                            }
-                        },
-                        grid: {
-                            color: '#334155'
-                        }
-                    }
-                }
-            }
-        });
-    }
-{% endif %}
-    }); // End DOMContentLoaded
+    /* jshint ignore:end */
+    /* eslint-enable */
 </script>
 
 <div class="d-flex justify-content-between align-items-center mb-4">

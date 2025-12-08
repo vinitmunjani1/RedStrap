@@ -1,0 +1,220 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Twitter Accounts - REDSTRAP{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <h1 class="mb-0"><i class="bi bi-twitter"></i> Twitter Accounts</h1>
+        <div class="d-flex gap-2">
+            <input type="text" id="searchAccounts" class="form-control form-control-sm" placeholder="Search accounts..." style="max-width: 250px;">
+            <form method="post" action="{% url 'scrape_twitter' %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-download"></i> Fetch All Tweets
+                </button>
+            </form>
+            <a href="{% url 'add_twitter' %}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Add Account
+            </a>
+        </div>
+    </div>
+
+    {% if accounts_data %}
+        <div class="row g-4">
+            {% for data in accounts_data %}
+                {% with account=data.account %}
+                <div class="col-md-6 col-lg-4 account-item" data-username="{{ account.username|lower }}">
+                    <div class="glass-card account-card">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="account-avatar me-3">
+                                    <i class="bi bi-person-circle"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h5 class="mb-0">
+                                        @{{ account.username }}
+                                        {% if account.verified %}
+                                            <i class="bi bi-check-circle-fill text-primary" title="Verified"></i>
+                                        {% endif %}
+                                    </h5>
+                                    <small class="text-muted">Added {{ account.created_at|date:"M d, Y" }}</small>
+                                </div>
+                            </div>
+                            
+                            <!-- Account Info -->
+                            {% if account.name %}
+                            <div class="mb-2">
+                                <strong>{{ account.name }}</strong>
+                            </div>
+                            {% endif %}
+                            
+                            {% if account.description %}
+                            <div class="mb-3 text-muted small">
+                                {{ account.description|truncatewords:15 }}
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Stats -->
+                            <div class="analytics-section">
+                                <h6 class="mb-2" style="color: var(--accent-primary);">
+                                    <i class="bi bi-graph-up"></i> Stats
+                                </h6>
+                                <div class="analytics-stats">
+                                    <div class="stat-row">
+                                        <span class="stat-label">Tweets:</span>
+                                        <span class="stat-value">{{ data.total_tweets }}</span>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span class="stat-label">Followers:</span>
+                                        <span class="stat-value">{{ account.followers_count|floatformat:0 }}</span>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span class="stat-label">Favorites:</span>
+                                        <span class="stat-value">{{ data.total_favorites|floatformat:0 }}</span>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span class="stat-label">Retweets:</span>
+                                        <span class="stat-value">{{ data.total_retweets|floatformat:0 }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Action Buttons -->
+                            <div class="mt-3 d-flex gap-2">
+                                <form method="post" action="{% url 'fetch_single_twitter_account_tweets' account.id %}" class="flex-grow-1" id="fetchForm{{ account.id }}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-success w-100" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; font-weight: 500;">
+                                        <i class="bi bi-download"></i> Fetch Tweets
+                                    </button>
+                                </form>
+                                <a href="{% url 'twitter_account_tweets' account.id %}" class="btn btn-outline-primary" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; font-weight: 500; min-width: 140px;">
+                                    <i class="bi bi-chat-quote"></i> View Tweets
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endwith %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="glass-card text-center py-5">
+            <i class="bi bi-twitter" style="font-size: 4rem; color: var(--text-muted);"></i>
+            <p class="mt-3 text-muted">No Twitter accounts added yet.</p>
+            <a href="{% url 'add_twitter' %}" class="btn btn-primary mt-3">
+                <i class="bi bi-plus-circle"></i> Add Your First Account
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.account-card {
+    height: 100%;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.account-card:hover {
+    transform: translateY(-5px);
+}
+
+.account-avatar {
+    font-size: 3rem;
+    color: var(--accent-primary);
+}
+
+.analytics-section {
+    padding: 1rem;
+    background: rgba(30, 41, 59, 0.2);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.analytics-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.stat-label {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.stat-value {
+    color: var(--accent-primary);
+    font-weight: 600;
+    font-size: 1rem;
+}
+</style>
+
+<script>
+// Search functionality for accounts
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchAccounts');
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            const accountItems = document.querySelectorAll('.account-item');
+            
+            accountItems.forEach(item => {
+                const username = item.getAttribute('data-username') || '';
+                
+                if (searchTerm === '' || username.includes(searchTerm)) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+    }
+    
+    // Handle fetch buttons for each account
+    const fetchForms = document.querySelectorAll('[id^="fetchForm"]');
+    fetchForms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const accountId = form.id.replace('fetchForm', '');
+            const button = form.querySelector('button[type="submit"]');
+            const originalText = button.innerHTML;
+            
+            // Disable button and show loading
+            button.disabled = true;
+            button.innerHTML = '<i class="bi bi-hourglass-split"></i> Fetching...';
+            
+            fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'started') {
+                    button.innerHTML = '<i class="bi bi-check-circle"></i> Fetching...';
+                    // You could add progress tracking here similar to Instagram
+                } else {
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        });
+    });
+});
+</script>
+{% endblock %}
+

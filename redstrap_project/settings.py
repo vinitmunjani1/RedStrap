@@ -181,6 +181,23 @@ TEST_MODE_POSTS_LIMIT = int(os.environ.get('TEST_MODE_POSTS_LIMIT', '600'))
 # Set to None or 0 to disable page limit and fetch all pages
 TEST_MODE_PAGES_LIMIT = int(os.environ.get('TEST_MODE_PAGES_LIMIT', '50'))
 
+# Twitter API Configuration
+# Explicit Twitter RapidAPI keys (do not mix with Instagram keys)
+TWITTER_RAPIDAPI_KEYS = os.environ.get('TWITTER_RAPIDAPI_KEYS', '').split(',') if os.environ.get('TWITTER_RAPIDAPI_KEYS') else []
+TWITTER_RAPIDAPI_KEYS = [key.strip() for key in TWITTER_RAPIDAPI_KEYS if key.strip()]
+
+# Default to the provided key if none set via environment
+if not TWITTER_RAPIDAPI_KEYS:
+    default_twitter_key = os.environ.get('TWITTER_RAPIDAPI_KEY', 'd409935002msh6ca472652d2ea6ep143efcjsn4d350435d328')
+    if default_twitter_key:
+        TWITTER_RAPIDAPI_KEYS = [default_twitter_key]
+
+TWITTER_RAPIDAPI_HOST = os.environ.get('TWITTER_RAPIDAPI_HOST', 'twitter241.p.rapidapi.com')
+
+# Test mode: Limit tweet fetching to 100 recent tweets for testing purposes
+# Set to None or 0 to disable test mode and fetch all tweets
+TEST_MODE_TWEETS_LIMIT = int(os.environ.get('TEST_MODE_TWEETS_LIMIT', '100')) if os.environ.get('TEST_MODE_TWEETS_LIMIT') else None
+
 # Discord Webhook Configuration
 # Discord webhook URL for sending notifications about new Instagram posts
 # Set in environment variable DISCORD_WEBHOOK_URL
@@ -190,7 +207,7 @@ DISCORD_WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL', 'https://discord.com
 # Automatic post fetching scheduler
 # Enable automatic scheduled fetching of Instagram posts
 # Set ENABLE_AUTO_FETCH=true in environment to enable
-ENABLE_AUTO_FETCH = os.environ.get('ENABLE_AUTO_FETCH', 'False').lower() == 'true'
+ENABLE_AUTO_FETCH = os.environ.get('ENABLE_AUTO_FETCH', 'True').lower() == 'true'
 
 # Interval in hours for automatic post fetching (default: 8 hours)
 # Set AUTO_FETCH_INTERVAL_HOURS in environment to customize

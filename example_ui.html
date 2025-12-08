@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Social Feeds</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-bg: #181924;
+      --surface: #21222c;
+      --accent: #4F8CFF;
+      --accent-gradient: linear-gradient(90deg, #4f8cff 0%, #34e3b2 100%);
+      --border: #292a36;
+      --tweet-bg: #232A34;
+      --tweet-accent: #1da1f2;
+      --tweet-gradient: linear-gradient(90deg, #1da1f2 0%, #3af5ce 100%);
+      --insta-gradient: linear-gradient(135deg,#e1306c 0%,#fdc75e 100%);
+      --text-main: #F4F6FA;
+      --text-muted: #B7B9C7;
+      --shadow: 0 8px 24px 0 rgba(18,22,48,.18);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      min-height: 100vh;
+      background: var(--primary-bg);
+      color: var(--text-main);
+      font-family: 'Inter', 'Roboto', Arial, sans-serif;
+      scroll-behavior: smooth;
+      transition: background 0.3s;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 48px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 32px;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .user-feed {
+      background: var(--surface);
+      padding: 36px 32px;
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      margin-bottom: 0;
+      border: 1px solid var(--border);
+      transition: box-shadow 0.2s;
+    }
+    .user-feed:hover {
+      box-shadow: 0 12px 32px 0 rgba(79, 140, 255, 0.10);
+    }
+
+    h2 {
+      font-size: 2rem;
+      color: var(--accent);
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      margin-bottom: 18px;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .social-posts {
+      display: flex;
+      flex-direction: row;
+      gap: 48px;
+      justify-content: space-between;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .social-block {
+      flex: 1 1 350px;
+      display: flex;
+      flex-direction: column;
+      min-width: 290px;
+      max-width: 500px;
+      gap: 12px;
+    }
+
+    h3 {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      margin-bottom: 8px;
+      margin-top: 6px;
+      background: none;
+      -webkit-text-fill-color: inherit;
+    }
+
+    /* Feed grids */
+    .instagram-posts,
+    .tweets {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 18px;
+      margin-top: 8px;
+    }
+
+    /* Modern Instagram post card */
+    .post {
+      position: relative;
+      aspect-ratio: 1/1;
+      width: 100%;
+      background: var(--insta-gradient);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: transform 0.20s, box-shadow 0.20s;
+      box-shadow: 0 2px 12px 0 rgba(224, 50, 108, 0.10);
+      cursor: pointer;
+      border: none;
+      isolation: isolate;
+    }
+    .post::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top,rgba(24,25,36,0.30),rgba(24,25,36,0.13) 55%,transparent 85%);
+      z-index: 2;
+    }
+    .post img, .post .post-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      z-index: 1;
+      position: relative;
+    }
+    .post:hover {
+      transform: translateY(-4px) scale(1.04);
+      box-shadow: 0 8px 32px 0 rgba(224,50,108,0.22);
+    }
+
+    /* Tweets Modern Card */
+    .tweet {
+      border-radius: 14px;
+      background: var(--tweet-gradient);
+      background-size: 140%;
+      color: #fff;
+      box-shadow: 0 4px 16px 0 rgba(29,161,242,0.12);
+      padding: 22px 18px 16px 18px;
+      font-size: 1rem;
+      font-weight: 500;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: flex-start;
+      min-height: 110px;
+      cursor: pointer;
+      gap: 8px;
+      transition: background 0.22s, box-shadow 0.22s, transform 0.15s;
+      border: none;
+      position: relative;
+      overflow: hidden;
+      word-break: break-word;
+    }
+    .tweet:hover {
+      background: linear-gradient(90deg, #3F86ED 0%, #15FAE4 100%);
+      transform: translateY(-2px) scale(1.015);
+      box-shadow: 0 6px 24px 0 rgba(52, 227, 178, 0.15);
+    }
+    .tweet .tweet-icon {
+      font-size: 1.5rem;
+      margin-bottom: 3px;
+      filter: drop-shadow(0 0 2px rgba(24,24,24,0.07));
+      color: #fff;
+      opacity: .88;
+      user-select: none;
+    }
+
+    /* Responsive Modern */
+    @media (max-width: 1050px) {
+      .container {
+        padding: 24px 6px;
+      }
+      .user-feed {
+        padding: 24px 10px;
+      }
+      .social-posts {
+        gap: 24px;
+      }
+    }
+
+    @media (max-width: 800px) {
+      .container {
+        padding: 8vw 2vw;
+      }
+      .user-feed {
+        padding: 16px 4vw;
+      }
+      .social-posts {
+        flex-direction: column;
+        gap: 30px;
+      }
+    }
+
+    @media (max-width: 550px) {
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 18px;
+      }
+      h2 {
+        font-size: 1.11rem;
+      }
+      .user-feed {
+        padding: 12px 3vw;
+        border-radius: 8px;
+      }
+      .social-block {
+        min-width: 0;
+      }
+      .instagram-posts,
+      .tweets {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>User Social Feeds</h1>
+    <!-- User 1 Feed -->
+    <div class="user-feed" id="user1-feed">
+      <h2>User 1</h2>
+      <div class="social-posts">
+        <div class="social-block">
+          <h3>Instagram Posts</h3>
+          <div class="instagram-posts" id="user1-instagram"></div>
+        </div>
+        <div class="social-block">
+          <h3>Recent Tweets</h3>
+          <div class="tweets" id="user1-tweets"></div>
+        </div>
+      </div>
+    </div>
+    <!-- User 2 Feed -->
+    <div class="user-feed" id="user2-feed">
+      <h2>User 2</h2>
+      <div class="social-posts">
+        <div class="social-block">
+          <h3>Instagram Posts</h3>
+          <div class="instagram-posts" id="user2-instagram"></div>
+        </div>
+        <div class="social-block">
+          <h3>Recent Tweets</h3>
+          <div class="tweets" id="user2-tweets"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // modern sample data
+    const userFeeds = [
+      {
+        username: 'user1',
+        instagramPosts: [
+          { id: 1, imageUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&h=400&fit=crop', alt: "Laptop workspace" },
+          { id: 2, imageUrl: 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=400&h=400&fit=crop', alt: "Coffee mug" },
+          { id: 3, imageUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=400&fit=crop', alt: "Sunrise" },
+        ],
+        tweets: [
+          { id: 1, content: 'Excited about the new product launch! #tech #innovation' },
+          { id: 2, content: 'Loving the new weather today! #sunny #vibes' },
+        ],
+      },
+      {
+        username: 'user2',
+        instagramPosts: [
+          { id: 1, imageUrl: 'https://images.unsplash.com/photo-1517816743773-6e0fd518b4a6?w=400&h=400&fit=crop', alt: "Coffee and flower" },
+          { id: 2, imageUrl: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?w=400&h=400&fit=crop', alt: "Nature" },
+        ],
+        tweets: [
+          { id: 1, content: 'Had an amazing coffee today ☕️ #coffeetime' },
+          { id: 2, content: 'Feeling blessed and grateful today 🙏 #thankful' },
+        ],
+      },
+    ];
+
+    // Generate Instagram Posts - Modern: use real images for demo
+    const generateInstagramPosts = (username, posts) => {
+      const container = document.getElementById(`${username}-instagram`);
+      container.innerHTML = posts
+        .map(post => 
+          `<div class="post" title="${post.alt||'Instagram Post'}">
+              <img src="${post.imageUrl}" class="post-img" loading="lazy" alt="${post.alt||'Instagram Photo'}">
+          </div>`
+        ).join('');
+    };
+
+    // Generate Tweets Modern
+    const generateTweets = (username, tweets) => {
+      const container = document.getElementById(`${username}-tweets`);
+      container.innerHTML = tweets
+        .map(tweet =>
+          `<div class="tweet" title="View original tweet">
+              <span class="tweet-icon">🐦</span>
+              <span>${tweet.content}</span>
+          </div>`
+        ).join('');
+    };
+
+    // Populate user feeds
+    userFeeds.forEach(user => {
+      generateInstagramPosts(user.username, user.instagramPosts);
+      generateTweets(user.username, user.tweets);
+    });
+  </script>
+</body>
+</html>

@@ -113,10 +113,11 @@ class Command(BaseCommand):
                 
                 # Fetch posts with conditional logic
                 if has_posts:
-                    # Fetch only 2 pages (24 posts) when posts exist in database
-                    logger.info(f"Account {username} has existing posts, fetching 2 pages (24 posts) only")
+                    # Fetch posts from last 24 hours when posts exist in database
+                    # This ensures we get all new posts regardless of which page they're on
+                    logger.info(f"Account {username} has existing posts, fetching posts from last 24 hours")
                     posts_data = instagram_service.get_all_posts_for_username(
-                        username, max_pages=2, save_callback=save_posts_batch
+                        username, max_age_hours=24, save_callback=save_posts_batch
                     )
                 else:
                     # No posts in database: fetch all posts (up to 600 limit from TEST_MODE_POSTS_LIMIT)
