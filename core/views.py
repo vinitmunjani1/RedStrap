@@ -60,10 +60,52 @@ def dashboard_view(request):
         account__user=request.user
     ).select_related('account').prefetch_related('keywords').order_by('-taken_at')[:6]
 
-    # Recent tweets (latest 6 overall)
+    # Recent tweets (latest 6 overall) with keywords
     recent_tweets = TwitterTweet.objects.filter(
         account__user=request.user
-    ).select_related('account').order_by('-created_at')[:6]
+    ).select_related('account').prefetch_related('keywords').order_by('-created_at')[:6]
+    
+    # Compute top engagement tweets (faves + retweets + replies) from recent tweets
+    RECENT_ENGAGEMENT_SAMPLE = 200
+    TOP_ENGAGEMENT_LIMIT = 5
+    recent_tweets_for_engagement = list(
+        TwitterTweet.objects.filter(account__user=request.user)
+        .select_related('account')
+        .prefetch_related('keywords')
+        .order_by('-created_at')[:RECENT_ENGAGEMENT_SAMPLE]
+    )
+    top_tw_engagement_posts = sorted(
+        recent_tweets_for_engagement,
+        key=lambda t: (t.favorite_count or 0) + (t.retweet_count or 0) + (t.reply_count or 0),
+        reverse=True
+    )[:TOP_ENGAGEMENT_LIMIT]
+    top_tw_engagement = [
+        {
+            'tweet': tweet,
+            'engagement_total': (tweet.favorite_count or 0) + (tweet.retweet_count or 0) + (tweet.reply_count or 0),
+        }
+        for tweet in top_tw_engagement_posts
+    ]
+    
+    # Compute top engagement Instagram posts (likes + comments) from recent posts
+    recent_posts_for_engagement = list(
+        InstagramPost.objects.filter(account__user=request.user)
+        .select_related('account')
+        .prefetch_related('keywords')
+        .order_by('-taken_at')[:RECENT_ENGAGEMENT_SAMPLE]
+    )
+    top_ig_engagement_posts = sorted(
+        recent_posts_for_engagement,
+        key=lambda p: (p.like_count or 0) + (p.comment_count or 0),
+        reverse=True
+    )[:TOP_ENGAGEMENT_LIMIT]
+    top_ig_engagement = [
+        {
+            'post': post,
+            'engagement_total': (post.like_count or 0) + (post.comment_count or 0),
+        }
+        for post in top_ig_engagement_posts
+    ]
     
     # Get recent posts/tweets per username (last 48 hours)
     recent_window = timezone.now() - timedelta(hours=48)
@@ -77,7 +119,7 @@ def dashboard_view(request):
         TwitterTweet.objects.filter(
             account__user=request.user,
             created_at__gte=recent_window
-        ).select_related('account').order_by('-created_at')
+        ).select_related('account').prefetch_related('keywords').order_by('-created_at')
     )
 
     # Group by username combining IG and Twitter
@@ -125,6 +167,8 @@ def dashboard_view(request):
         'username_cards': username_cards,
         'recent_instagram_posts': recent_instagram_posts,
         'recent_tweets': recent_tweets,
+        'top_ig_engagement': top_ig_engagement,
+        'top_tw_engagement': top_tw_engagement,
     }
     return render(request, 'core/dashboard.html', context)
 
@@ -690,20 +734,75 @@ def account_analytics_view(request, account_id):
 
 
 @login_required
-def add_instagram_account_view(request):
-    """Add a new Instagram account to monitor."""
+def add_instagram_account_view(request, username=None):
+    """
+    Add a new Instagram account to monitor.
+    If username parameter is provided, link the account to that SocialUsername.
+    """
+    # Get username from URL parameter or query string
+    parent_username = username or request.GET.get('username')
+    social_username = None
+    redirect_to = 'instagram_accounts'
+    
+    # If parent username is provided, get or create the SocialUsername
+    if parent_username:
+        parent_username_clean = str(parent_username).strip().lstrip('@').lower()
+        try:
+            social_username = SocialUsername.objects.get(user=request.user, username=parent_username_clean)
+            redirect_to = 'social_user_analytics'
+        except SocialUsername.DoesNotExist:
+            # If parent username doesn't exist, create it
+            social_username = SocialUsername.objects.create(
+                user=request.user,
+                username=parent_username_clean
+            )
+            redirect_to = 'social_user_analytics'
+    
     if request.method == 'POST':
         form = InstagramAccountForm(request.POST)
         if form.is_valid():
+            username_input = form.cleaned_data['username'].strip().lstrip('@').lower()
+            
+            # Check if account already exists
+            existing_account = InstagramAccount.objects.filter(
+                user=request.user,
+                username=username_input
+            ).first()
+            
+            if existing_account:
+                # If account exists, just link it to the social_username if provided
+                if social_username and existing_account.social_username != social_username:
+                    existing_account.social_username = social_username
+                    existing_account.save()
+                    messages.info(request, f'Instagram account @{username_input} already exists. Linked to @{parent_username_clean}.')
+                else:
+                    messages.info(request, f'Instagram account @{username_input} is already being monitored.')
+                
+                if redirect_to == 'social_user_analytics':
+                    return redirect('social_user_analytics', username=parent_username_clean)
+                return redirect(redirect_to)
+            
+            # Create new account
             account = form.save(commit=False)
             account.user = request.user
+            account.username = username_input
+            if social_username:
+                account.social_username = social_username
             account.save()
+            
             messages.success(request, f'Instagram account @{account.username} added successfully!')
-            return redirect('instagram_accounts')
+            if redirect_to == 'social_user_analytics':
+                return redirect('social_user_analytics', username=parent_username_clean)
+            return redirect(redirect_to)
     else:
         form = InstagramAccountForm()
     
-    return render(request, 'core/add_instagram.html', {'form': form})
+    context = {'form': form}
+    if parent_username:
+        context['parent_username'] = parent_username_clean
+        context['redirect_url'] = f"/social/analytics/{parent_username_clean}/"
+    
+    return render(request, 'core/add_instagram.html', context)
 
 
 @login_required
@@ -2477,29 +2576,67 @@ def twitter_accounts_view(request):
 
 
 @login_required
-def add_twitter_account_view(request):
-    """Add a new Twitter account to monitor."""
+def add_twitter_account_view(request, username=None):
+    """
+    Add a new Twitter account to monitor.
+    If username parameter is provided, link the account to that SocialUsername.
+    """
+    # Get username from URL parameter or query string
+    parent_username = username or request.GET.get('username')
+    social_username = None
+    redirect_to = 'twitter_accounts'
+    
+    # If parent username is provided, get or create the SocialUsername
+    if parent_username:
+        parent_username_clean = str(parent_username).strip().lstrip('@').lower()
+        try:
+            social_username = SocialUsername.objects.get(user=request.user, username=parent_username_clean)
+            redirect_to = 'social_user_analytics'
+        except SocialUsername.DoesNotExist:
+            # If parent username doesn't exist, create it
+            social_username = SocialUsername.objects.create(
+                user=request.user,
+                username=parent_username_clean
+            )
+            redirect_to = 'social_user_analytics'
+    
     if request.method == 'POST':
         form = TwitterAccountForm(request.POST)
         if form.is_valid():
-            username = form.cleaned_data['username']
+            username_input = form.cleaned_data['username'].strip().lstrip('@').lower()
             
             # Check if account already exists
-            if TwitterAccount.objects.filter(user=request.user, username=username).exists():
-                messages.error(request, f'Twitter account @{username} is already being monitored.')
-                return redirect('twitter_accounts')
+            existing_account = TwitterAccount.objects.filter(
+                user=request.user,
+                username=username_input
+            ).first()
+            
+            if existing_account:
+                # If account exists, just link it to the social_username if provided
+                if social_username and existing_account.social_username != social_username:
+                    existing_account.social_username = social_username
+                    existing_account.save()
+                    messages.info(request, f'Twitter account @{username_input} already exists. Linked to @{parent_username_clean}.')
+                else:
+                    messages.info(request, f'Twitter account @{username_input} is already being monitored.')
+                
+                if redirect_to == 'social_user_analytics':
+                    return redirect('social_user_analytics', username=parent_username_clean)
+                return redirect(redirect_to)
             
             # Fetch user info from Twitter API to get rest_id
             try:
-                user_info = twitter_service.get_user_by_username(username)
+                user_info = twitter_service.get_user_by_username(username_input)
                 if not user_info:
-                    messages.error(request, f'Could not find Twitter account @{username}. Please check the username and try again.')
-                    return redirect('twitter_accounts')
+                    messages.error(request, f'Could not find Twitter account @{username_input}. Please check the username and try again.')
+                    if redirect_to == 'social_user_analytics':
+                        return redirect('social_user_analytics', username=parent_username_clean)
+                    return redirect(redirect_to)
                 
                 # Create account with fetched info
                 account = TwitterAccount(
                     user=request.user,
-                    username=username,
+                    username=username_input,
                     rest_id=user_info.get('rest_id', ''),
                     name=user_info.get('name', ''),
                     description=user_info.get('description', ''),
@@ -2510,16 +2647,25 @@ def add_twitter_account_view(request):
                     profile_image_url=user_info.get('profile_image_url', ''),
                     profile_banner_url=user_info.get('profile_banner_url', ''),
                 )
+                if social_username:
+                    account.social_username = social_username
                 account.save()
-                messages.success(request, f'Twitter account @{username} added successfully!')
-                return redirect('twitter_accounts')
+                messages.success(request, f'Twitter account @{username_input} added successfully!')
+                if redirect_to == 'social_user_analytics':
+                    return redirect('social_user_analytics', username=parent_username_clean)
+                return redirect(redirect_to)
             except Exception as e:
-                logger.error(f"Error adding Twitter account {username}: {e}", exc_info=True)
+                logger.error(f"Error adding Twitter account {username_input}: {e}", exc_info=True)
                 messages.error(request, f'Error adding Twitter account: {str(e)}')
     else:
         form = TwitterAccountForm()
     
-    return render(request, 'core/add_twitter.html', {'form': form})
+    context = {'form': form}
+    if parent_username:
+        context['parent_username'] = parent_username_clean
+        context['redirect_url'] = f"/social/analytics/{parent_username_clean}/"
+    
+    return render(request, 'core/add_twitter.html', context)
 
 
 @login_required
@@ -2937,29 +3083,40 @@ def social_dashboard_view(request):
                 
                 # Create Instagram account if provided
                 if ig_username:
+                    ig_username_clean = ig_username.strip().lstrip('@').lower()
                     ig_account, ig_created = InstagramAccount.objects.get_or_create(
                         user=request.user,
-                        username=ig_username.lower(),
+                        username=ig_username_clean,
                         defaults={'social_username': social_username}
                     )
                     # Always link to social_username (update if needed)
                     if ig_account.social_username != social_username:
                         ig_account.social_username = social_username
                         ig_account.save()
+                    if not ig_created:
+                        messages.info(request, f'Instagram account @{ig_username_clean} already exists. Linked to @{unified_username}.')
                 
                 # Create Twitter account if provided
                 if tw_username:
+                    tw_username_clean = tw_username.strip().lstrip('@').lower()
                     tw_account, tw_created = TwitterAccount.objects.get_or_create(
                         user=request.user,
-                        username=tw_username.lower(),
+                        username=tw_username_clean,
                         defaults={'social_username': social_username}
                     )
                     # Always link to social_username (update if needed)
                     if tw_account.social_username != social_username:
                         tw_account.social_username = social_username
                         tw_account.save()
+                    if not tw_created:
+                        messages.info(request, f'Twitter account @{tw_username_clean} already exists. Linked to @{unified_username}.')
                 
-                messages.success(request, "Accounts added successfully.")
+                # Only show success if at least one new account was created
+                if ig_username and ig_created or tw_username and tw_created:
+                    messages.success(request, "Accounts added successfully.")
+                elif ig_username or tw_username:
+                    # Both accounts already existed, just linked
+                    pass  # Info messages already shown above
                 return redirect('social_dashboard')
             except Exception as e:
                 logger.error(f"Error adding social accounts: {e}", exc_info=True)

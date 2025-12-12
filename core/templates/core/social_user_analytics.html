@@ -272,10 +272,10 @@
                 <div class="small text-muted">Add the absent platform(s) to see combined analytics and recent content.</div>
             </div>
             {% if not has_ig_accounts %}
-            <a href="{% url 'add_instagram' %}" class="btn btn-primary btn-sm"><i class="bi bi-instagram"></i> Add Instagram</a>
+            <a href="{% url 'add_instagram_with_username' username_display %}" class="btn btn-primary btn-sm"><i class="bi bi-instagram"></i> Add Instagram</a>
             {% endif %}
             {% if not has_tw_accounts %}
-            <a href="{% url 'add_twitter' %}" class="btn btn-info btn-sm"><i class="bi bi-twitter"></i> Add Twitter</a>
+            <a href="{% url 'add_twitter_with_username' username_display %}" class="btn btn-info btn-sm"><i class="bi bi-twitter"></i> Add Twitter</a>
             {% endif %}
         </div>
     </div>

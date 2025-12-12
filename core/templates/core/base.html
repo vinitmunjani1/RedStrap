@@ -207,19 +207,38 @@
             background: var(--bg-surface-strong);
         }
 
-        .form-control, .form-select {
-            background: rgba(22, 31, 54, 0.7);
-            border: 1px solid var(--glass-border);
+        /* Form inputs - ensure text is always visible */
+        .form-control, .form-select, input[type="text"], input[type="email"], 
+        input[type="password"], input[type="search"], input[type="number"], 
+        input[type="url"], textarea, select {
+            background: rgba(22, 31, 54, 0.7) !important;
+            border: 1px solid var(--glass-border) !important;
             border-radius: var(--radius-md);
             padding: 0.75rem 1rem;
-            color: var(--text-primary);
+            color: var(--text-primary) !important;
+            font-size: 1rem;
         }
-        .form-control:focus, .form-select:focus {
-            background: rgba(26, 38, 66, 0.9);
-            border-color: rgba(124, 125, 255, 0.5);
-            box-shadow: 0 0 0 4px rgba(124, 125, 255, 0.15);
+        .form-control:focus, .form-select:focus, input:focus, textarea:focus, select:focus {
+            background: rgba(26, 38, 66, 0.9) !important;
+            border-color: rgba(124, 125, 255, 0.5) !important;
+            box-shadow: 0 0 0 4px rgba(124, 125, 255, 0.15) !important;
+            color: var(--text-primary) !important;
         }
-        .form-control::placeholder { color: var(--text-muted); }
+        .form-control::placeholder, input::placeholder, textarea::placeholder { 
+            color: var(--text-muted) !important; 
+            opacity: 0.7;
+        }
+        .form-control:-webkit-autofill,
+        .form-control:-webkit-autofill:hover,
+        .form-control:-webkit-autofill:focus,
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover,
+        input:-webkit-autofill:focus {
+            -webkit-text-fill-color: var(--text-primary) !important;
+            -webkit-box-shadow: 0 0 0px 1000px rgba(22, 31, 54, 0.7) inset !important;
+            box-shadow: 0 0 0px 1000px rgba(22, 31, 54, 0.7) inset !important;
+            border: 1px solid var(--glass-border) !important;
+        }
         .form-label { color: var(--text-secondary); font-weight: 600; }
 
         .badge {

@@ -20,6 +20,7 @@ urlpatterns = [
     # Instagram
     path('instagram/', views.instagram_accounts_view, name='instagram_accounts'),
     path('instagram/add/', views.add_instagram_account_view, name='add_instagram'),
+    path('instagram/add/<str:username>/', views.add_instagram_account_view, name='add_instagram_with_username'),
     path('instagram/delete/<int:account_id>/', views.delete_instagram_account_view, name='delete_instagram'),
     path('instagram/scrape/', views.scrape_instagram_view, name='scrape_instagram'),
     path('instagram/fetch/<int:account_id>/', views.fetch_single_account_posts_view, name='fetch_single_account_posts'),
@@ -40,6 +41,7 @@ urlpatterns = [
     # Twitter
     path('twitter/', views.twitter_accounts_view, name='twitter_accounts'),
     path('twitter/add/', views.add_twitter_account_view, name='add_twitter'),
+    path('twitter/add/<str:username>/', views.add_twitter_account_view, name='add_twitter_with_username'),
     path('twitter/delete/<int:account_id>/', views.delete_twitter_account_view, name='delete_twitter'),
     path('twitter/scrape/', views.scrape_twitter_view, name='scrape_twitter'),
     path('twitter/fetch/<int:account_id>/', views.fetch_single_twitter_account_tweets_view, name='fetch_single_twitter_account_tweets'),

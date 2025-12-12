@@ -8,6 +8,11 @@
         <div class="glass-card">
             <div class="card-body">
                 <h2 class="mb-4"><i class="bi bi-plus-circle"></i> Add Twitter Account</h2>
+                {% if parent_username %}
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i> This account will be linked to <strong>@{{ parent_username }}</strong>
+                </div>
+                {% endif %}
                 <form method="post">
                     {% csrf_token %}
                     <div class="mb-3">
@@ -23,9 +28,15 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-check-circle"></i> Add Account
                     </button>
+                    {% if redirect_url %}
+                    <a href="{{ redirect_url }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Analytics
+                    </a>
+                    {% else %}
                     <a href="{% url 'twitter_accounts' %}" class="btn btn-secondary">
                         <i class="bi bi-arrow-left"></i> Back
                     </a>
+                    {% endif %}
                 </form>
             </div>
         </div>
