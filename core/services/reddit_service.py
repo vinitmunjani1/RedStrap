@@ -79,7 +79,7 @@ def scrape_subreddit(subreddit_name: str) -> List[Dict]:
     Returns:
         List of post dictionaries with title, url, score, body, flair
     """
-    url = f"https://old.reddit.com/r/{subreddit_name}"
+    url = f"https://old.reddit.com/r/{subreddit_name}/rising/"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
@@ -145,6 +145,51 @@ def scrape_subreddit(subreddit_name: str) -> List[Dict]:
                 body = post_data.get("selftext", "") or ""
                 flair = post_data.get("link_flair_text") or ""
                 
+                # Extract media information
+                thumbnail_url = post_data.get("thumbnail", "") or ""
+                # Clean thumbnail URL - Reddit uses "self" for text posts
+                if thumbnail_url in ["self", "default", "nsfw", "spoiler"]:
+                    thumbnail_url = ""
+                
+                media_url = ""
+                is_video = False
+                post_type = post_data.get("post_hint", "") or post_data.get("type", "")
+                
+                # Check for video media
+                if post_data.get("is_video", False):
+                    is_video = True
+                    media_url = post_data.get("url", "") or ""
+                    post_type = "video"
+                # Check for image media
+                elif post_data.get("preview", {}).get("images"):
+                    preview = post_data.get("preview", {})
+                    if preview.get("images") and len(preview["images"]) > 0:
+                        # Get the highest resolution image
+                        image_source = preview["images"][0].get("source", {})
+                        media_url = image_source.get("url", "") or ""
+                        if not media_url:
+                            # Fallback to variants
+                            variants = preview["images"][0].get("variants", {})
+                            if variants:
+                                # Try to get the original or a high-res variant
+                                for variant_key in ["original", "gif"]:
+                                    if variant_key in variants:
+                                        media_url = variants[variant_key].get("source", {}).get("url", "") or ""
+                                        if media_url:
+                                            break
+                        post_type = "image"
+                # Check for gallery
+                elif post_data.get("is_gallery", False):
+                    post_type = "gallery"
+                    # For galleries, use the first image as thumbnail
+                    if post_data.get("preview", {}).get("images"):
+                        image_source = post_data["preview"]["images"][0].get("source", {})
+                        thumbnail_url = image_source.get("url", "") or ""
+                # Check for external link with thumbnail
+                elif thumbnail_url and thumbnail_url.startswith("http"):
+                    media_url = post_data.get("url", "") or ""
+                    post_type = "link"
+                
             except Exception as e:
                 logger.warning(f"Error fetching JSON for {permalink}: {e}")
                 continue
@@ -155,6 +200,10 @@ def scrape_subreddit(subreddit_name: str) -> List[Dict]:
                 "score": post_score,
                 "body": body,
                 "flair": flair,
+                "thumbnail_url": thumbnail_url,
+                "media_url": media_url,
+                "is_video": is_video,
+                "post_type": post_type,
             })
             
             count_kept += 1

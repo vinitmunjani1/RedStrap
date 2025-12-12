@@ -4,21 +4,195 @@
 
 {% block content %}
 <style>
+    .reddit-post-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+    }
+    
+    .reddit-post-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+        border-color: var(--accent-primary);
+    }
+    
+    .reddit-post-media {
+        width: 100%;
+        max-height: 300px;
+        object-fit: cover;
+        border-radius: var(--radius-md);
+        margin-bottom: 1rem;
+        background: var(--bg-tertiary);
+    }
+    
+    .reddit-post-thumbnail {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        border-radius: var(--radius-md);
+        margin-bottom: 1rem;
+        background: var(--bg-tertiary);
+        cursor: pointer;
+    }
+    
+    .reddit-video-thumbnail {
+        position: relative;
+        width: 100%;
+        height: 200px;
+        border-radius: var(--radius-md);
+        margin-bottom: 1rem;
+        overflow: hidden;
+        background: var(--bg-tertiary);
+        cursor: pointer;
+    }
+    
+    .reddit-video-thumbnail video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .reddit-video-thumbnail::after {
+        content: '▶';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 3rem;
+        color: rgba(255, 255, 255, 0.9);
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    
+    .reddit-video-thumbnail:hover::after {
+        opacity: 0.7;
+    }
+    
     .keyword-badge {
         cursor: default;
+        background: linear-gradient(135deg, rgba(129, 140, 248, 0.15) 0%, rgba(167, 139, 250, 0.1) 100%);
+        color: var(--accent-primary);
+        border: 1px solid rgba(129, 140, 248, 0.3);
+        font-size: 0.75rem;
+        padding: 0.3rem 0.6rem;
+        border-radius: var(--radius-full);
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
     }
     
     .keyword-badge:hover {
-        background: linear-gradient(135deg, rgba(129, 140, 248, 0.25) 0%, rgba(167, 139, 250, 0.2) 100%) !important;
-        border-color: rgba(129, 140, 248, 0.5) !important;
+        background: linear-gradient(135deg, rgba(129, 140, 248, 0.25) 0%, rgba(167, 139, 250, 0.2) 100%);
+        border-color: rgba(129, 140, 248, 0.5);
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(129, 140, 248, 0.2);
     }
     
-    .list-group-item {
-        padding: 1.25rem !important;
+    .reddit-stats {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-top: 0.75rem;
+    }
+    
+    .reddit-stats span {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+    
+    .reddit-flair {
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-color);
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: var(--radius-sm);
+    }
+    
+    .subreddit-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-lg);
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        transition: all 0.3s ease;
+    }
+    
+    .subreddit-card:hover {
+        border-color: var(--accent-primary);
+        transform: translateX(4px);
+    }
+    
+    .action-card {
+        background: linear-gradient(135deg, rgba(30, 41, 59, 0.3) 0%, rgba(51, 65, 85, 0.2) 100%);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .action-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+        border-color: var(--accent-primary);
+    }
+    
+    .modal-content {
+        background: var(--bg-secondary);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-lg);
+        color: var(--text-primary);
+    }
+    
+    .modal-header {
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .modal-body {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    .modal-body img,
+    .modal-body video {
+        max-width: 100%;
+        border-radius: var(--radius-md);
+        margin: 1rem 0;
+    }
+    
+    /* Custom scrollbar for modal */
+    .modal-body::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .modal-body::-webkit-scrollbar-track {
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-sm);
+    }
+    
+    .modal-body::-webkit-scrollbar-thumb {
+        background: var(--accent-primary);
+        border-radius: var(--radius-sm);
+    }
+    
+    .modal-body::-webkit-scrollbar-thumb:hover {
+        background: var(--accent-secondary);
     }
 </style>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-reddit"></i> Reddit Monitoring</h1>
     <a href="{% url 'add_subreddit' %}" class="btn btn-primary">
@@ -28,31 +202,27 @@
 
 <div class="row mb-4">
     <div class="col-md-6 mb-3">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-arrow-down-circle"></i> Scrape Posts</h5>
-                <p class="card-text text-muted">Fetch latest posts from all your subreddits</p>
-                <form method="post" action="{% url 'scrape_reddit' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-success">
-                        <i class="bi bi-download"></i> Scrape Reddit
-                    </button>
-                </form>
-            </div>
+        <div class="action-card">
+            <h5 class="card-title mb-3"><i class="bi bi-arrow-down-circle"></i> Scrape Posts</h5>
+            <p class="card-text text-muted mb-3">Fetch latest posts from all your subreddits</p>
+            <form method="post" action="{% url 'scrape_reddit' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-download"></i> Scrape Reddit
+                </button>
+            </form>
         </div>
     </div>
     <div class="col-md-6 mb-3">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-key"></i> Extract Keywords</h5>
-                <p class="card-text text-muted">Extract keywords from scraped posts</p>
-                <form method="post" action="{% url 'extract_keywords' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-info">
-                        <i class="bi bi-tags"></i> Extract Keywords
-                    </button>
-                </form>
-            </div>
+        <div class="action-card">
+            <h5 class="card-title mb-3"><i class="bi bi-key"></i> Extract Keywords</h5>
+            <p class="card-text text-muted mb-3">Extract keywords from scraped posts</p>
+            <form method="post" action="{% url 'extract_keywords' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-info">
+                    <i class="bi bi-tags"></i> Extract Keywords
+                </button>
+            </form>
         </div>
     </div>
 </div>
@@ -63,9 +233,9 @@
         {% if subreddits %}
             <div class="list-group">
                 {% for subreddit in subreddits %}
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <a href="{{ subreddit.reddit_url }}" target="_blank" class="text-decoration-none">
-                            <strong>r/{{ subreddit.name }}</strong>
+                    <div class="subreddit-card d-flex justify-content-between align-items-center">
+                        <a href="{{ subreddit.reddit_url }}" target="_blank" class="text-decoration-none flex-grow-1">
+                            <strong style="color: var(--accent-primary);">r/{{ subreddit.name }}</strong>
                         </a>
                         <form method="post" action="{% url 'delete_subreddit' subreddit.id %}" class="d-inline">
                             {% csrf_token %}
@@ -88,58 +258,59 @@
     <div class="col-md-8">
         <h3 class="mb-3"><i class="bi bi-newspaper"></i> Recent Posts</h3>
         {% if posts %}
-            <div class="list-group">
+            <div id="reddit-posts-container">
                 {% for post in posts %}
-                    <div class="list-group-item">
-                        <div class="d-flex justify-content-between">
+                    <div class="reddit-post-card" onclick="showRedditPostModal({{ post.id }})">
+                        <div class="d-flex">
+                            {% if post.thumbnail_url or post.media_url %}
+                                <div style="flex-shrink: 0; width: 200px; margin-right: 1rem;">
+                                    {% if post.is_video and post.media_url %}
+                                        <div class="reddit-video-thumbnail">
+                                            <video muted loop playsinline preload="metadata" data-video-url="{{ post.media_url }}">
+                                                <source src="{{ post.media_url }}" type="video/mp4">
+                                            </video>
+                                        </div>
+                                    {% elif post.thumbnail_url %}
+                                        <img src="{{ post.thumbnail_url }}" alt="Post thumbnail" class="reddit-post-thumbnail" onerror="this.style.display='none'">
+                                    {% elif post.media_url %}
+                                        <img src="{{ post.media_url }}" alt="Post image" class="reddit-post-thumbnail" onerror="this.style.display='none'">
+                                    {% endif %}
+                                </div>
+                            {% endif %}
                             <div class="flex-grow-1">
-                                <h6 class="mb-2">
-                                    <a href="{{ post.url }}" target="_blank" class="text-decoration-none">{{ post.title }}</a>
-                                </h6>
-                                <p class="mb-2 text-muted small">{{ post.body|truncatewords:30 }}</p>
-                                <div class="d-flex flex-wrap align-items-center gap-2 mb-2" style="font-size: 0.85rem;">
-                                    <span class="text-muted">
-                                        <i class="bi bi-arrow-up"></i> {{ post.score }}
+                                <h6 class="mb-2" style="color: var(--text-primary); font-weight: 600;">{{ post.title }}</h6>
+                                {% if post.body %}
+                                    <p class="mb-2 text-muted small" style="line-height: 1.5;">{{ post.body|truncatewords:40 }}</p>
+                                {% endif %}
+                                <div class="reddit-stats">
+                                    <span>
+                                        <i class="bi bi-arrow-up" style="color: var(--accent-success);"></i> {{ post.score }}
                                     </span>
-                                    <span class="text-muted">•</span>
-                                    <span class="text-muted">
+                                    <span>•</span>
+                                    <span>
                                         <i class="bi bi-calendar"></i> {{ post.scraped_at|date:"M d, Y" }}
                                     </span>
                                     {% if post.flair %}
-                                        <span class="text-muted">•</span>
-                                        <span class="badge" style="background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border-color); font-size: 0.75rem; padding: 0.2rem 0.5rem;">
-                                            {{ post.flair }}
-                                        </span>
+                                        <span>•</span>
+                                        <span class="reddit-flair">{{ post.flair }}</span>
                                     {% endif %}
+                                    <span>•</span>
+                                    <span style="color: var(--accent-primary);">r/{{ post.subreddit.name }}</span>
                                 </div>
                                 {% if post.keywords.all %}
                                     <div class="mt-2 d-flex flex-wrap align-items-center gap-1">
                                         <i class="bi bi-tags-fill" style="color: var(--accent-primary); font-size: 0.85rem;"></i>
-                                        {% for keyword in post.keywords.all %}
-                                            <span class="keyword-badge" style="
-                                                background: linear-gradient(135deg, rgba(129, 140, 248, 0.15) 0%, rgba(167, 139, 250, 0.1) 100%);
-                                                color: var(--accent-primary);
-                                                border: 1px solid rgba(129, 140, 248, 0.3);
-                                                font-size: 0.75rem;
-                                                padding: 0.3rem 0.6rem;
-                                                border-radius: 12px;
-                                                font-weight: 500;
-                                                transition: all 0.2s ease;
-                                                display: inline-flex;
-                                                align-items: center;
-                                                gap: 0.25rem;
-                                            ">
+                                        {% for keyword in post.keywords.all|slice:":5" %}
+                                            <span class="keyword-badge">
                                                 {{ keyword.keyword }}
-                                                <span style="
-                                                    color: var(--text-muted);
-                                                    font-size: 0.65rem;
-                                                    opacity: 0.8;
-                                                    font-weight: 400;
-                                                ">
+                                                <span style="color: var(--text-muted); font-size: 0.65rem; opacity: 0.8;">
                                                     {{ keyword.similarity|floatformat:2 }}
                                                 </span>
                                             </span>
                                         {% endfor %}
+                                        {% if post.keywords.all|length > 5 %}
+                                            <span class="text-muted small">+{{ post.keywords.all|length|add:"-5" }} more</span>
+                                        {% endif %}
                                     </div>
                                 {% endif %}
                             </div>
@@ -195,7 +366,7 @@
                                                 <ul class="list-unstyled mb-0 mt-1" style="font-size: 0.75rem;">
                                                     {% for post in kw_data.posts %}
                                                         <li class="mb-1">
-                                                            <a href="{{ post.url }}" target="_blank" class="text-decoration-none" style="color: var(--accent-info);">
+                                                            <a href="javascript:void(0)" onclick="showRedditPostModal({{ post.id }})" class="text-decoration-none" style="color: var(--accent-info);">
                                                                 <i class="bi bi-link-45deg"></i> {{ post.title|truncatewords:8 }}
                                                             </a>
                                                         </li>
@@ -218,4 +389,164 @@
         </div>
     </div>
 </div>
+
+<!-- Reddit Post Modal -->
+<div class="modal fade" id="redditPostModal" tabindex="-1" aria-labelledby="redditPostModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="redditPostModalLabel">Reddit Post</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="redditPostModalBody">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <a id="redditPostModalLink" href="#" target="_blank" class="btn btn-primary">
+                    <i class="bi bi-box-arrow-up-right"></i> Open on Reddit
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Store posts data from Django template
+    const redditPostsData = {{ posts_json|safe }};
+    
+    // Function to show Reddit post modal
+    function showRedditPostModal(postId) {
+        const post = redditPostsData.find(p => p.id === postId);
+        if (!post) {
+            console.error('Post not found:', postId);
+            return;
+        }
+        
+        const modal = new bootstrap.Modal(document.getElementById('redditPostModal'));
+        const modalBody = document.getElementById('redditPostModalBody');
+        const modalLink = document.getElementById('redditPostModalLink');
+        
+        // Build modal content
+        let content = `
+            <div class="mb-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span style="color: var(--accent-primary); font-weight: 600;">r/${post.subreddit}</span>
+                    <span class="text-muted">•</span>
+                    <span class="text-muted small">${new Date(post.scraped_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+                <h4 style="color: var(--text-primary); margin-bottom: 1rem;">${escapeHtml(post.title)}</h4>
+        `;
+        
+        // Add media
+        if (post.is_video && post.media_url) {
+            content += `
+                <div class="mb-3">
+                    <video controls autoplay muted loop playsinline style="width: 100%; max-height: 500px; border-radius: var(--radius-md);">
+                        <source src="${escapeHtml(post.media_url)}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            `;
+        } else if (post.media_url) {
+            content += `
+                <div class="mb-3">
+                    <img src="${escapeHtml(post.media_url)}" alt="Post image" style="width: 100%; max-height: 500px; object-fit: contain; border-radius: var(--radius-md);">
+                </div>
+            `;
+        } else if (post.thumbnail_url) {
+            content += `
+                <div class="mb-3">
+                    <img src="${escapeHtml(post.thumbnail_url)}" alt="Post thumbnail" style="width: 100%; max-height: 500px; object-fit: contain; border-radius: var(--radius-md);">
+                </div>
+            `;
+        }
+        
+        // Add body text
+        if (post.body) {
+            content += `
+                <div class="mb-3" style="line-height: 1.6; color: var(--text-secondary);">
+                    ${escapeHtml(post.body).replace(/\n/g, '<br>')}
+                </div>
+            `;
+        }
+        
+        // Add stats
+        content += `
+            <div class="d-flex align-items-center gap-3 mb-3" style="padding: 0.75rem; background: var(--bg-tertiary); border-radius: var(--radius-md);">
+                <span style="color: var(--accent-success);">
+                    <i class="bi bi-arrow-up"></i> ${post.score} upvotes
+                </span>
+                ${post.flair ? `<span class="reddit-flair">${escapeHtml(post.flair)}</span>` : ''}
+            </div>
+        `;
+        
+        // Add keywords
+        if (post.keywords && post.keywords.length > 0) {
+            content += `
+                <div class="mb-3">
+                    <h6 style="color: var(--text-secondary); margin-bottom: 0.75rem;"><i class="bi bi-tags-fill"></i> Keywords</h6>
+                    <div class="d-flex flex-wrap gap-1">
+            `;
+            post.keywords.forEach(kw => {
+                content += `
+                    <span class="keyword-badge">
+                        ${escapeHtml(kw.keyword)}
+                        <span style="color: var(--text-muted); font-size: 0.65rem; opacity: 0.8;">
+                            ${kw.similarity.toFixed(2)}
+                        </span>
+                    </span>
+                `;
+            });
+            content += `
+                    </div>
+                </div>
+            `;
+        }
+        
+        content += `</div>`;
+        
+        modalBody.innerHTML = content;
+        modalLink.href = post.url;
+        modal.show();
+        
+        // Setup video autoplay when modal is shown
+        const modalVideo = modalBody.querySelector('video');
+        if (modalVideo) {
+            modalVideo.play().catch(e => console.log('Video autoplay prevented:', e));
+        }
+    }
+    
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Setup video autoplay on hover for post cards
+    function setupRedditVideoAutoplay() {
+        const videoThumbnails = document.querySelectorAll('.reddit-video-thumbnail video');
+        
+        videoThumbnails.forEach(video => {
+            const container = video.closest('.reddit-video-thumbnail');
+            
+            container.addEventListener('mouseenter', () => {
+                video.play().catch(e => {
+                    // Autoplay prevented, that's okay
+                });
+            });
+            
+            container.addEventListener('mouseleave', () => {
+                video.pause();
+                video.currentTime = 0;
+            });
+        });
+    }
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        setupRedditVideoAutoplay();
+    });
+</script>
 {% endblock %}

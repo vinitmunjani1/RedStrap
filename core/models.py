@@ -6,12 +6,51 @@ from django.contrib.auth.models import User
 from django.urls import reverse
 
 
+class SocialUsername(models.Model):
+    """
+    Represents a unified username that can have both Instagram and Twitter accounts.
+    This allows linking accounts from different platforms under the same username.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='social_usernames')
+    username = models.CharField(max_length=255, db_index=True, help_text="Unified username (case-insensitive)")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = [['username', 'user']]
+        indexes = [
+            models.Index(fields=['user', 'username']),
+        ]
+    
+    def __str__(self):
+        return f"@{self.username} (user: {self.user.username})"
+    
+    @property
+    def has_instagram(self):
+        return self.instagram_accounts.exists()
+    
+    @property
+    def has_twitter(self):
+        return self.twitter_accounts.exists()
+    
+    @property
+    def instagram_count(self):
+        return self.instagram_accounts.count()
+    
+    @property
+    def twitter_count(self):
+        return self.twitter_accounts.count()
+
+
 class InstagramAccount(models.Model):
     """
     Represents an Instagram account to monitor.
     Each account belongs to a user and can have multiple posts.
+    Linked to a SocialUsername for unified management.
     """
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='instagram_accounts')
+    social_username = models.ForeignKey('SocialUsername', on_delete=models.CASCADE, related_name='instagram_accounts', null=True, blank=True, help_text="Linked unified username")
     username = models.CharField(max_length=255, help_text="Instagram username without @")
     created_at = models.DateTimeField(auto_now_add=True)
     last_scraped_at = models.DateTimeField(null=True, blank=True, help_text="Last time posts were fetched for this account")
@@ -89,11 +128,11 @@ class InstagramCarouselItem(models.Model):
 class InstagramKeyword(models.Model):
     """
     Represents a keyword extracted from an Instagram post caption.
-    Keywords are extracted using semantic similarity analysis.
+    Keywords are extracted using Together AI or semantic similarity analysis.
     """
     post = models.ForeignKey(InstagramPost, on_delete=models.CASCADE, related_name='keywords')
     keyword = models.CharField(max_length=255, help_text="Extracted keyword/phrase")
-    similarity = models.FloatField(help_text="Similarity score (0.0 to 1.0) indicating how well the keyword represents the post")
+    similarity = models.FloatField(null=True, blank=True, help_text="Similarity score (0.0 to 1.0) indicating how well the keyword represents the post. Null for Together AI keywords.")
     extracted_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -103,7 +142,9 @@ class InstagramKeyword(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.keyword} (similarity: {self.similarity:.2f})"
+        if self.similarity is not None:
+            return f"{self.keyword} (similarity: {self.similarity:.2f})"
+        return f"{self.keyword}"
 
 
 class Subreddit(models.Model):
@@ -131,7 +172,7 @@ class Subreddit(models.Model):
 class RedditPost(models.Model):
     """
     Represents a single Reddit post.
-    Stores post metadata including title, body, score, and keywords.
+    Stores post metadata including title, body, score, media, and keywords.
     """
     subreddit = models.ForeignKey(Subreddit, on_delete=models.CASCADE, related_name='posts')
     title = models.CharField(max_length=500)
@@ -139,6 +180,10 @@ class RedditPost(models.Model):
     score = models.IntegerField(default=0, help_text="Reddit upvote score")
     body = models.TextField(blank=True, help_text="Post body text")
     flair = models.CharField(max_length=100, blank=True, help_text="Reddit post flair")
+    thumbnail_url = models.URLField(max_length=500, blank=True, help_text="Thumbnail image URL")
+    media_url = models.URLField(max_length=500, blank=True, help_text="Media URL (image or video)")
+    is_video = models.BooleanField(default=False, help_text="Whether this post contains a video")
+    post_type = models.CharField(max_length=50, blank=True, help_text="Post type: self, link, image, video, gallery")
     scraped_at = models.DateTimeField(auto_now_add=True, help_text="When this post was scraped")
     keywords_extracted = models.BooleanField(default=False, help_text="Whether keywords have been extracted from this post")
     
@@ -159,7 +204,7 @@ class RedditKeyword(models.Model):
     """
     post = models.ForeignKey(RedditPost, on_delete=models.CASCADE, related_name='keywords')
     keyword = models.CharField(max_length=255, help_text="Extracted keyword/phrase")
-    similarity = models.FloatField(help_text="Similarity score (0.0 to 1.0) indicating how well the keyword represents the post")
+    similarity = models.FloatField(null=True, blank=True, help_text="Similarity score (0.0 to 1.0) indicating how well the keyword represents the post")
     extracted_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -169,15 +214,19 @@ class RedditKeyword(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.keyword} (similarity: {self.similarity:.2f})"
+        if self.similarity is not None:
+            return f"{self.keyword} (similarity: {self.similarity:.2f})"
+        return f"{self.keyword}"
 
 
 class TwitterAccount(models.Model):
     """
     Represents a Twitter account to monitor.
     Each account belongs to a user and can have multiple tweets.
+    Linked to a SocialUsername for unified management.
     """
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='twitter_accounts')
+    social_username = models.ForeignKey('SocialUsername', on_delete=models.CASCADE, related_name='twitter_accounts', null=True, blank=True, help_text="Linked unified username")
     username = models.CharField(max_length=255, help_text="Twitter username without @")
     rest_id = models.CharField(max_length=255, blank=True, help_text="Twitter user rest_id (used for API calls)")
     name = models.CharField(max_length=255, blank=True, help_text="Twitter display name")
@@ -228,18 +277,34 @@ class TwitterTweet(models.Model):
     created_at_db = models.DateTimeField(auto_now_add=True, help_text="When this tweet was added to our database")
     keywords_extracted = models.BooleanField(default=False, help_text="Whether keywords have been extracted from this tweet")
     
-    class Meta:
-        ordering = ['-created_at']
-        unique_together = [['account', 'tweet_id']]
-        indexes = [
-            models.Index(fields=['keywords_extracted', '-created_at']),
-        ]
-    
-    def __str__(self):
-        return f"Tweet {self.tweet_id} by @{self.account.username}"
-    
     @property
     def twitter_url(self):
         """Generate the Twitter URL for this tweet."""
         return f"https://twitter.com/{self.account.username}/status/{self.tweet_id}"
+    
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = [['account', 'tweet_id']]
+
+
+class TwitterKeyword(models.Model):
+    """
+    Represents a keyword extracted from a Twitter tweet.
+    Keywords are extracted using Together AI.
+    """
+    post = models.ForeignKey(TwitterTweet, on_delete=models.CASCADE, related_name='keywords')
+    keyword = models.CharField(max_length=255, help_text="Extracted keyword/phrase")
+    similarity = models.FloatField(null=True, blank=True, help_text="Similarity score (0.0 to 1.0) indicating how well the keyword represents the tweet. Null for Together AI keywords.")
+    extracted_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-extracted_at', 'keyword']
+        indexes = [
+            models.Index(fields=['-extracted_at']),
+        ]
+    
+    def __str__(self):
+        if self.similarity is not None:
+            return f"{self.keyword} (similarity: {self.similarity:.2f})"
+        return f"{self.keyword}"
 

@@ -2,6 +2,7 @@
 Django views for Instagram and Reddit scraping application.
 """
 import logging
+import json
 from collections import defaultdict, Counter
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
@@ -25,10 +26,11 @@ logger = logging.getLogger(__name__)
 from .models import (
     InstagramAccount, InstagramPost, InstagramCarouselItem, InstagramKeyword,
     Subreddit, RedditPost, RedditKeyword,
-    TwitterAccount, TwitterTweet
+    TwitterAccount, TwitterTweet, TwitterKeyword, SocialUsername
 )
 from .forms import InstagramAccountForm, SubredditForm, TwitterAccountForm, SocialAccountForm
-from .services import instagram_service, reddit_service, keyword_service, twitter_service
+from .services import instagram_service, reddit_service, twitter_service
+from .services.together_ai_service import extract_keywords_with_together_ai
 
 
 def register_view(request):
@@ -52,62 +54,77 @@ def dashboard_view(request):
     
     # Get user's Instagram accounts
     accounts = InstagramAccount.objects.filter(user=request.user)
+
+    # Recent Instagram posts (latest 6 overall)
+    recent_instagram_posts = InstagramPost.objects.filter(
+        account__user=request.user
+    ).select_related('account').prefetch_related('keywords').order_by('-taken_at')[:6]
+
+    # Recent tweets (latest 6 overall)
+    recent_tweets = TwitterTweet.objects.filter(
+        account__user=request.user
+    ).select_related('account').order_by('-created_at')[:6]
     
-    # Get all posts and reels - show only last 48 hours per username
-    # Include both regular posts and reels
-    recent_posts_time = timezone.now() - timedelta(hours=48)
-    all_posts = list(InstagramPost.objects.filter(
-        account__user=request.user,
-        taken_at__gte=recent_posts_time
-    ).select_related('account').order_by('-taken_at'))
-    
-    # Log for debugging
-    posts_count = sum(1 for p in all_posts if not p.is_reel)
-    reels_count = sum(1 for p in all_posts if p.is_reel)
-    logger.info(f"Dashboard: Found {len(all_posts)} items ({posts_count} posts, {reels_count} reels, last 48 hours) for user {request.user.username}")
-    
-    # Group posts by username - only include usernames with posts from last 48 hours
-    posts_by_username = defaultdict(list)
-    account_id_map = {}  # Map username to account_id
-    
-    for post in all_posts:
-        posts_by_username[post.account.username].append(post)
-        # Store account_id mapping
-        if post.account.username not in account_id_map:
-            account_id_map[post.account.username] = post.account.id
-    
-    # Only include accounts that have posts in the last 48 hours
-    # Accounts with no recent posts will not appear on dashboard
-    
-    # Sort usernames by most recent post and create list of dictionaries
-    # Posts are already filtered to last 48 hours, so show all of them
-    username_posts_list = []
-    for username, posts in posts_by_username.items():
-        # Sort posts by taken_at for each username (most recent first)
-        posts.sort(key=lambda x: x.taken_at, reverse=True)
-        # Show all posts from last 48 hours (no limit needed since already filtered)
-        limited_posts = posts
-        
-        # Get account_id from map
-        account_id = account_id_map.get(username)
-        
-        if account_id:  # Only add if we have a valid account_id
-            username_posts_list.append({
-                'username': username,
-                'account_id': account_id,
-                'posts': limited_posts,
-                'count': len(limited_posts)
-            })
-    
-    # Sort by most recent post across all usernames
-    username_posts_list.sort(
-        key=lambda x: max(p.taken_at for p in x['posts']) if x['posts'] else timezone.now() - timedelta(days=365),
-        reverse=True
+    # Get recent posts/tweets per username (last 48 hours)
+    recent_window = timezone.now() - timedelta(hours=48)
+    all_posts = list(
+        InstagramPost.objects.filter(
+            account__user=request.user,
+            taken_at__gte=recent_window
+        ).select_related('account').prefetch_related('keywords').order_by('-taken_at')
     )
+    all_tweets = list(
+        TwitterTweet.objects.filter(
+            account__user=request.user,
+            created_at__gte=recent_window
+        ).select_related('account').order_by('-created_at')
+    )
+
+    # Group by username combining IG and Twitter
+    by_username = defaultdict(lambda: {
+        'ig_posts': [],
+        'tw_tweets': [],
+        'ig_account_id': None,
+        'tw_account_id': None,
+    })
+
+    for post in all_posts:
+        entry = by_username[post.account.username]
+        entry['ig_posts'].append(post)
+        entry['ig_account_id'] = entry['ig_account_id'] or post.account.id
+
+    for tweet in all_tweets:
+        entry = by_username[tweet.account.username]
+        entry['tw_tweets'].append(tweet)
+        entry['tw_account_id'] = entry['tw_account_id'] or tweet.account.id
+
+    username_cards = []
+    for username, data in by_username.items():
+        ig_sorted = sorted(data['ig_posts'], key=lambda p: p.taken_at, reverse=True)
+        tw_sorted = sorted(data['tw_tweets'], key=lambda t: t.created_at, reverse=True)
+        latest_dt = None
+        if ig_sorted:
+            latest_dt = ig_sorted[0].taken_at
+        if tw_sorted:
+            latest_dt = max(latest_dt, tw_sorted[0].created_at) if latest_dt else tw_sorted[0].created_at
+        username_cards.append({
+            'username': username,
+            'ig_account_id': data['ig_account_id'],
+            'tw_account_id': data['tw_account_id'],
+            'ig_posts': ig_sorted,
+            'tw_tweets': tw_sorted,
+            'ig_count': len(ig_sorted),
+            'tw_count': len(tw_sorted),
+            'latest_dt': latest_dt or timezone.now() - timedelta(days=365),
+        })
+
+    username_cards.sort(key=lambda x: x['latest_dt'], reverse=True)
     
     context = {
         'accounts': accounts,
-        'username_posts_list': username_posts_list,
+        'username_cards': username_cards,
+        'recent_instagram_posts': recent_instagram_posts,
+        'recent_tweets': recent_tweets,
     }
     return render(request, 'core/dashboard.html', context)
 
@@ -120,21 +137,70 @@ def posts_view(request):
     Supports searching by username.
     """
     from collections import defaultdict
+    RECENT_ENGAGEMENT_SAMPLE = 200
+    TOP_ENGAGEMENT_LIMIT = 5
     
-    # Get all posts for the user (no time restriction)
-    all_posts = InstagramPost.objects.filter(
+    # Get all posts/tweets for the user (kept as queryset until after search to avoid unnecessary work)
+    all_posts_qs = InstagramPost.objects.filter(
         account__user=request.user
     ).select_related('account').prefetch_related('keywords')
+    all_tweets_qs = TwitterTweet.objects.filter(
+        account__user=request.user
+    ).select_related('account')
+
+    # Compute top engagement Instagram posts (likes + comments) from recent posts
+    recent_posts_for_engagement = list(
+        InstagramPost.objects.filter(account__user=request.user)
+        .select_related('account')
+        .order_by('-taken_at')[:RECENT_ENGAGEMENT_SAMPLE]
+    )
+    top_ig_engagement_posts = sorted(
+        recent_posts_for_engagement,
+        key=lambda p: (p.like_count or 0) + (p.comment_count or 0),
+        reverse=True
+    )[:TOP_ENGAGEMENT_LIMIT]
+    top_ig_engagement = [
+        {
+            'post': post,
+            'engagement_total': (post.like_count or 0) + (post.comment_count or 0),
+        }
+        for post in top_ig_engagement_posts
+    ]
+
+    # Compute top engagement tweets (faves + retweets + replies) from recent tweets
+    recent_tweets_for_engagement = list(
+        TwitterTweet.objects.filter(account__user=request.user)
+        .select_related('account')
+        .order_by('-created_at')[:RECENT_ENGAGEMENT_SAMPLE]
+    )
+    top_tw_engagement_posts = sorted(
+        recent_tweets_for_engagement,
+        key=lambda t: (t.favorite_count or 0) + (t.retweet_count or 0) + (t.reply_count or 0),
+        reverse=True
+    )[:TOP_ENGAGEMENT_LIMIT]
+    top_tw_engagement = [
+        {
+            'tweet': tweet,
+            'engagement_total': (tweet.favorite_count or 0) + (tweet.retweet_count or 0) + (tweet.reply_count or 0),
+        }
+        for tweet in top_tw_engagement_posts
+    ]
     
     # Get search query from request
     search_query = request.GET.get('search', '').strip().lower()
     
     # Filter by username if search query provided
     if search_query:
-        all_posts = all_posts.filter(account__username__icontains=search_query)
+        all_posts_qs = all_posts_qs.filter(account__username__icontains=search_query)
+        all_tweets_qs = all_tweets_qs.filter(account__username__icontains=search_query)
+    
+    # Materialize lists only after search filtering
+    all_posts = list(all_posts_qs)
+    all_tweets = list(all_tweets_qs)
     
     # Get sort parameter from request (default: time, descending)
     sort_by = request.GET.get('sort', 'time_desc')
+    tw_sort_by = request.GET.get('tw_sort', 'time_desc')
     
     # Group posts by username
     posts_by_username = defaultdict(list)
@@ -190,11 +256,68 @@ def posts_view(request):
             reverse=True
         )
     
+    # Group tweets by username
+    tweets_by_username = defaultdict(list)
+    tw_account_id_map = {}
+    for tweet in all_tweets:
+        tweets_by_username[tweet.account.username].append(tweet)
+        if tweet.account.username not in tw_account_id_map:
+            tw_account_id_map[tweet.account.username] = tweet.account.id
+
+    tweets_username_list = []
+    for username, tweets in tweets_by_username.items():
+        if tw_sort_by == 'likes_desc':
+            tweets.sort(key=lambda t: t.favorite_count or 0, reverse=True)
+        elif tw_sort_by == 'likes_asc':
+            tweets.sort(key=lambda t: t.favorite_count or 0, reverse=False)
+        elif tw_sort_by == 'retweets_desc':
+            tweets.sort(key=lambda t: t.retweet_count or 0, reverse=True)
+        elif tw_sort_by == 'retweets_asc':
+            tweets.sort(key=lambda t: t.retweet_count or 0, reverse=False)
+        elif tw_sort_by == 'replies_desc':
+            tweets.sort(key=lambda t: t.reply_count or 0, reverse=True)
+        elif tw_sort_by == 'replies_asc':
+            tweets.sort(key=lambda t: t.reply_count or 0, reverse=False)
+        elif tw_sort_by == 'engagement_desc':
+            tweets.sort(key=lambda t: (t.favorite_count or 0) + (t.retweet_count or 0) + (t.reply_count or 0), reverse=True)
+        elif tw_sort_by == 'engagement_asc':
+            tweets.sort(key=lambda t: (t.favorite_count or 0) + (t.retweet_count or 0) + (t.reply_count or 0), reverse=False)
+        elif tw_sort_by == 'time_asc':
+            tweets.sort(key=lambda t: t.created_at, reverse=False)
+        else:
+            tweets.sort(key=lambda t: t.created_at, reverse=True)
+
+        account_id = tw_account_id_map.get(username)
+        if account_id:
+            initial_tweets = tweets[:6]
+            tweets_username_list.append({
+                'username': username,
+                'account_id': account_id,
+                'tweets': initial_tweets,
+                'count': len(tweets),
+                'loaded_count': len(initial_tweets),
+                'has_more': len(tweets) > 6,
+            })
+
+    # Sort tweet groups by most recent tweet (or username if searching)
+    if search_query:
+        tweets_username_list.sort(key=lambda x: x['username'].lower())
+    else:
+        tweets_username_list.sort(
+            key=lambda x: max(t.created_at for t in x['tweets']) if x['tweets'] else timezone.now() - timedelta(days=365),
+            reverse=True
+        )
+
     context = {
         'username_posts_list': username_posts_list,
         'search_query': search_query,
         'sort_by': sort_by,
-        'total_posts': all_posts.count(),
+        'total_posts': len(all_posts),
+        'top_ig_engagement': top_ig_engagement,
+        'tweets_username_list': tweets_username_list,
+        'tw_sort_by': tw_sort_by,
+        'total_tweets': len(all_tweets),
+        'top_tw_engagement': top_tw_engagement,
     }
     return render(request, 'core/posts.html', context)
 
@@ -280,6 +403,87 @@ def load_more_posts_view(request):
         'has_more': has_more,
         'next_offset': offset + len(next_posts),
         'total_count': len(all_posts)
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def load_more_tweets_view(request):
+    """
+    AJAX endpoint to load more tweets for infinite scroll/pagination on the posts page.
+    Returns next 6 tweets for a specific username.
+    """
+    username = request.GET.get('username', '').strip()
+    offset = int(request.GET.get('offset', 0))
+    sort_by = request.GET.get('tw_sort', 'time_desc')
+    search_query = request.GET.get('search', '').strip().lower()
+    limit = 6
+    
+    if not username:
+        return JsonResponse({'error': 'Username required'}, status=400)
+    
+    tweets_qs = TwitterTweet.objects.filter(
+        account__user=request.user,
+        account__username=username
+    ).select_related('account')
+    
+    if search_query:
+        tweets_qs = tweets_qs.filter(account__username__icontains=search_query)
+    
+    tweets = list(tweets_qs)
+    
+    if sort_by == 'likes_desc':
+        tweets.sort(key=lambda t: t.favorite_count or 0, reverse=True)
+    elif sort_by == 'likes_asc':
+        tweets.sort(key=lambda t: t.favorite_count or 0, reverse=False)
+    elif sort_by == 'retweets_desc':
+        tweets.sort(key=lambda t: t.retweet_count or 0, reverse=True)
+    elif sort_by == 'retweets_asc':
+        tweets.sort(key=lambda t: t.retweet_count or 0, reverse=False)
+    elif sort_by == 'replies_desc':
+        tweets.sort(key=lambda t: t.reply_count or 0, reverse=True)
+    elif sort_by == 'replies_asc':
+        tweets.sort(key=lambda t: t.reply_count or 0, reverse=False)
+    elif sort_by == 'engagement_desc':
+        tweets.sort(key=lambda t: (t.favorite_count or 0) + (t.retweet_count or 0) + (t.reply_count or 0), reverse=True)
+    elif sort_by == 'engagement_asc':
+        tweets.sort(key=lambda t: (t.favorite_count or 0) + (t.retweet_count or 0) + (t.reply_count or 0), reverse=False)
+    elif sort_by == 'time_asc':
+        tweets.sort(key=lambda t: t.created_at, reverse=False)
+    else:
+        tweets.sort(key=lambda t: t.created_at, reverse=True)
+    
+    next_tweets = tweets[offset:offset + limit]
+    has_more = (offset + limit) < len(tweets)
+    
+    tweets_data = []
+    for tweet in next_tweets:
+        # Prepare one representative media item (first)
+        media_info = {}
+        if tweet.media:
+            media_item = tweet.media[0]
+            media_info = {
+                'type': media_item.type,
+                'url': media_item.url,
+                'video_url': media_item.video_url,
+            }
+        tweets_data.append({
+            'id': tweet.id,
+            'text': tweet.text or '',
+            'created_at': tweet.created_at.isoformat() if tweet.created_at else '',
+            'favorite_count': tweet.favorite_count or 0,
+            'retweet_count': tweet.retweet_count or 0,
+            'reply_count': tweet.reply_count or 0,
+            'twitter_url': tweet.twitter_url,
+            'media': media_info,
+            'username': tweet.account.username,
+        })
+    
+    return JsonResponse({
+        'tweets': tweets_data,
+        'has_more': has_more,
+        'next_offset': offset + len(next_tweets),
+        'total_count': len(tweets),
     })
 
 
@@ -510,7 +714,7 @@ def delete_instagram_account_view(request, account_id):
         username = account.username
         account.delete()
         messages.success(request, f'Instagram account @{username} deleted successfully!')
-    return redirect('instagram_accounts')
+    return redirect('social_dashboard')
 
 
 def _update_progress(task_id, **kwargs):
@@ -579,11 +783,12 @@ def _fetch_posts_with_progress(user, task_id):
             nonlocal total_posts, total_errors, new_posts_for_keywords
             account_new_posts = []
             account_saved_count = 0
+            account_has_posts = False  # Track if account had existing posts
             
             try:
                 username = account.username.strip().lstrip('@').lower()
                 if not username:
-                    return account_saved_count, account_new_posts, None
+                    return account_saved_count, account_new_posts, False, None
                 
                 # Update current account being processed
                 _update_progress(
@@ -593,6 +798,7 @@ def _fetch_posts_with_progress(user, task_id):
                 )
                 
                 has_posts = account.posts.exists()
+                account_has_posts = has_posts  # Store for later use
                 
                 def save_posts_batch(posts_batch):
                     """Save a batch of posts and update progress - thread-safe."""
@@ -648,6 +854,10 @@ def _fetch_posts_with_progress(user, task_id):
                             batch_new_posts += 1
                             if post.caption and post.caption.strip():
                                 account_new_posts.append(post)
+                        else:
+                            # Only queue for keywords if not already extracted
+                            if (not post.keywords_extracted) and post.caption and post.caption.strip():
+                                account_new_posts.append(post)
                     
                     # Thread-safe progress update after processing batch
                     if batch_new_posts > 0:
@@ -665,11 +875,14 @@ def _fetch_posts_with_progress(user, task_id):
                 
                 # Fetch posts (concurrently with other accounts)
                 if has_posts:
-                    # Fetch posts from last 24 hours when posts exist in database
-                    # This ensures we get all new posts regardless of which page they're on
-                    logger.info(f"Account {username} has existing posts, fetching posts from last 24 hours")
+                    # Fetch until we reach the most recent post already in DB (stop_post_id boundary)
+                    last_post = account.posts.order_by('-taken_at', '-created_at').first()
+                    stop_post_id = last_post.post_id if last_post else None
+                    logger.info(f"Account {username} has existing posts, fetching until stop_post_id={stop_post_id}")
                     posts_data = instagram_service.get_all_posts_for_username(
-                        username, max_age_hours=24, save_callback=save_posts_batch
+                        username,
+                        save_callback=save_posts_batch,
+                        stop_post_id=stop_post_id,
                     )
                 else:
                     # No posts in database: fetch all posts (up to 600 limit from TEST_MODE_POSTS_LIMIT)
@@ -696,11 +909,11 @@ def _fetch_posts_with_progress(user, task_id):
                                 logger.error(f"Error sending Discord notification for @{username}: {e}", exc_info=True)
                                 # Don't fail the entire fetch if Discord fails
                 
-                return account_saved_count, account_new_posts, None
+                return account_saved_count, account_new_posts, account_has_posts, None
                 
             except Exception as e:
                 logger.error(f"Error fetching posts for @{account.username}: {e}", exc_info=True)
-                return 0, [], str(e)
+                return 0, [], False, str(e)
         
         # Process accounts concurrently using ThreadPoolExecutor
         # Use up to 13 workers (one per API key) to maximize throughput
@@ -726,12 +939,14 @@ def _fetch_posts_with_progress(user, task_id):
                 completed_accounts += 1
                 
                 try:
-                    saved_count, account_new_posts, error = future.result()
+                    saved_count, account_new_posts, account_has_posts, error = future.result()
                     
                     # Thread-safe updates
                     with accounts_processed_lock:
                         total_posts += saved_count
-                        new_posts_for_keywords.extend(account_new_posts)
+                        # Only add posts for keyword extraction if account had existing posts (recent fetch, not initial bulk)
+                        if account_has_posts:
+                            new_posts_for_keywords.extend(account_new_posts)
                         if error:
                             total_errors += 1
                         
@@ -848,7 +1063,7 @@ def _fetch_posts_with_progress(user, task_id):
                             InstagramKeyword(
                                 post=post,
                                 keyword=kw_data['keyword'],
-                                similarity=kw_data['similarity']
+                                similarity=kw_data.get('similarity')  # Together AI keywords have no similarity
                             )
                         )
                     
@@ -1004,13 +1219,14 @@ def scrape_instagram_view(request):
             
             # Fetch posts with callback to save incrementally
             if has_posts:
-                # Fetch posts from last 24 hours when posts exist in database
-                # This ensures we get all new posts regardless of which page they're on
-                logger.info(f"Account {username} has existing posts, fetching posts from last 24 hours")
+                # Fetch until we reach the most recent stored post_id
+                last_post = account.posts.order_by('-taken_at', '-created_at').first()
+                stop_post_id = last_post.post_id if last_post else None
+                logger.info(f"Account {username} has existing posts, fetching until stop_post_id={stop_post_id}")
                 posts_data = instagram_service.get_all_posts_for_username(
-                    username, 
-                    max_age_hours=24,  # Fetch posts from last 24 hours
-                    save_callback=save_posts_batch
+                    username,
+                    save_callback=save_posts_batch,
+                    stop_post_id=stop_post_id
                 )
             else:
                 # No posts in database: fetch all posts (up to 600 limit from TEST_MODE_POSTS_LIMIT)
@@ -1048,10 +1264,12 @@ def scrape_instagram_view(request):
             total_errors += 1
             messages.error(request, f'Error fetching posts for @{account.username}: {str(e)}')
     
-    # Automatically extract keywords for all newly fetched posts
+    # Automatically extract keywords for all newly fetched posts (only for recent posts, not initial bulk fetch)
     total_keywords_extracted = 0
-    if new_posts_for_keywords:
-        logger.info(f"Automatically extracting keywords for {len(new_posts_for_keywords)} newly fetched posts")
+    # Only extract keywords if account had existing posts (recent fetch, not initial bulk)
+    # Skip keyword extraction for initial bulk fetch when new account is added
+    if new_posts_for_keywords and has_posts:
+        logger.info(f"Automatically extracting keywords for {len(new_posts_for_keywords)} newly fetched posts (recent posts only)")
         
         # Determine optimal number of workers for keyword extraction
         max_workers = min(len(new_posts_for_keywords), (os.cpu_count() or 4) * 2, 20)
@@ -1116,7 +1334,7 @@ def scrape_instagram_view(request):
                         InstagramKeyword(
                             post=post,
                             keyword=kw_data['keyword'],
-                            similarity=kw_data['similarity']
+                            similarity=kw_data.get('similarity')  # Together AI keywords have no similarity
                         )
                     )
                 
@@ -1231,11 +1449,11 @@ def fetch_single_account_posts_view(request, account_id):
                 
                 # Fetch posts
                 if has_posts:
-                    # Fetch posts from last 24 hours when posts exist in database
-                    # This ensures we get all new posts regardless of which page they're on
-                    logger.info(f"Account {username} has existing posts, fetching posts from last 24 hours")
+                    last_post = account.posts.order_by('-taken_at', '-created_at').first()
+                    stop_post_id = last_post.post_id if last_post else None
+                    logger.info(f"Account {username} has existing posts, fetching until stop_post_id={stop_post_id}")
                     posts_data = instagram_service.get_all_posts_for_username(
-                        username, max_age_hours=24, save_callback=save_posts_batch
+                        username, save_callback=save_posts_batch, stop_post_id=stop_post_id
                     )
                 else:
                     # No posts in database: fetch all posts (up to 600 limit from TEST_MODE_POSTS_LIMIT)
@@ -1261,9 +1479,10 @@ def fetch_single_account_posts_view(request, account_id):
                             except Exception as e:
                                 logger.error(f"Error sending Discord notification for @{username}: {e}", exc_info=True)
                 
-                # Extract keywords for new posts
+                # Extract keywords for new posts (only for recent posts, not initial bulk fetch)
                 total_keywords_extracted = 0
-                if account_new_posts:
+                # Only extract keywords if account had existing posts (recent fetch, not initial bulk)
+                if account_new_posts and has_posts:
                     # Update progress to show keyword extraction phase
                     estimated_keywords_total = len(account_new_posts) * 4
                     _update_progress(
@@ -1344,7 +1563,7 @@ def fetch_single_account_posts_view(request, account_id):
                                     InstagramKeyword(
                                         post=post,
                                         keyword=kw_data['keyword'],
-                                        similarity=kw_data['similarity']
+                                        similarity=kw_data.get('similarity')  # Together AI keywords have no similarity
                                     )
                                 )
                             
@@ -1448,11 +1667,11 @@ def fetch_single_account_posts_view(request, account_id):
         
         # Fetch posts
         if has_posts:
-            # Fetch posts from last 24 hours when posts exist in database
-            # This ensures we get all new posts regardless of which page they're on
-            logger.info(f"Account {username} has existing posts, fetching posts from last 24 hours")
+            last_post = account.posts.order_by('-taken_at', '-created_at').first()
+            stop_post_id = last_post.post_id if last_post else None
+            logger.info(f"Account {username} has existing posts, fetching until stop_post_id={stop_post_id}")
             posts_data = instagram_service.get_all_posts_for_username(
-                username, max_age_hours=24, save_callback=save_posts_batch
+                username, save_callback=save_posts_batch, stop_post_id=stop_post_id
             )
         else:
             # No posts in database: fetch all posts (up to 600 limit from TEST_MODE_POSTS_LIMIT)
@@ -1478,10 +1697,11 @@ def fetch_single_account_posts_view(request, account_id):
                     except Exception as e:
                         logger.error(f"Error sending Discord notification for @{username}: {e}", exc_info=True)
         
-        # Automatically extract keywords for all newly fetched posts
+        # Automatically extract keywords for all newly fetched posts (only for recent posts, not initial bulk fetch)
         total_keywords_extracted = 0
-        if new_posts_for_keywords:
-            logger.info(f"Automatically extracting keywords for {len(new_posts_for_keywords)} newly fetched posts")
+        # Only extract keywords if account had existing posts (recent fetch, not initial bulk)
+        if new_posts_for_keywords and has_posts:
+            logger.info(f"Automatically extracting keywords for {len(new_posts_for_keywords)} newly fetched posts (recent posts only)")
             
             # Determine optimal number of workers for keyword extraction
             max_workers = min(len(new_posts_for_keywords), (os.cpu_count() or 4) * 2, 20)
@@ -1550,7 +1770,7 @@ def fetch_single_account_posts_view(request, account_id):
                             InstagramKeyword(
                                 post=post,
                                 keyword=kw_data['keyword'],
-                                similarity=kw_data['similarity']
+                                similarity=kw_data.get('similarity')  # Together AI keywords have no similarity
                             )
                         )
                     
@@ -1609,25 +1829,48 @@ def reddit_view(request):
         subreddit__user=request.user
     ).prefetch_related('keywords').order_by('-scraped_at')[:50]
     
+    # Serialize posts to JSON for JavaScript modal
+    posts_json = []
+    for post in posts:
+        posts_json.append({
+            'id': post.id,
+            'title': post.title,
+            'body': post.body,
+            'url': post.url,
+            'score': post.score,
+            'flair': post.flair,
+            'thumbnail_url': post.thumbnail_url,
+            'media_url': post.media_url,
+            'is_video': post.is_video,
+            'post_type': post.post_type,
+            'subreddit': post.subreddit.name,
+            'scraped_at': post.scraped_at.isoformat(),
+            'keywords': [{'keyword': kw.keyword, 'similarity': kw.similarity} for kw in post.keywords.all()],
+        })
+    
     # Fetch extracted keywords - get top keywords by similarity (for separate section)
     keywords = RedditKeyword.objects.filter(
         post__subreddit__user=request.user
     ).select_related('post', 'post__subreddit').order_by('-similarity')[:50]
     
     # Group keywords by keyword text to show frequency and average similarity
-    keyword_stats = defaultdict(lambda: {'count': 0, 'total_similarity': 0.0, 'posts': []})
+    keyword_stats = defaultdict(lambda: {'count': 0, 'total_similarity': 0.0, 'similarity_count': 0, 'posts': []})
     for kw in keywords:
         keyword_stats[kw.keyword]['count'] += 1
-        keyword_stats[kw.keyword]['total_similarity'] += kw.similarity
+        if kw.similarity is not None:
+            keyword_stats[kw.keyword]['total_similarity'] += kw.similarity
+            keyword_stats[kw.keyword]['similarity_count'] += 1
         keyword_stats[kw.keyword]['posts'].append(kw.post)
     
     # Convert to list and calculate average similarity
     keyword_list = []
     for keyword, stats in keyword_stats.items():
+        similarity_count = stats['similarity_count']
+        avg_similarity = (stats['total_similarity'] / similarity_count) if similarity_count > 0 else 0.0
         keyword_list.append({
             'keyword': keyword,
             'count': stats['count'],
-            'avg_similarity': stats['total_similarity'] / stats['count'],
+            'avg_similarity': avg_similarity,
             'posts': stats['posts'][:3]  # Show up to 3 posts per keyword
         })
     
@@ -1637,6 +1880,7 @@ def reddit_view(request):
     context = {
         'subreddits': subreddits,
         'posts': posts,
+        'posts_json': json.dumps(posts_json),
         'keywords': keyword_list[:30],  # Show top 30 keywords
         'total_keywords': RedditKeyword.objects.filter(post__subreddit__user=request.user).count(),
     }
@@ -1700,6 +1944,10 @@ def scrape_reddit_view(request):
                         'score': post_data['score'],
                         'body': post_data['body'],
                         'flair': post_data.get('flair', ''),
+                        'thumbnail_url': post_data.get('thumbnail_url', ''),
+                        'media_url': post_data.get('media_url', ''),
+                        'is_video': post_data.get('is_video', False),
+                        'post_type': post_data.get('post_type', ''),
                     }
                 )
                 if created:
@@ -1722,50 +1970,97 @@ def scrape_reddit_view(request):
 
 @login_required
 def extract_keywords_view(request):
-    """Extract keywords from Reddit posts that don't have keywords yet."""
+    """Extract keywords from Reddit posts using Together AI."""
     if request.method != 'POST':
         return redirect('reddit')
     
-    posts = RedditPost.objects.filter(
+    posts = list(RedditPost.objects.filter(
         subreddit__user=request.user,
         keywords_extracted=False
-    )[:100]  # Process up to 100 posts at a time
+    )[:100])  # Process up to 100 posts at a time
     
-    if not posts.exists():
+    if not posts:
         messages.info(request, 'No posts need keyword extraction.')
         return redirect('reddit')
     
+    max_workers = min(len(posts), (os.cpu_count() or 4) * 2, 20)
+    logger.info(f"Extracting keywords for {len(posts)} Reddit posts using {max_workers} concurrent workers")
+    
+    results = []
     total_keywords = 0
     total_errors = 0
     
-    for post in posts:
-        try:
-            # Combine title and body for keyword extraction
-            combined_text = (post.title + "\n\n" + post.body).strip()
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_post = {
+            executor.submit(_extract_keywords_for_reddit_post, post): post
+            for post in posts
+        }
+        
+        for future in as_completed(future_to_post):
+            post = future_to_post[future]
+            try:
+                post_id, keywords, error = future.result()
+                results.append({
+                    'post_id': post_id,
+                    'keywords': keywords,
+                    'error': error
+                })
+                if error:
+                    total_errors += 1
+                else:
+                    total_keywords += len(keywords)
+            except Exception as e:
+                logger.error(f"Exception extracting keywords for Reddit post {post.id}: {e}", exc_info=True)
+                total_errors += 1
+                results.append({
+                    'post_id': post.id,
+                    'keywords': [],
+                    'error': str(e)
+                })
+    
+    post_map = {post.id: post for post in posts}
+    keywords_to_create = []
+    posts_to_update = []
+    post_ids_to_delete_keywords = []
+    
+    with transaction.atomic():
+        for result in results:
+            post_id = result['post_id']
+            keywords = result['keywords']
+            error = result['error']
             
-            keywords = keyword_service.extract_keywords(combined_text)
+            if error:
+                continue
             
-            # Delete old keywords for this post
-            post.keywords.all().delete()
+            post = post_map.get(post_id)
+            if not post:
+                continue
             
-            # Save new keywords
+            post_ids_to_delete_keywords.append(post_id)
+            
             for kw_data in keywords:
-                RedditKeyword.objects.create(
-                    post=post,
-                    keyword=kw_data['keyword'],
-                    similarity=kw_data['similarity']
+                keywords_to_create.append(
+                    RedditKeyword(
+                        post=post,
+                        keyword=kw_data['keyword'],
+                        similarity=kw_data.get('similarity')  # Together AI keywords have no similarity
+                    )
                 )
-                total_keywords += 1
             
             post.keywords_extracted = True
-            post.save()
-            
-        except Exception as e:
-            total_errors += 1
-            logger.error(f"Error extracting keywords for post {post.id}: {e}", exc_info=True)
+            posts_to_update.append(post)
+        
+        if post_ids_to_delete_keywords:
+            RedditKeyword.objects.filter(post_id__in=post_ids_to_delete_keywords).delete()
+        
+        if keywords_to_create:
+            RedditKeyword.objects.bulk_create(keywords_to_create, batch_size=100)
+        
+        if posts_to_update:
+            RedditPost.objects.bulk_update(posts_to_update, ['keywords_extracted'], batch_size=100)
     
     if total_keywords > 0:
-        messages.success(request, f'Extracted {total_keywords} keywords from {posts.count()} posts!')
+        messages.success(request, f'Extracted {total_keywords} keywords from {len(posts_to_update)} posts using Together AI!')
     if total_errors > 0:
         messages.warning(request, f'Encountered {total_errors} errors during keyword extraction.')
     
@@ -1785,22 +2080,197 @@ def reddit_keywords_view(request):
 
 def _extract_keywords_for_post(post):
     """
-    Extract keywords for a single post. Designed for concurrent processing.
+    Extract keywords for a single Instagram post using Together AI.
+    Designed for concurrent processing.
     
     Args:
         post: InstagramPost instance
     
     Returns:
         Tuple of (post_id, keywords_list, error_message)
+        keywords_list contains dicts with 'keyword' field (similarity is None for Together AI)
     """
     try:
-        # Extract keywords from caption
-        keywords = keyword_service.extract_keywords(post.caption)
+        if post.keywords_extracted:
+            return post.id, [], None
+        if not post.caption or not post.caption.strip():
+            logger.debug(f"Skipping keyword extraction for post {post.id} - empty caption")
+            return post.id, [], None
+        
+        # Extract keywords using Together AI
+        keywords = extract_keywords_with_together_ai(str(post.post_id), post.caption)
         
         return post.id, keywords, None
     except Exception as e:
         logger.error(f"Error extracting keywords for Instagram post {post.id}: {e}", exc_info=True)
         return post.id, [], str(e)
+
+
+def _extract_keywords_for_tweet(tweet):
+    """
+    Extract keywords for a single Twitter tweet using Together AI.
+    Designed for concurrent processing.
+    
+    Args:
+        tweet: TwitterTweet instance
+    
+    Returns:
+        Tuple of (tweet_id, keywords_list, error_message)
+        keywords_list contains dicts with 'keyword' field (similarity is None for Together AI)
+    """
+    try:
+        if tweet.keywords_extracted:
+            return tweet.id, [], None
+        if not tweet.text or not tweet.text.strip():
+            logger.debug(f"Skipping keyword extraction for tweet {tweet.id} - empty text")
+            return tweet.id, [], None
+        
+        # Extract keywords using Together AI
+        keywords = extract_keywords_with_together_ai(str(tweet.tweet_id), tweet.text)
+        
+        return tweet.id, keywords, None
+    except Exception as e:
+        logger.error(f"Error extracting keywords for Twitter tweet {tweet.id}: {e}", exc_info=True)
+        return tweet.id, [], str(e)
+
+
+def _extract_keywords_for_reddit_post(post):
+    """
+    Extract keywords for a single Reddit post using Together AI.
+    Designed for concurrent processing.
+    
+    Args:
+        post: RedditPost instance
+    
+    Returns:
+        Tuple of (post_id, keywords_list, error_message)
+        keywords_list contains dicts with 'keyword' field (similarity is None for Together AI)
+    """
+    try:
+        if getattr(post, 'keywords_extracted', False):
+            return post.id, [], None
+        # Combine title and body for keyword extraction
+        combined_text = (post.title + "\n\n" + post.body).strip()
+        
+        if not combined_text:
+            logger.debug(f"Skipping keyword extraction for Reddit post {post.id} - empty text")
+            return post.id, [], None
+        
+        # Use post URL as unique identifier (since RedditPost doesn't have a post_id field like Instagram)
+        # We'll use the post's database ID converted to string
+        post_identifier = str(post.id)
+        
+        # Extract keywords using Together AI
+        keywords = extract_keywords_with_together_ai(post_identifier, combined_text)
+        
+        return post.id, keywords, None
+    except Exception as e:
+        logger.error(f"Error extracting keywords for Reddit post {post.id}: {e}", exc_info=True)
+        return post.id, [], str(e)
+
+
+@login_required
+def extract_twitter_keywords_view(request):
+    """
+    Extract keywords from Twitter tweets using Together AI.
+    Processes multiple tweets in parallel using ThreadPoolExecutor.
+    """
+    if request.method != 'POST':
+        return redirect('twitter_accounts')
+    
+    # Get tweets that need keyword extraction
+    tweets = list(TwitterTweet.objects.filter(
+        account__user=request.user,
+        keywords_extracted=False,
+        text__isnull=False
+    ).exclude(text='').select_related('account')[:100])  # Process up to 100 tweets at a time
+    
+    if not tweets:
+        messages.info(request, 'No tweets need keyword extraction.')
+        return redirect('twitter_accounts')
+    
+    max_workers = min(len(tweets), (os.cpu_count() or 4) * 2, 20)
+    logger.info(f"Extracting keywords for {len(tweets)} tweets using {max_workers} concurrent workers")
+    
+    results = []
+    total_keywords = 0
+    total_errors = 0
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_tweet = {
+            executor.submit(_extract_keywords_for_tweet, tweet): tweet
+            for tweet in tweets
+        }
+        
+        for future in as_completed(future_to_tweet):
+            tweet = future_to_tweet[future]
+            try:
+                tweet_id, keywords, error = future.result()
+                results.append({
+                    'tweet_id': tweet_id,
+                    'keywords': keywords,
+                    'error': error
+                })
+                if error:
+                    total_errors += 1
+                else:
+                    total_keywords += len(keywords)
+            except Exception as e:
+                logger.error(f"Exception extracting keywords for tweet {tweet.id}: {e}", exc_info=True)
+                total_errors += 1
+                results.append({
+                    'tweet_id': tweet.id,
+                    'keywords': [],
+                    'error': str(e)
+                })
+    
+    tweet_map = {tweet.id: tweet for tweet in tweets}
+    keywords_to_create = []
+    tweets_to_update = []
+    tweet_ids_to_delete_keywords = []
+    
+    with transaction.atomic():
+        for result in results:
+            tweet_id = result['tweet_id']
+            keywords = result['keywords']
+            error = result['error']
+            
+            if error:
+                continue
+            
+            tweet = tweet_map.get(tweet_id)
+            if not tweet:
+                continue
+            
+            tweet_ids_to_delete_keywords.append(tweet_id)
+            
+            for kw_data in keywords:
+                keywords_to_create.append(
+                    TwitterKeyword(
+                        post=tweet,
+                        keyword=kw_data['keyword'],
+                        similarity=kw_data.get('similarity')  # Together AI keywords have no similarity
+                    )
+                )
+            
+            tweet.keywords_extracted = True
+            tweets_to_update.append(tweet)
+        
+        if tweet_ids_to_delete_keywords:
+            TwitterKeyword.objects.filter(post_id__in=tweet_ids_to_delete_keywords).delete()
+        
+        if keywords_to_create:
+            TwitterKeyword.objects.bulk_create(keywords_to_create, batch_size=100)
+        
+        if tweets_to_update:
+            TwitterTweet.objects.bulk_update(tweets_to_update, ['keywords_extracted'], batch_size=100)
+    
+    if total_keywords > 0:
+        messages.success(request, f'Extracted {total_keywords} keywords from {len(tweets_to_update)} tweets using Together AI!')
+    if total_errors > 0:
+        messages.warning(request, f'Encountered {total_errors} errors during keyword extraction.')
+    
+    return redirect('twitter_accounts')
 
 
 @login_required
@@ -1897,7 +2367,7 @@ def extract_instagram_keywords_view(request):
                     InstagramKeyword(
                         post=post,
                         keyword=kw_data['keyword'],
-                        similarity=kw_data['similarity']
+                        similarity=kw_data.get('similarity')  # Together AI keywords have no similarity
                     )
                 )
             
@@ -2060,7 +2530,7 @@ def delete_twitter_account_view(request, account_id):
         username = account.username
         account.delete()
         messages.success(request, f'Twitter account @{username} deleted successfully!')
-    return redirect('twitter_accounts')
+    return redirect('social_dashboard')
 
 
 @login_required
@@ -2102,25 +2572,110 @@ def _fetch_twitter_tweets_with_progress(user, account, task_id):
         # Check if account has existing tweets
         has_tweets = TwitterTweet.objects.filter(account=account).exists()
         
+        # Track new tweets for keyword extraction
+        new_tweets_for_keywords = []
+        
         # Determine fetching strategy
+        stop_tweet_id = None
         if has_tweets:
-            # Fetch tweets from last 24 hours
-            max_age_hours = 24
-            logger.info(f"Account @{account.username} has existing tweets, fetching tweets from last 24 hours")
+            last_tweet = TwitterTweet.objects.filter(account=account).order_by('-created_at', '-created_at_db').first()
+            stop_tweet_id = last_tweet.tweet_id if last_tweet else None
+            logger.info(f"Account @{account.username} has existing tweets, fetching until stop_tweet_id={stop_tweet_id}")
         else:
-            # No tweets in database: fetch all available tweets (up to limit)
-            max_age_hours = None
             logger.info(f"Account @{account.username} has no tweets in database, fetching all available tweets")
         
         # Fetch tweets
         tweets_data = twitter_service.get_all_tweets_for_user(
             account.username,
-            max_age_hours=max_age_hours,
-            save_callback=lambda batch: _save_twitter_tweets_batch(account, batch, task_id)
+            save_callback=lambda batch: _save_twitter_tweets_batch(account, batch, task_id, new_tweets_for_keywords),
+            stop_tweet_id=stop_tweet_id
         )
         
+        # Extract keywords for new tweets (only for recent tweets, not initial bulk fetch)
+        total_keywords_extracted = 0
+        if new_tweets_for_keywords:
+            logger.info(f"Automatically extracting keywords for {len(new_tweets_for_keywords)} newly fetched tweets (including first fetch)")
+            
+            max_workers = min(len(new_tweets_for_keywords), (os.cpu_count() or 4) * 2, 20)
+            results = []
+            keyword_errors = 0
+            
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_tweet = {
+                    executor.submit(_extract_keywords_for_tweet, tweet): tweet
+                    for tweet in new_tweets_for_keywords
+                }
+                
+                for future in as_completed(future_to_tweet):
+                    tweet = future_to_tweet[future]
+                    try:
+                        tweet_id, keywords, error = future.result()
+                        results.append({
+                            'tweet_id': tweet_id,
+                            'keywords': keywords,
+                            'error': error
+                        })
+                        if error:
+                            keyword_errors += 1
+                        else:
+                            total_keywords_extracted += len(keywords)
+                    except Exception as e:
+                        logger.error(f"Exception extracting keywords for tweet {tweet.id}: {e}", exc_info=True)
+                        keyword_errors += 1
+                        results.append({
+                            'tweet_id': tweet.id,
+                            'keywords': [],
+                            'error': str(e)
+                        })
+            
+            # Batch database operations
+            tweet_map = {tweet.id: tweet for tweet in new_tweets_for_keywords}
+            keywords_to_create = []
+            tweets_to_update = []
+            tweet_ids_to_delete_keywords = []
+            
+            with transaction.atomic():
+                for result in results:
+                    tweet_id = result['tweet_id']
+                    keywords = result['keywords']
+                    error = result['error']
+                    
+                    if error:
+                        continue
+                    
+                    tweet = tweet_map.get(tweet_id)
+                    if not tweet:
+                        continue
+                    
+                    tweet_ids_to_delete_keywords.append(tweet_id)
+                    
+                    for kw_data in keywords:
+                        keywords_to_create.append(
+                            TwitterKeyword(
+                                post=tweet,
+                                keyword=kw_data['keyword'],
+                                similarity=kw_data.get('similarity')  # Together AI keywords have no similarity
+                            )
+                        )
+                    
+                    tweet.keywords_extracted = True
+                    tweets_to_update.append(tweet)
+                
+                if tweet_ids_to_delete_keywords:
+                    TwitterKeyword.objects.filter(post_id__in=tweet_ids_to_delete_keywords).delete()
+                
+                if keywords_to_create:
+                    TwitterKeyword.objects.bulk_create(keywords_to_create, batch_size=100)
+                    logger.info(f"Auto-extracted and saved {len(keywords_to_create)} keywords for {len(tweets_to_update)} tweets")
+                
+                if tweets_to_update:
+                    TwitterTweet.objects.bulk_update(tweets_to_update, ['keywords_extracted'], batch_size=100)
+        
         # Update progress
-        _update_progress(task_id, status='completed', message=f'Fetched {len(tweets_data)} tweets for @{account.username}', progress=100)
+        message = f'Fetched {len(tweets_data)} tweets for @{account.username}'
+        if total_keywords_extracted > 0:
+            message += f' and extracted {total_keywords_extracted} keywords'
+        _update_progress(task_id, status='completed', message=message, progress=100)
         
         # Update account last_scraped_at
         account.last_scraped_at = timezone.now()
@@ -2131,7 +2686,7 @@ def _fetch_twitter_tweets_with_progress(user, account, task_id):
         _update_progress(task_id, status='error', message=f'Error: {str(e)}', progress=0)
 
 
-def _save_twitter_tweets_batch(account, tweets_batch, task_id):
+def _save_twitter_tweets_batch(account, tweets_batch, task_id, new_tweets_list=None):
     """Save a batch of tweets to the database."""
     saved_count = 0
     new_count = 0
@@ -2161,6 +2716,9 @@ def _save_twitter_tweets_batch(account, tweets_batch, task_id):
         saved_count += 1
         if created:
             new_count += 1
+            # Track new tweets with text for keyword extraction
+        if new_tweets_list is not None and tweet.text and tweet.text.strip() and not tweet.keywords_extracted:
+                new_tweets_list.append(tweet)
     
     # Update progress
     _update_progress(task_id, message=f'Saved {saved_count} tweets ({new_count} new)', progress=50)
@@ -2205,17 +2763,71 @@ def _fetch_all_twitter_accounts_tweets(user, task_id):
             """Fetch tweets for a single account."""
             try:
                 has_tweets = TwitterTweet.objects.filter(account=account).exists()
+                new_tweets_for_keywords = []
                 
                 if has_tweets:
-                    max_age_hours = 24
+                    last_tweet = TwitterTweet.objects.filter(account=account).order_by('-created_at', '-created_at_db').first()
+                    stop_tweet_id = last_tweet.tweet_id if last_tweet else None
                 else:
-                    max_age_hours = None
+                    stop_tweet_id = None
                 
                 tweets_data = twitter_service.get_all_tweets_for_user(
                     account.username,
-                    max_age_hours=max_age_hours,
-                    save_callback=lambda batch: _save_twitter_tweets_batch(account, batch, task_id)
+                    save_callback=lambda batch: _save_twitter_tweets_batch(account, batch, task_id, new_tweets_for_keywords),
+                    stop_tweet_id=stop_tweet_id
                 )
+                
+                # Extract keywords for new tweets (only for recent tweets, not initial bulk fetch)
+                if new_tweets_for_keywords and has_tweets:
+                    logger.info(f"Extracting keywords for {len(new_tweets_for_keywords)} new tweets for @{account.username}")
+                    try:
+                        max_workers = min(len(new_tweets_for_keywords), (os.cpu_count() or 4) * 2, 20)
+                        results = []
+                        
+                        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                            future_to_tweet = {
+                                executor.submit(_extract_keywords_for_tweet, tweet): tweet
+                                for tweet in new_tweets_for_keywords
+                            }
+                            
+                            for future in as_completed(future_to_tweet):
+                                tweet = future_to_tweet[future]
+                                try:
+                                    tweet_id, keywords, error = future.result()
+                                    if not error:
+                                        results.append((tweet, keywords))
+                                except Exception as e:
+                                    logger.error(f"Exception extracting keywords for tweet {tweet.id}: {e}", exc_info=True)
+                        
+                        # Batch save keywords
+                        if results:
+                            keywords_to_create = []
+                            tweets_to_update = []
+                            
+                            with transaction.atomic():
+                                for tweet, keywords in results:
+                                    # Delete old keywords
+                                    TwitterKeyword.objects.filter(post=tweet).delete()
+                                    
+                                    # Create new keywords
+                                    for kw_data in keywords:
+                                        keywords_to_create.append(
+                                            TwitterKeyword(
+                                                post=tweet,
+                                                keyword=kw_data['keyword'],
+                                                similarity=kw_data.get('similarity')
+                                            )
+                                        )
+                                    
+                                    tweet.keywords_extracted = True
+                                    tweets_to_update.append(tweet)
+                                
+                                if keywords_to_create:
+                                    TwitterKeyword.objects.bulk_create(keywords_to_create, batch_size=100)
+                                if tweets_to_update:
+                                    TwitterTweet.objects.bulk_update(tweets_to_update, ['keywords_extracted'], batch_size=100)
+                    except Exception as e:
+                        logger.error(f"Error extracting keywords for @{account.username}: {e}", exc_info=True)
                 
                 account.last_scraped_at = timezone.now()
                 account.save()
@@ -2293,17 +2905,60 @@ def twitter_account_tweets_view(request, account_id):
 def social_dashboard_view(request):
     """
     Unified dashboard: add IG/Twitter accounts and list handles with analytics links.
+    Accounts are linked under a unified SocialUsername.
     """
     form = SocialAccountForm(request.POST or None)
     if request.method == 'POST':
         if form.is_valid():
             ig_username = form.cleaned_data.get('instagram_username')
             tw_username = form.cleaned_data.get('twitter_username')
+            
+            if not ig_username and not tw_username:
+                messages.error(request, "Please provide at least one username.")
+                return redirect('social_dashboard')
+            
+            # Determine the unified username
+            # If both are provided, use Instagram username as primary (or Twitter if IG not provided)
+            # If only one is provided, use that one
+            if ig_username and tw_username:
+                # Both provided - use Instagram as primary, but link both to same SocialUsername
+                unified_username = ig_username.lower()
+            elif ig_username:
+                unified_username = ig_username.lower()
+            else:
+                unified_username = tw_username.lower()
+            
             try:
+                # Get or create the unified SocialUsername
+                social_username, created = SocialUsername.objects.get_or_create(
+                    user=request.user,
+                    username=unified_username
+                )
+                
+                # Create Instagram account if provided
                 if ig_username:
-                    InstagramAccount.objects.get_or_create(user=request.user, username=ig_username)
+                    ig_account, ig_created = InstagramAccount.objects.get_or_create(
+                        user=request.user,
+                        username=ig_username.lower(),
+                        defaults={'social_username': social_username}
+                    )
+                    # Always link to social_username (update if needed)
+                    if ig_account.social_username != social_username:
+                        ig_account.social_username = social_username
+                        ig_account.save()
+                
+                # Create Twitter account if provided
                 if tw_username:
-                    TwitterAccount.objects.get_or_create(user=request.user, username=tw_username)
+                    tw_account, tw_created = TwitterAccount.objects.get_or_create(
+                        user=request.user,
+                        username=tw_username.lower(),
+                        defaults={'social_username': social_username}
+                    )
+                    # Always link to social_username (update if needed)
+                    if tw_account.social_username != social_username:
+                        tw_account.social_username = social_username
+                        tw_account.save()
+                
                 messages.success(request, "Accounts added successfully.")
                 return redirect('social_dashboard')
             except Exception as e:
@@ -2312,21 +2967,19 @@ def social_dashboard_view(request):
         else:
             messages.error(request, "Please fix the errors in the form.")
 
-    # Build combined handle list (case-insensitive merge of IG/Twitter usernames)
-    ig_accounts = list(InstagramAccount.objects.filter(user=request.user))
-    tw_accounts = list(TwitterAccount.objects.filter(user=request.user))
+    # Get all SocialUsernames for this user with their linked accounts
+    social_usernames = SocialUsername.objects.filter(user=request.user).prefetch_related(
+        'instagram_accounts', 'twitter_accounts'
+    ).order_by('username')
 
-    handles = {}
-    for acc in ig_accounts:
-        key = acc.username.lower()
-        handles.setdefault(key, {'username': acc.username, 'ig': [], 'tw': []})
-        handles[key]['ig'].append(acc)
-    for acc in tw_accounts:
-        key = acc.username.lower()
-        handles.setdefault(key, {'username': acc.username, 'ig': [], 'tw': []})
-        handles[key]['tw'].append(acc)
-
-    handle_cards = sorted(handles.values(), key=lambda x: x['username'].lower())
+    handle_cards = []
+    for social_username in social_usernames:
+        handle_cards.append({
+            'username': social_username.username,
+            'ig': list(social_username.instagram_accounts.all()),
+            'tw': list(social_username.twitter_accounts.all()),
+            'social_username': social_username
+        })
 
     context = {
         'form': form,
@@ -2336,13 +2989,55 @@ def social_dashboard_view(request):
 
 
 @login_required
+def delete_social_username_view(request, username):
+    """Delete a SocialUsername and all associated accounts."""
+    username_clean = str(username).strip().lstrip('@').lower()
+    social_username = get_object_or_404(SocialUsername, username=username_clean, user=request.user)
+    
+    if request.method == 'POST':
+        username_display = social_username.username
+        # Count accounts that will be deleted (for user feedback)
+        ig_count = social_username.instagram_accounts.count()
+        tw_count = social_username.twitter_accounts.count()
+        
+        # Delete the SocialUsername (this will cascade delete all linked accounts)
+        social_username.delete()
+        
+        # Build success message
+        account_info = []
+        if ig_count > 0:
+            account_info.append(f"{ig_count} Instagram account{'s' if ig_count > 1 else ''}")
+        if tw_count > 0:
+            account_info.append(f"{tw_count} Twitter account{'s' if tw_count > 1 else ''}")
+        
+        if account_info:
+            messages.success(request, f'Username @{username_display} and {", ".join(account_info)} deleted successfully!')
+        else:
+            messages.success(request, f'Username @{username_display} deleted successfully!')
+    
+    return redirect('social_dashboard')
+
+
+@login_required
 def social_user_analytics_view(request, username):
     """
     Show combined analytics for a specific username across Instagram and Twitter.
+    Includes advanced metrics: engagement rates, time-based analysis, content performance, etc.
     """
-    username_clean = str(username).strip().lstrip('@')
-    ig_accounts = list(InstagramAccount.objects.filter(user=request.user, username__iexact=username_clean))
-    tw_accounts = list(TwitterAccount.objects.filter(user=request.user, username__iexact=username_clean))
+    username_clean = str(username).strip().lstrip('@').lower()
+    
+    # Try to find by SocialUsername first, then fallback to direct username matching
+    try:
+        social_username = SocialUsername.objects.get(user=request.user, username=username_clean)
+        ig_accounts = list(social_username.instagram_accounts.all())
+        tw_accounts = list(social_username.twitter_accounts.all())
+    except SocialUsername.DoesNotExist:
+        # Fallback: find accounts by username directly (for backward compatibility)
+        ig_accounts = list(InstagramAccount.objects.filter(user=request.user, username__iexact=username_clean))
+        tw_accounts = list(TwitterAccount.objects.filter(user=request.user, username__iexact=username_clean))
+
+    has_ig_accounts = len(ig_accounts) > 0
+    has_tw_accounts = len(tw_accounts) > 0
 
     ig_posts = list(
         InstagramPost.objects.filter(account__in=ig_accounts)
@@ -2355,6 +3050,7 @@ def social_user_analytics_view(request, username):
         .order_by('-created_at')
     )
 
+    # Helper functions for analytics
     def weekday_counts(items, dt_getter):
         counts = [0] * 7
         for item in items:
@@ -2363,45 +3059,317 @@ def social_user_analytics_view(request, username):
                 counts[dt.weekday()] += 1
         return counts
 
+    def hour_counts(items, dt_getter):
+        """Count items by hour of day (0-23)"""
+        counts = [0] * 24
+        for item in items:
+            dt = dt_getter(item)
+            if dt:
+                counts[dt.hour] += 1
+        return counts
+
+    def hour_engagement(items, dt_getter, engagement_getter):
+        """Calculate average engagement by hour of day"""
+        hour_data = defaultdict(lambda: {'count': 0, 'total': 0})
+        for item in items:
+            dt = dt_getter(item)
+            if dt:
+                hour = dt.hour
+                hour_data[hour]['count'] += 1
+                hour_data[hour]['total'] += engagement_getter(item)
+        
+        # Convert to list with averages
+        result = []
+        for hour in range(24):
+            if hour_data[hour]['count'] > 0:
+                result.append(hour_data[hour]['total'] / hour_data[hour]['count'])
+            else:
+                result.append(0)
+        return result
+
+    def month_counts(items, dt_getter):
+        """Count items by month (YYYY-MM format)"""
+        month_data = defaultdict(int)
+        for item in items:
+            dt = dt_getter(item)
+            if dt:
+                month_key = dt.strftime('%Y-%m')
+                month_data[month_key] += 1
+        return dict(month_data)
+
+    def top_performers(items, metric_getter, limit=5):
+        """Get top N items by a metric"""
+        sorted_items = sorted(items, key=metric_getter, reverse=True)
+        return sorted_items[:limit]
+
+    # Basic counts
     ig_total_posts = len(ig_posts)
     ig_total_likes = sum(p.like_count for p in ig_posts)
     ig_total_comments = sum(p.comment_count for p in ig_posts)
-    ig_weekday_counts = weekday_counts(ig_posts, lambda p: p.taken_at)
-
+    
     tw_total_tweets = len(tw_tweets)
     tw_total_faves = sum(t.favorite_count for t in tw_tweets)
     tw_total_retweets = sum(t.retweet_count for t in tw_tweets)
+    tw_total_replies = sum(t.reply_count for t in tw_tweets)
     tw_total_views = sum(t.view_count for t in tw_tweets)
-    tw_weekday_counts = weekday_counts(tw_tweets, lambda t: t.created_at)
 
+    # Phase 1: Enhanced Metrics Calculations
+    ig_avg_likes = ig_total_likes / ig_total_posts if ig_total_posts > 0 else 0
+    ig_avg_comments = ig_total_comments / ig_total_posts if ig_total_posts > 0 else 0
+    ig_avg_engagement = (ig_total_likes + ig_total_comments) / ig_total_posts if ig_total_posts > 0 else 0
+
+    tw_avg_faves = tw_total_faves / tw_total_tweets if tw_total_tweets > 0 else 0
+    tw_avg_retweets = tw_total_retweets / tw_total_tweets if tw_total_tweets > 0 else 0
+    tw_avg_views = tw_total_views / tw_total_tweets if tw_total_tweets > 0 else 0
+    tw_avg_engagement = (tw_total_faves + tw_total_retweets + tw_total_replies) / tw_total_tweets if tw_total_tweets > 0 else 0
+
+    # Phase 1.2: Content Type Distribution
+    ig_regular_posts = sum(1 for p in ig_posts if not p.is_reel and not p.is_video and not p.is_carousel)
+    ig_reels = sum(1 for p in ig_posts if p.is_reel)
+    ig_videos = sum(1 for p in ig_posts if p.is_video and not p.is_reel)
+    ig_carousels = sum(1 for p in ig_posts if p.is_carousel)
+    
+    tw_original = sum(1 for t in tw_tweets if not t.is_retweet and not t.is_quote)
+    tw_retweets = sum(1 for t in tw_tweets if t.is_retweet)
+    tw_quotes = sum(1 for t in tw_tweets if t.is_quote)
+
+    # Phase 2: Time-Based Analytics
+    ig_weekday_counts = weekday_counts(ig_posts, lambda p: p.taken_at)
+    tw_weekday_counts = weekday_counts(tw_tweets, lambda t: t.created_at)
+    
+    # Weekday engagement averages
+    ig_weekday_engagement = [0] * 7
+    tw_weekday_engagement = [0] * 7
+    for i in range(7):
+        ig_day_posts = [p for p in ig_posts if p.taken_at and p.taken_at.weekday() == i]
+        tw_day_tweets = [t for t in tw_tweets if t.created_at and t.created_at.weekday() == i]
+        
+        if ig_day_posts:
+            ig_weekday_engagement[i] = sum(p.like_count + p.comment_count for p in ig_day_posts) / len(ig_day_posts)
+        if tw_day_tweets:
+            tw_weekday_engagement[i] = sum(t.favorite_count + t.retweet_count for t in tw_day_tweets) / len(tw_day_tweets)
+
+    # Hour of day analysis
+    ig_hour_counts = hour_counts(ig_posts, lambda p: p.taken_at)
+    tw_hour_counts = hour_counts(tw_tweets, lambda t: t.created_at)
+    ig_hour_engagement = hour_engagement(ig_posts, lambda p: p.taken_at, lambda p: p.like_count + p.comment_count)
+    tw_hour_engagement = hour_engagement(tw_tweets, lambda t: t.created_at, lambda t: t.favorite_count + t.retweet_count)
+
+    # Monthly trends
+    ig_month_counts = month_counts(ig_posts, lambda p: p.taken_at)
+    tw_month_counts = month_counts(tw_tweets, lambda t: t.created_at)
+
+    # Phase 3: Top Performing Content
+    ig_top_by_likes = top_performers(ig_posts, lambda p: p.like_count, 5)
+    ig_top_by_comments = top_performers(ig_posts, lambda p: p.comment_count, 5)
+    ig_top_by_engagement = top_performers(ig_posts, lambda p: p.like_count + p.comment_count, 5)
+    
+    tw_top_by_faves = top_performers(tw_tweets, lambda t: t.favorite_count, 5)
+    tw_top_by_retweets = top_performers(tw_tweets, lambda t: t.retweet_count, 5)
+    tw_top_by_views = top_performers(tw_tweets, lambda t: t.view_count, 5)
+    tw_top_by_engagement = top_performers(tw_tweets, lambda t: t.favorite_count + t.retweet_count + t.reply_count, 5)
+
+    # Phase 5: Enhanced Twitter Analytics
     hashtag_counter = Counter()
+    hashtag_engagement = defaultdict(lambda: {'count': 0, 'total_engagement': 0})
     mention_counter = Counter()
+    mention_engagement = defaultdict(lambda: {'count': 0, 'total_engagement': 0})
+    url_counter = Counter()
+    url_engagement = defaultdict(lambda: {'count': 0, 'total_engagement': 0})
+    lang_counter = Counter()
+    lang_engagement = defaultdict(lambda: {'count': 0, 'total_engagement': 0})
+    
     for t in tw_tweets:
+        engagement = t.favorite_count + t.retweet_count + t.reply_count
+        
+        # Hashtags
         for h in t.hashtags or []:
-            hashtag_counter[h.lower()] += 1
+            h_lower = h.lower()
+            hashtag_counter[h_lower] += 1
+            hashtag_engagement[h_lower]['count'] += 1
+            hashtag_engagement[h_lower]['total_engagement'] += engagement
+        
+        # Mentions
         for m in t.mentions or []:
-            mention_counter[m.lower()] += 1
-    top_hashtags = hashtag_counter.most_common(5)
-    top_mentions = mention_counter.most_common(5)
+            m_lower = m.lower()
+            mention_counter[m_lower] += 1
+            mention_engagement[m_lower]['count'] += 1
+            mention_engagement[m_lower]['total_engagement'] += engagement
+        
+        # URLs
+        for url in t.urls or []:
+            url_counter[url] += 1
+            url_engagement[url]['count'] += 1
+            url_engagement[url]['total_engagement'] += engagement
+        
+        # Language
+        if t.lang:
+            lang_counter[t.lang] += 1
+            lang_engagement[t.lang]['count'] += 1
+            lang_engagement[t.lang]['total_engagement'] += engagement
+
+    top_hashtags = hashtag_counter.most_common(10)
+    top_hashtags_by_engagement = sorted(
+        [(tag, hashtag_engagement[tag]['total_engagement'] / hashtag_engagement[tag]['count'] if hashtag_engagement[tag]['count'] > 0 else 0) 
+         for tag in hashtag_counter.keys()],
+        key=lambda x: x[1], reverse=True
+    )[:10]
+    
+    top_mentions = mention_counter.most_common(10)
+    top_mentions_by_engagement = sorted(
+        [(mention, mention_engagement[mention]['total_engagement'] / mention_engagement[mention]['count'] if mention_engagement[mention]['count'] > 0 else 0)
+         for mention in mention_counter.keys()],
+        key=lambda x: x[1], reverse=True
+    )[:10]
+
+    # Phase 6: Instagram-Specific Analytics
+    ig_reels_posts = [p for p in ig_posts if p.is_reel]
+    ig_regular_posts_list = [p for p in ig_posts if not p.is_reel and not p.is_video and not p.is_carousel]
+    ig_video_posts = [p for p in ig_posts if p.is_video and not p.is_reel]
+    ig_image_posts = [p for p in ig_posts if not p.is_video and not p.is_reel and not p.is_carousel]
+    ig_carousel_posts = [p for p in ig_posts if p.is_carousel]
+
+    # Reel performance
+    ig_reels_avg_likes = sum(p.like_count for p in ig_reels_posts) / len(ig_reels_posts) if ig_reels_posts else 0
+    ig_reels_avg_comments = sum(p.comment_count for p in ig_reels_posts) / len(ig_reels_posts) if ig_reels_posts else 0
+    ig_reels_avg_engagement = (sum(p.like_count + p.comment_count for p in ig_reels_posts) / len(ig_reels_posts)) if ig_reels_posts else 0
+    
+    ig_regular_avg_engagement = (sum(p.like_count + p.comment_count for p in ig_regular_posts_list) / len(ig_regular_posts_list)) if ig_regular_posts_list else 0
+    
+    # Video vs Image
+    ig_video_avg_engagement = (sum(p.like_count + p.comment_count for p in ig_video_posts) / len(ig_video_posts)) if ig_video_posts else 0
+    ig_image_avg_engagement = (sum(p.like_count + p.comment_count for p in ig_image_posts) / len(ig_image_posts)) if ig_image_posts else 0
+    
+    # Carousel analysis
+    ig_carousel_avg_engagement = (sum(p.like_count + p.comment_count for p in ig_carousel_posts) / len(ig_carousel_posts)) if ig_carousel_posts else 0
+    ig_single_avg_engagement = (sum(p.like_count + p.comment_count for p in ig_image_posts) / len(ig_image_posts)) if ig_image_posts else 0
+
+    # Content length analysis
+    ig_caption_lengths = [len(p.caption or '') for p in ig_posts]
+    tw_text_lengths = [len(t.text or '') for t in tw_tweets]
 
     context = {
         'username_display': username_clean,
         'ig_accounts': ig_accounts,
         'tw_accounts': tw_accounts,
+        'ig_account_ids': [acc.id for acc in ig_accounts],
+        'tw_account_ids': [acc.id for acc in tw_accounts],
+        'has_ig_accounts': has_ig_accounts,
+        'has_tw_accounts': has_tw_accounts,
         'ig_posts': ig_posts[:12],
         'tw_tweets': tw_tweets[:12],
+        'ig_all_posts': ig_posts,  # All posts for modal display
+        'tw_all_tweets': tw_tweets,  # All tweets for modal display
+        'ig_posts_json': json.dumps({
+            str(p.id): {
+                'id': p.id,
+                'username': p.account.username,
+                'caption': p.caption or '',
+                'image_url': p.image_url or '',
+                'video_url': p.video_url or '',
+                'is_video': p.is_video,
+                'is_reel': p.is_reel,
+                'is_carousel': p.is_carousel,
+                'like_count': p.like_count,
+                'comment_count': p.comment_count,
+                'taken_at': p.taken_at.strftime('%b %d, %Y %I:%M %p') if p.taken_at else '',
+                'instagram_url': p.instagram_url,
+            }
+            for p in ig_posts
+        }),
+        'tw_tweets_json': json.dumps({
+            str(t.id): {
+                'id': t.id,
+                'username': t.account.username,
+                'text': t.text or '',
+                'media': t.media or [],
+                'hashtags': t.hashtags or [],
+                'mentions': t.mentions or [],
+                'favorite_count': t.favorite_count,
+                'retweet_count': t.retweet_count,
+                'reply_count': t.reply_count,
+                'view_count': t.view_count,
+                'created_at': t.created_at.strftime('%b %d, %Y %I:%M %p') if t.created_at else '',
+                'twitter_url': t.twitter_url,
+            }
+            for t in tw_tweets
+        }),
+        
+        # Basic metrics
         'ig_total_posts': ig_total_posts,
         'ig_total_likes': ig_total_likes,
         'ig_total_comments': ig_total_comments,
         'tw_total_tweets': tw_total_tweets,
         'tw_total_faves': tw_total_faves,
         'tw_total_retweets': tw_total_retweets,
+        'tw_total_replies': tw_total_replies,
         'tw_total_views': tw_total_views,
-        'top_hashtags': top_hashtags,
-        'top_mentions': top_mentions,
+        
+        # Phase 1: Enhanced metrics
+        'ig_avg_likes': ig_avg_likes,
+        'ig_avg_comments': ig_avg_comments,
+        'ig_avg_engagement': ig_avg_engagement,
+        'tw_avg_faves': tw_avg_faves,
+        'tw_avg_retweets': tw_avg_retweets,
+        'tw_avg_views': tw_avg_views,
+        'tw_avg_engagement': tw_avg_engagement,
+        
+        # Phase 1.2: Content type distribution
+        'ig_regular_posts': ig_regular_posts,
+        'ig_reels': ig_reels,
+        'ig_videos': ig_videos,
+        'ig_carousels': ig_carousels,
+        'tw_original': tw_original,
+        'tw_retweets': tw_retweets,
+        'tw_quotes': tw_quotes,
+        
+        # Phase 2: Time-based analytics
         'ig_weekday_counts': ig_weekday_counts,
         'tw_weekday_counts': tw_weekday_counts,
+        'ig_weekday_engagement': ig_weekday_engagement,
+        'tw_weekday_engagement': tw_weekday_engagement,
+        'ig_hour_counts': ig_hour_counts,
+        'tw_hour_counts': tw_hour_counts,
+        'ig_hour_engagement': ig_hour_engagement,
+        'tw_hour_engagement': tw_hour_engagement,
+        'ig_month_counts': ig_month_counts,
+        'tw_month_counts': tw_month_counts,
         'weekday_labels': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        'hour_labels': [f'{h:02d}:00' for h in range(24)],
+        
+        # Phase 3: Top performers
+        'ig_top_by_likes': ig_top_by_likes,
+        'ig_top_by_comments': ig_top_by_comments,
+        'ig_top_by_engagement': ig_top_by_engagement,
+        'tw_top_by_faves': tw_top_by_faves,
+        'tw_top_by_retweets': tw_top_by_retweets,
+        'tw_top_by_views': tw_top_by_views,
+        'tw_top_by_engagement': tw_top_by_engagement,
+        
+        # Phase 5: Twitter analytics
+        'top_hashtags': top_hashtags[:5],
+        'top_hashtags_by_engagement': top_hashtags_by_engagement[:5],
+        'top_mentions': top_mentions[:5],
+        'top_mentions_by_engagement': top_mentions_by_engagement[:5],
+        'lang_counter': dict(lang_counter),
+        'lang_engagement': {lang: lang_engagement[lang]['total_engagement'] / lang_engagement[lang]['count'] 
+                           if lang_engagement[lang]['count'] > 0 else 0 
+                           for lang in lang_counter.keys()},
+        
+        # Phase 6: Instagram analytics
+        'ig_reels_avg_likes': ig_reels_avg_likes,
+        'ig_reels_avg_comments': ig_reels_avg_comments,
+        'ig_reels_avg_engagement': ig_reels_avg_engagement,
+        'ig_regular_avg_engagement': ig_regular_avg_engagement,
+        'ig_video_avg_engagement': ig_video_avg_engagement,
+        'ig_image_avg_engagement': ig_image_avg_engagement,
+        'ig_carousel_avg_engagement': ig_carousel_avg_engagement,
+        'ig_single_avg_engagement': ig_single_avg_engagement,
+        'ig_reels_count': len(ig_reels_posts),
+        'ig_regular_count': len(ig_regular_posts_list),
+        'ig_video_count': len(ig_video_posts),
+        'ig_image_count': len(ig_image_posts),
+        'ig_carousel_count': len(ig_carousel_posts),
     }
     return render(request, 'core/social_user_analytics.html', context)
 

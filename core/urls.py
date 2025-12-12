@@ -15,6 +15,7 @@ urlpatterns = [
     path('', views.dashboard_view, name='dashboard'),
     path('posts/', views.posts_view, name='posts'),
     path('posts/load-more/', views.load_more_posts_view, name='load_more_posts'),
+    path('posts/load-more-tweets/', views.load_more_tweets_view, name='load_more_tweets'),
     
     # Instagram
     path('instagram/', views.instagram_accounts_view, name='instagram_accounts'),
@@ -44,9 +45,11 @@ urlpatterns = [
     path('twitter/fetch/<int:account_id>/', views.fetch_single_twitter_account_tweets_view, name='fetch_single_twitter_account_tweets'),
     path('twitter/tweets/', views.twitter_tweets_view, name='twitter_tweets'),
     path('twitter/account/<int:account_id>/tweets/', views.twitter_account_tweets_view, name='twitter_account_tweets'),
+    path('twitter/extract-keywords/', views.extract_twitter_keywords_view, name='extract_twitter_keywords'),
     
     # Unified social dashboard
     path('social/', views.social_dashboard_view, name='social_dashboard'),
+    path('social/delete/<str:username>/', views.delete_social_username_view, name='delete_social_username'),
     path('social/analytics/<str:username>/', views.social_user_analytics_view, name='social_user_analytics'),
 ]
 

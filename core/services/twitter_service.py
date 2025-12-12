@@ -419,7 +419,7 @@ def parse_tweet(entry: Dict) -> Optional[Dict]:
         return None
 
 
-def get_user_tweets(rest_id: str, count: int = 20, cursor: Optional[str] = None, max_age_hours: Optional[int] = None) -> Dict:
+def get_user_tweets(rest_id: str, count: int = 20, cursor: Optional[str] = None, max_age_hours: Optional[int] = None, stop_tweet_id: Optional[str] = None) -> Dict:
     """
     Fetch tweets for a user by their rest_id.
     
@@ -477,6 +477,12 @@ def get_user_tweets(rest_id: str, count: int = 20, cursor: Optional[str] = None,
                 
                 parsed_tweet = parse_tweet(entry)
                 if parsed_tweet:
+                    # Stop if we reached an already-known tweet id
+                    if stop_tweet_id and parsed_tweet.get("tweet_id") == stop_tweet_id:
+                        logger.info(f"Reached existing tweet_id {stop_tweet_id}; stopping pagination")
+                        next_cursor = None
+                        break
+                    
                     # Check time cutoff if specified
                     if cutoff_time and parsed_tweet.get("created_at"):
                         if parsed_tweet["created_at"] < cutoff_time:
@@ -494,7 +500,13 @@ def get_user_tweets(rest_id: str, count: int = 20, cursor: Optional[str] = None,
     }
 
 
-def get_all_tweets_for_user(username: str, max_age_hours: Optional[int] = None, max_tweets: Optional[int] = None, save_callback: Optional[callable] = None) -> List[Dict]:
+def get_all_tweets_for_user(
+    username: str,
+    max_age_hours: Optional[int] = None,
+    max_tweets: Optional[int] = None,
+    save_callback: Optional[callable] = None,
+    stop_tweet_id: Optional[str] = None,
+) -> List[Dict]:
     """
     Fetch all tweets for a given Twitter username with pagination.
     
@@ -531,7 +543,7 @@ def get_all_tweets_for_user(username: str, max_age_hours: Optional[int] = None, 
     
     while True:
         # Fetch a batch of tweets
-        result = get_user_tweets(rest_id, count=count, cursor=cursor, max_age_hours=max_age_hours)
+        result = get_user_tweets(rest_id, count=count, cursor=cursor, max_age_hours=max_age_hours, stop_tweet_id=stop_tweet_id)
         batch_tweets = result.get("tweets", [])
         next_cursor = result.get("next_cursor")
         

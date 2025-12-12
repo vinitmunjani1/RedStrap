@@ -1341,7 +1341,13 @@ def _fetch_single_page(username: str, end_cursor: Optional[str] = None) -> Optio
     return result
 
 
-def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = None, max_pages: Optional[int] = None, save_callback: Optional[callable] = None) -> List[Dict]:
+def get_all_posts_for_username(
+    username: str,
+    max_age_hours: Optional[int] = None,
+    max_pages: Optional[int] = None,
+    save_callback: Optional[callable] = None,
+    stop_post_id: Optional[str] = None,
+) -> List[Dict]:
     """
     Fetch all posts for a given Instagram username using concurrent pagination.
     Uses up to 13 API keys concurrently to fetch multiple pages simultaneously.
@@ -1384,7 +1390,7 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
     if effective_pages_limit and effective_pages_limit > 0:
         logger.info(f"Page limit: Maximum {effective_pages_limit} pages will be fetched")
     
-    # Calculate cutoff time if max_age_hours is provided
+    # Calculate cutoff time if max_age_hours is provided (still supported, but stop_post_id takes precedence)
     cutoff_time = None
     if max_age_hours is not None:
         cutoff_time = timezone.now() - timedelta(hours=max_age_hours)
@@ -1462,6 +1468,7 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
                             batch_posts = []
                             reels_count = 0
                             reached_time_cutoff = False
+                            reached_existing_post = False
                             
                             for parsed_post in page_posts:
                                 # Check test mode limit
@@ -1486,6 +1493,13 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
                                             else:
                                                 logger.warning(f"Failed to fetch carousel items for post {parsed_post.get('post_id')}, but continuing...")
                                 
+                                # Stop if we reached an already-known post id (most recent already in DB)
+                                if stop_post_id and parsed_post.get("post_id") == stop_post_id:
+                                    logger.info(f"Reached existing post_id {stop_post_id} for {username}; stopping pagination")
+                                    reached_existing_post = True
+                                    should_stop = True
+                                    break
+                                
                                 # Check time cutoff - Instagram returns posts in reverse chronological order
                                 # So if we encounter an old post, all subsequent posts will also be old
                                 if cutoff_time is not None:
@@ -1508,10 +1522,11 @@ def get_all_posts_for_username(username: str, max_age_hours: Optional[int] = Non
                             
                             logger.info(f"Page {page_num}: Fetched {len(batch_posts)} posts ({len(batch_posts) - reels_count} posts, {reels_count} reels)")
                             
-                            # Check if we should stop due to time cutoff before queuing next page
-                            if reached_time_cutoff:
-                                logger.info(f"Reached time cutoff on page {page_num}, stopping pagination")
-                                # Don't queue next page if we've reached the time cutoff
+                            # Check if we should stop before queuing next page
+                            if reached_time_cutoff or reached_existing_post:
+                                reason = "time cutoff" if reached_time_cutoff else "existing post boundary"
+                                logger.info(f"Reached {reason} on page {page_num}, stopping pagination")
+                                # Don't queue next page if we've reached the stop condition
                                 break
                             
                             # If there's a next page, add it to queue

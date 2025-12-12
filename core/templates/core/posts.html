@@ -12,6 +12,9 @@
             {% if sort_by %}
                 <input type="hidden" name="sort" value="{{ sort_by }}">
             {% endif %}
+            {% if tw_sort_by %}
+                <input type="hidden" name="tw_sort" value="{{ tw_sort_by }}">
+            {% endif %}
             <button type="submit" class="btn btn-primary btn-sm" style="padding: 0.5rem 1rem; white-space: nowrap;">
                 <i class="bi bi-search"></i>
             </button>
@@ -53,6 +56,126 @@
                 </a></li>
             </ul>
         </div>
+    </div>
+</div>
+
+<!-- Top Engagement Posts -->
+<div class="glass-card mb-4">
+    <div class="card-body">
+        <h4 class="mb-3"><i class="bi bi-activity"></i> Top Engagement (Instagram)</h4>
+        {% if top_ig_engagement %}
+            <div class="row g-3">
+                {% for item in top_ig_engagement %}
+                    {% with post=item.post %}
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <a href="{% url 'instagram_post_detail' post.id %}" class="text-decoration-none">
+                            <div class="card h-100 bg-transparent border" style="border-color: var(--glass-border);">
+                                {% if post.image_url %}
+                                    <img src="{{ post.image_url }}" class="card-img-top" style="height: 200px; object-fit: cover;" alt="Post image">
+                                {% elif post.video_url %}
+                                    <div class="position-relative" style="height: 200px; background: rgba(30,41,59,0.6);">
+                                        <div class="d-flex align-items-center justify-content-center h-100 w-100">
+                                            <i class="bi bi-play-circle text-primary fs-1"></i>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div class="d-flex align-items-center justify-content-center" style="height: 200px; background: rgba(30,41,59,0.6);">
+                                        <i class="bi bi-image fs-1 text-muted"></i>
+                                    </div>
+                                {% endif %}
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <div class="fw-semibold text-white">@{{ post.account.username }}</div>
+                                        <small class="text-muted">{{ post.taken_at|date:"M d, Y" }}</small>
+                                    </div>
+                                    <div class="text-muted small mb-2" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">{{ post.caption|default:"No caption" |truncatewords:16 }}</div>
+                                    <div class="small text-muted d-flex gap-3">
+                                        <span><i class="bi bi-activity"></i> {{ item.engagement_total }}</span>
+                                        <span><i class="bi bi-heart"></i> {{ post.like_count }}</span>
+                                        <span><i class="bi bi-chat"></i> {{ post.comment_count }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                    {% endwith %}
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-muted mb-0">No recent posts yet. Fetch Instagram posts to see engagement leaders.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Top Engagement Tweets -->
+<div class="glass-card mb-4">
+    <div class="card-body">
+        <h4 class="mb-3"><i class="bi bi-activity"></i> Top Engagement (Tweets)</h4>
+        {% if top_tw_engagement %}
+            <div class="row g-3">
+                {% for item in top_tw_engagement %}
+                    {% with tweet=item.tweet %}
+                    <div class="col-12 col-md-6 col-lg-4">
+                        <div class="card h-100 bg-transparent border text-white" style="border-color: var(--glass-border); cursor: pointer;"
+                             onclick="showTweetModal({{ tweet.id }})"
+                             data-tweet-id="{{ tweet.id }}"
+                             data-tweet-user="@{{ tweet.account.username }}"
+                             data-tweet-date="{{ tweet.created_at|date:'M d, Y' }}"
+                             data-tweet-text="{{ tweet.text|escapejs }}"
+                             data-tweet-likes="{{ tweet.favorite_count }}"
+                             data-tweet-retweets="{{ tweet.retweet_count }}"
+                             data-tweet-replies="{{ tweet.reply_count }}"
+                             data-tweet-url="{{ tweet.twitter_url }}"
+                             {% if tweet.media and tweet.media|length > 0 %}
+                             {% with media_item=tweet.media.0 %}
+                             data-media-type="{{ media_item.type|default_if_none:'' }}"
+                             data-media-url="{{ media_item.url|default_if_none:'' }}"
+                             data-media-video="{{ media_item.video_url|default_if_none:'' }}"
+                             {% endwith %}
+                             {% endif %}>
+                            <div class="card-body">
+                                {% if tweet.media %}
+                                    {% for media_item in tweet.media|slice:":1" %}
+                                        {% if media_item.type == "photo" %}
+                                        <div class="mb-2 rounded overflow-hidden" style="height: 180px; background: rgba(30,41,59,0.6);">
+                                            <img src="{{ media_item.url }}" alt="Tweet media" style="width: 100%; height: 100%; object-fit: cover;">
+                                        </div>
+                                        {% elif media_item.type == "video" %}
+                                        <div class="mb-2 position-relative rounded overflow-hidden" style="height: 180px; background: rgba(30,41,59,0.6);">
+                                            {% if media_item.video_url %}
+                                            <video class="w-100 h-100" muted loop playsinline preload="metadata" style="object-fit: cover;">
+                                                <source src="{{ media_item.video_url }}" type="video/mp4">
+                                            </video>
+                                            {% else %}
+                                            <img src="{{ media_item.url }}" alt="Tweet media" style="width: 100%; height: 100%; object-fit: cover;">
+                                            {% endif %}
+                                            <div class="position-absolute top-50 start-50 translate-middle" style="pointer-events: none;">
+                                                <i class="bi bi-play-circle-fill text-white" style="font-size: 2.25rem; opacity: 0.9;"></i>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endif %}
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div class="fw-semibold">@{{ tweet.account.username }}</div>
+                                    <small class="text-muted">{{ tweet.created_at|date:"M d, Y" }}</small>
+                                </div>
+                                <div class="text-muted mb-2" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">{{ tweet.text|default:"No text" }}</div>
+                                <div class="small text-muted d-flex gap-3 flex-wrap">
+                                    <span><i class="bi bi-activity"></i> {{ item.engagement_total }}</span>
+                                    <span><i class="bi bi-heart"></i> {{ tweet.favorite_count }}</span>
+                                    <span><i class="bi bi-repeat"></i> {{ tweet.retweet_count }}</span>
+                                    <span><i class="bi bi-chat"></i> {{ tweet.reply_count }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endwith %}
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-muted mb-0">No recent tweets yet. Fetch tweets to see engagement leaders.</p>
+        {% endif %}
     </div>
 </div>
 
@@ -246,6 +369,175 @@
     </div>
 {% endif %}
 
+<!-- Tweets Section -->
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3 mt-5">
+    <h2 class="mb-0" style="font-size: 1.5rem; font-weight: 600;"><i class="bi bi-twitter"></i> Tweets</h2>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+        <div class="dropdown">
+            <button class="btn btn-info btn-sm dropdown-toggle" type="button" id="twSortDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="padding: 0.5rem 1.25rem;">
+                <i class="bi bi-sort-down"></i> Sort Tweets
+            </button>
+            <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="twSortDropdown">
+                <li><h6 class="dropdown-header">Sort by Time</h6></li>
+                <li><a class="dropdown-item {% if tw_sort_by == 'time_desc' %}active{% endif %}" href="?tw_sort=time_desc{% if search_query %}&search={{ search_query }}{% endif %}"><i class="bi bi-clock-history"></i> Newest First</a></li>
+                <li><a class="dropdown-item {% if tw_sort_by == 'time_asc' %}active{% endif %}" href="?tw_sort=time_asc{% if search_query %}&search={{ search_query }}{% endif %}"><i class="bi bi-clock"></i> Oldest First</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><h6 class="dropdown-header">Sort by Likes</h6></li>
+                <li><a class="dropdown-item {% if tw_sort_by == 'likes_desc' %}active{% endif %}" href="?tw_sort=likes_desc{% if search_query %}&search={{ search_query }}{% endif %}"><i class="bi bi-heart-fill"></i> Most Likes</a></li>
+                <li><a class="dropdown-item {% if tw_sort_by == 'likes_asc' %}active{% endif %}" href="?tw_sort=likes_asc{% if search_query %}&search={{ search_query }}{% endif %}"><i class="bi bi-heart"></i> Least Likes</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><h6 class="dropdown-header">Sort by Retweets</h6></li>
+                <li><a class="dropdown-item {% if tw_sort_by == 'retweets_desc' %}active{% endif %}" href="?tw_sort=retweets_desc{% if search_query %}&search={{ search_query }}{% endif %}"><i class="bi bi-repeat"></i> Most Retweets</a></li>
+                <li><a class="dropdown-item {% if tw_sort_by == 'retweets_asc' %}active{% endif %}" href="?tw_sort=retweets_asc{% if search_query %}&search={{ search_query }}{% endif %}"><i class="bi bi-arrow-repeat"></i> Least Retweets</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><h6 class="dropdown-header">Sort by Replies</h6></li>
+                <li><a class="dropdown-item {% if tw_sort_by == 'replies_desc' %}active{% endif %}" href="?tw_sort=replies_desc{% if search_query %}&search={{ search_query }}{% endif %}"><i class="bi bi-chat-fill"></i> Most Replies</a></li>
+                <li><a class="dropdown-item {% if tw_sort_by == 'replies_asc' %}active{% endif %}" href="?tw_sort=replies_asc{% if search_query %}&search={{ search_query }}{% endif %}"><i class="bi bi-chat"></i> Least Replies</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><h6 class="dropdown-header">Sort by Engagement</h6></li>
+                <li><a class="dropdown-item {% if tw_sort_by == 'engagement_desc' %}active{% endif %}" href="?tw_sort=engagement_desc{% if search_query %}&search={{ search_query }}{% endif %}"><i class="bi bi-activity"></i> Highest</a></li>
+                <li><a class="dropdown-item {% if tw_sort_by == 'engagement_asc' %}active{% endif %}" href="?tw_sort=engagement_asc{% if search_query %}&search={{ search_query }}{% endif %}"><i class="bi bi-activity"></i> Lowest</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+{% if tweets_username_list %}
+    {% for username_data in tweets_username_list %}
+        <div class="glass-card mb-4 tweet-username-section"
+             data-username="{{ username_data.username }}"
+             data-offset="{{ username_data.loaded_count }}"
+             data-has-more="{% if username_data.has_more %}true{% else %}false{% endif %}"
+             data-tw-sort="{{ tw_sort_by }}"
+             data-search="{{ search_query|default:'' }}"
+             style="border-radius: 12px; overflow: hidden;">
+            <div class="card-header" style="background: rgba(30, 41, 59, 0.3); backdrop-filter: blur(10px); border-bottom: 1px solid var(--glass-border); padding: 1.25rem 1.5rem;">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                    <div>
+                        <h4 class="mb-1" style="color: var(--accent-primary); font-weight: 600; font-size: 1.1rem;">
+                            <i class="bi bi-twitter"></i> @{{ username_data.username }}
+                        </h4>
+                        <small class="text-muted" style="font-size: 0.875rem;">
+                             {{ username_data.loaded_count }} / {{ username_data.count }} tweet{{ username_data.count|pluralize }}
+                        </small>
+                    </div>
+                    <a href="https://twitter.com/{{ username_data.username }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary" style="white-space: nowrap; min-width: 110px; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-weight: 500;">
+                        <i class="bi bi-box-arrow-up-right"></i> Twitter
+                    </a>
+                </div>
+            </div>
+            <div class="card-body" style="padding: 1.25rem 1.5rem;">
+                <div class="list-group list-group-flush">
+                    <div class="row g-3 tweet-grid">
+                        {% for tweet in username_data.tweets %}
+                        <div class="col-12 col-md-6 col-lg-4">
+                            <div class="card h-100 bg-transparent border text-white" style="border-color: var(--glass-border); cursor: pointer;"
+                                 onclick="showTweetModal({{ tweet.id }})"
+                                 data-tweet-id="{{ tweet.id }}"
+                                 data-tweet-user="@{{ tweet.account.username }}"
+                                 data-tweet-date="{{ tweet.created_at|date:'M d, Y' }}"
+                                 data-tweet-text="{{ tweet.text|escapejs }}"
+                                 data-tweet-likes="{{ tweet.favorite_count }}"
+                                 data-tweet-retweets="{{ tweet.retweet_count }}"
+                                 data-tweet-replies="{{ tweet.reply_count }}"
+                                 data-tweet-url="{{ tweet.twitter_url }}"
+                                 {% if tweet.media and tweet.media|length > 0 %}
+                                 {% with media_item=tweet.media.0 %}
+                                 data-media-type="{{ media_item.type|default_if_none:'' }}"
+                                 data-media-url="{{ media_item.url|default_if_none:'' }}"
+                                 data-media-video="{{ media_item.video_url|default_if_none:'' }}"
+                                 {% endwith %}
+                                 {% endif %}>
+                                <div class="card-body">
+                                    {% if tweet.media %}
+                                        {% for media_item in tweet.media|slice:":1" %}
+                                            {% if media_item.type == "photo" %}
+                                            <div class="mb-2 rounded overflow-hidden" style="height: 180px; background: rgba(30,41,59,0.6);">
+                                                <img src="{{ media_item.url }}" alt="Tweet media" style="width: 100%; height: 100%; object-fit: cover;">
+                                            </div>
+                                            {% elif media_item.type == "video" %}
+                                            <div class="mb-2 position-relative rounded overflow-hidden" style="height: 180px; background: rgba(30,41,59,0.6);">
+                                                {% if media_item.video_url %}
+                                                <video class="w-100 h-100" muted loop playsinline preload="metadata" style="object-fit: cover;">
+                                                    <source src="{{ media_item.video_url }}" type="video/mp4">
+                                                </video>
+                                                {% else %}
+                                                <img src="{{ media_item.url }}" alt="Tweet media" style="width: 100%; height: 100%; object-fit: cover;">
+                                                {% endif %}
+                                                <div class="position-absolute top-50 start-50 translate-middle" style="pointer-events: none;">
+                                                    <i class="bi bi-play-circle-fill text-white" style="font-size: 2.25rem; opacity: 0.9;"></i>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="fw-semibold">@{{ tweet.account.username }}</div>
+                                        <small class="text-muted">{{ tweet.created_at|date:"M d, Y" }}</small>
+                                    </div>
+                                    <div class="text-muted mb-2" style="white-space: pre-wrap; word-break: break-word; max-height: 4.5em; overflow: hidden;">{{ tweet.text|default:"No text" }}</div>
+                                    <div class="small text-muted d-flex gap-3 flex-wrap">
+                                        <span><i class="bi bi-activity"></i> {{ tweet.favorite_count|add:tweet.retweet_count|add:tweet.reply_count }}</span>
+                                        <span><i class="bi bi-heart"></i> {{ tweet.favorite_count }}</span>
+                                        <span><i class="bi bi-repeat"></i> {{ tweet.retweet_count }}</span>
+                                        <span><i class="bi bi-chat"></i> {{ tweet.reply_count }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="d-flex justify-content-center mt-3 load-more-tweets-container" style="{% if not username_data.has_more %}display: none;{% endif %}">
+                        <div class="d-flex flex-column align-items-center gap-2">
+                            <div class="spinner-border text-primary tweets-loading-spinner" role="status" style="display: none;">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="loadMoreTweets(this)" style="min-width: 180px;">
+                                <i class="bi bi-plus-circle"></i> Load More Tweets
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="glass-card" style="border-radius: 12px;">
+        <div class="card-body text-center py-4 px-4">
+            <i class="bi bi-info-circle" style="font-size: 3rem; color: var(--text-muted); opacity: 0.6;"></i>
+            <p class="text-muted mt-2 mb-0">No tweets found.</p>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Tweet Modal -->
+<div class="modal fade" id="tweetModal" tabindex="-1" aria-labelledby="tweetModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="tweetModalLabel">Tweet</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+            <div class="fw-semibold" id="tweetUser"></div>
+            <small class="text-muted" id="tweetDate"></small>
+        </div>
+        <p class="text-muted" id="tweetText" style="white-space: pre-wrap;"></p>
+        <div id="tweetMediaContainer" class="mb-3"></div>
+        <div class="d-flex gap-3 text-muted small mb-3">
+            <span><i class="bi bi-heart"></i> <span id="tweetLikes"></span></span>
+            <span><i class="bi bi-repeat"></i> <span id="tweetRetweets"></span></span>
+            <span><i class="bi bi-chat"></i> <span id="tweetReplies"></span></span>
+        </div>
+        <a id="tweetLink" href="#" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-box-arrow-up-right"></i> View on Twitter
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Back to Top Button -->
 <button id="backToTopBtn" type="button" style="
     position: fixed;
@@ -308,6 +600,7 @@
     
     .post-card:hover .post-overlay {
         opacity: 1;
+ 
     }
     
     .post-video-thumbnail {
@@ -316,6 +609,7 @@
     
     .post-card:hover .post-video-thumbnail {
         filter: brightness(1.1);
+        height: 30vh;
     }
     
     .post-image {
@@ -438,6 +732,47 @@
         
         // Initialize video autoplay for initial posts
         setupVideoAutoplay();
+
+        // Tweet modal helper
+        window.showTweetModal = function(id) {
+            const card = document.querySelector('[data-tweet-id="' + id + '"]');
+            if (!card) return;
+            const user = card.dataset.tweetUser || '';
+            const date = card.dataset.tweetDate || '';
+            const text = card.dataset.tweetText || '';
+            const likes = card.dataset.tweetLikes || '0';
+            const retweets = card.dataset.tweetRetweets || '0';
+            const replies = card.dataset.tweetReplies || '0';
+            const url = card.dataset.tweetUrl || '#';
+            const modalEl = document.getElementById('tweetModal');
+            if (!modalEl) return;
+            modalEl.querySelector('#tweetUser').textContent = user;
+            modalEl.querySelector('#tweetDate').textContent = date;
+            modalEl.querySelector('#tweetText').textContent = text;
+            modalEl.querySelector('#tweetLikes').textContent = likes;
+            modalEl.querySelector('#tweetRetweets').textContent = retweets;
+            modalEl.querySelector('#tweetReplies').textContent = replies;
+            modalEl.querySelector('#tweetLink').href = url;
+            const mediaType = card.dataset.mediaType || '';
+            const mediaUrl = card.dataset.mediaUrl || '';
+            const mediaVideo = card.dataset.mediaVideo || '';
+            const mediaContainer = modalEl.querySelector('#tweetMediaContainer');
+            if (mediaContainer) {
+                if (mediaType === 'photo' && mediaUrl) {
+                    mediaContainer.innerHTML = `<img src="${mediaUrl}" alt="Tweet media" style="width: 100%; border-radius: 10px; object-fit: cover;">`;
+                } else if (mediaType === 'video' && (mediaVideo || mediaUrl)) {
+                    const videoSrc = mediaVideo || mediaUrl;
+                    mediaContainer.innerHTML = `
+                        <video style="width: 100%; border-radius: 10px; background: rgba(30,41,59,0.6);" controls autoplay muted playsinline loop>
+                            <source src="${videoSrc}" type="video/mp4">
+                        </video>`;
+                } else {
+                    mediaContainer.innerHTML = '';
+                }
+            }
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        };
         
         // Function to render a post from JSON data
         function renderPost(postData, postDetailUrl) {
@@ -720,6 +1055,107 @@
                 }
             }
         });
+
+        // Tweet pagination (button-based for performance)
+        const tweetLoadingStates = new WeakMap();
+        window.loadMoreTweets = function(buttonEl) {
+            const section = buttonEl.closest('.tweet-username-section');
+            if (!section || tweetLoadingStates.get(section)) return;
+            tweetLoadingStates.set(section, true);
+            
+            const username = section.getAttribute('data-username');
+            const currentOffset = parseInt(section.getAttribute('data-offset') || '0');
+            const hasMore = section.getAttribute('data-has-more') === 'true';
+            const sortBy = section.getAttribute('data-tw-sort') || 'time_desc';
+            const searchQuery = section.getAttribute('data-search') || '';
+            const tweetGrid = section.querySelector('.tweet-grid');
+            const loadMoreContainer = section.querySelector('.load-more-tweets-container');
+            const spinner = section.querySelector('.tweets-loading-spinner');
+            const countLabel = section.querySelector('.card-header small');
+            
+            if (!hasMore || !tweetGrid) {
+                tweetLoadingStates.set(section, false);
+                return;
+            }
+            if (spinner) spinner.style.display = 'block';
+            
+            const url = new URL('{% url "load_more_tweets" %}', window.location.origin);
+            url.searchParams.set('username', username);
+            url.searchParams.set('offset', currentOffset);
+            url.searchParams.set('tw_sort', sortBy);
+            if (searchQuery) url.searchParams.set('search', searchQuery);
+            
+            fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' }})
+                .then(resp => resp.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error loading tweets', data.error);
+                        return;
+                    }
+                    data.tweets.forEach(t => {
+                        const media = t.media || {};
+                        const hasMedia = media.type && (media.url || media.video_url);
+                        const mediaHtml = hasMedia ? `
+                            <div class="mb-2 ${media.type === 'video' ? 'position-relative' : ''} rounded overflow-hidden" style="height: 180px; background: rgba(30,41,59,0.6);">
+                                ${media.type === 'video' && media.video_url ? `
+                                    <video class="w-100 h-100" muted loop playsinline preload="metadata" style="object-fit: cover;">
+                                        <source src="${media.video_url}" type="video/mp4">
+                                    </video>
+                                ` : `<img src="${media.url || ''}" alt="Tweet media" style="width: 100%; height: 100%; object-fit: cover;">`}
+                                ${media.type === 'video' ? `
+                                    <div class="position-absolute top-50 start-50 translate-middle" style="pointer-events: none;">
+                                        <i class="bi bi-play-circle-fill text-white" style="font-size: 2.25rem; opacity: 0.9;"></i>
+                                    </div>` : ''}
+                            </div>
+                        ` : '';
+                        const cardHtml = `
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <div class="card h-100 bg-transparent border text-white" style="border-color: var(--glass-border); cursor: pointer;"
+                                     onclick="showTweetModal(${t.id})"
+                                     data-tweet-id="${t.id}"
+                                     data-tweet-user="@${t.username}"
+                                     data-tweet-date="${t.created_at ? new Date(t.created_at).toLocaleDateString() : ''}"
+                                     data-tweet-text="${(t.text || '').replace(/\"/g,'&quot;')}"
+                                     data-tweet-likes="${t.favorite_count}"
+                                     data-tweet-retweets="${t.retweet_count}"
+                                     data-tweet-replies="${t.reply_count}"
+                                     data-tweet-url="${t.twitter_url}"
+                                     ${hasMedia ? `data-media-type="${media.type || ''}" data-media-url="${media.url || ''}" data-media-video="${media.video_url || ''}"` : ''}>
+                                    <div class="card-body">
+                                        ${mediaHtml}
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="fw-semibold">@${t.username}</div>
+                                            <small class="text-muted">${t.created_at ? new Date(t.created_at).toLocaleDateString() : ''}</small>
+                                        </div>
+                                        <div class="text-muted mb-2" style="white-space: pre-wrap; word-break: break-word; max-height: 4.5em; overflow: hidden;">${t.text || 'No text'}</div>
+                                        <div class="small text-muted d-flex gap-3 flex-wrap">
+                                            <span><i class="bi bi-activity"></i> ${(t.favorite_count + t.retweet_count + t.reply_count)}</span>
+                                            <span><i class="bi bi-heart"></i> ${t.favorite_count}</span>
+                                            <span><i class="bi bi-repeat"></i> ${t.retweet_count}</span>
+                                            <span><i class="bi bi-chat"></i> ${t.reply_count}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        tweetGrid.insertAdjacentHTML('beforeend', cardHtml);
+                    });
+                    
+                    const newOffset = data.next_offset;
+                    section.setAttribute('data-offset', newOffset);
+                    section.setAttribute('data-has-more', data.has_more ? 'true' : 'false');
+                    if (countLabel) {
+                        countLabel.textContent = `${newOffset} / ${data.total_count} tweet${data.total_count === 1 ? '' : 's'}`;
+                    }
+                    if (!data.has_more && loadMoreContainer) {
+                        loadMoreContainer.style.display = 'none';
+                    }
+                })
+                .finally(() => {
+                    if (spinner) spinner.style.display = 'none';
+                    tweetLoadingStates.set(section, false);
+                });
+        };
     });
     
     // Back to Top Button Functionality - Optimized

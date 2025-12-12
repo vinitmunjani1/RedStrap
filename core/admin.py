@@ -4,16 +4,18 @@ Django admin configuration for core models.
 from django.contrib import admin
 from .models import (
     InstagramAccount, InstagramPost, InstagramCarouselItem, InstagramKeyword,
-    Subreddit, RedditPost, RedditKeyword
+    Subreddit, RedditPost, RedditKeyword,
+    TwitterAccount, TwitterTweet, TwitterKeyword, SocialUsername
 )
 
 
 @admin.register(InstagramAccount)
 class InstagramAccountAdmin(admin.ModelAdmin):
-    list_display = ['username', 'user', 'created_at', 'last_scraped_at']
-    list_filter = ['created_at', 'last_scraped_at']
-    search_fields = ['username']
+    list_display = ['username', 'user', 'social_username', 'created_at', 'last_scraped_at']
+    list_filter = ['created_at', 'last_scraped_at', 'social_username']
+    search_fields = ['username', 'social_username__username']
     readonly_fields = ['created_at']
+    raw_id_fields = ['user', 'social_username']
 
 
 @admin.register(InstagramPost)
@@ -62,5 +64,45 @@ class RedditKeywordAdmin(admin.ModelAdmin):
     list_display = ['keyword', 'post', 'similarity', 'extracted_at']
     list_filter = ['extracted_at', 'similarity']
     search_fields = ['keyword', 'post__title']
+    readonly_fields = ['extracted_at']
+
+
+@admin.register(SocialUsername)
+class SocialUsernameAdmin(admin.ModelAdmin):
+    list_display = ['username', 'user', 'instagram_count', 'twitter_count', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['username']
+    readonly_fields = ['created_at', 'updated_at']
+    date_hierarchy = 'created_at'
+    raw_id_fields = ['user']
+    inlines = []
+
+
+@admin.register(TwitterAccount)
+class TwitterAccountAdmin(admin.ModelAdmin):
+    list_display = ['username', 'user', 'social_username', 'name', 'followers_count', 'verified', 'created_at', 'last_scraped_at']
+    list_filter = ['verified', 'created_at', 'last_scraped_at', 'social_username']
+    search_fields = ['username', 'name', 'description', 'social_username__username']
+    readonly_fields = ['created_at', 'rest_id']
+    date_hierarchy = 'created_at'
+    raw_id_fields = ['user', 'social_username']
+
+
+@admin.register(TwitterTweet)
+class TwitterTweetAdmin(admin.ModelAdmin):
+    list_display = ['tweet_id', 'account', 'created_at', 'favorite_count', 'retweet_count', 'view_count', 'is_retweet', 'is_quote', 'keywords_extracted']
+    list_filter = ['is_retweet', 'is_quote', 'keywords_extracted', 'created_at', 'created_at_db']
+    search_fields = ['tweet_id', 'text', 'account__username']
+    readonly_fields = ['created_at_db', 'tweet_id']
+    date_hierarchy = 'created_at'
+    raw_id_fields = ['account']
+    list_per_page = 50
+
+
+@admin.register(TwitterKeyword)
+class TwitterKeywordAdmin(admin.ModelAdmin):
+    list_display = ['keyword', 'post', 'similarity', 'extracted_at']
+    list_filter = ['extracted_at', 'similarity']
+    search_fields = ['keyword', 'post__text', 'post__tweet_id']
     readonly_fields = ['extracted_at']
 

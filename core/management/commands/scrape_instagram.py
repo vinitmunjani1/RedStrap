@@ -12,7 +12,7 @@ from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from core.models import InstagramAccount, InstagramPost, InstagramKeyword, InstagramCarouselItem
-from core.services import instagram_service, keyword_service
+from core.services import instagram_service
 from core.services.discord_service import send_discord_webhook
 from core.views import _extract_keywords_for_post, filter_recent_posts
 
@@ -52,7 +52,7 @@ class Command(BaseCommand):
                 username = account.username.strip().lstrip('@').lower()
                 if not username:
                     logger.warning(f'Skipping account with empty username: {account.username}')
-                    return 0, [], None
+                    return 0, [], False, None
                 
                 has_posts = account.posts.exists()
                 
@@ -141,11 +141,11 @@ class Command(BaseCommand):
                             except Exception as e:
                                 logger.error(f"Error sending Discord notification for @{username}: {e}", exc_info=True)
                 
-                return account_saved_count, account_new_posts, None
+                return account_saved_count, account_new_posts, has_posts, None
                 
             except Exception as e:
                 logger.error(f"Error fetching posts for @{account.username}: {e}", exc_info=True)
-                return 0, [], str(e)
+                return 0, [], False, str(e)
         
         # Process accounts concurrently
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -158,7 +158,7 @@ class Command(BaseCommand):
             for future in as_completed(future_to_account):
                 account = future_to_account[future]
                 try:
-                    saved_count, new_posts, error = future.result()
+                    saved_count, new_posts, account_has_posts, error = future.result()
                     completed_accounts += 1
                     
                     if error:
@@ -168,7 +168,8 @@ class Command(BaseCommand):
                         )
                     else:
                         total_posts += saved_count
-                        if new_posts:
+                        # Only add posts for keyword extraction if account had existing posts (recent fetch, not initial bulk)
+                        if new_posts and account_has_posts:
                             all_new_posts_for_keywords.extend(new_posts)
                         self.stdout.write(
                             self.style.SUCCESS(
@@ -182,10 +183,10 @@ class Command(BaseCommand):
                         self.style.ERROR(f'Exception fetching posts for @{account.username}: {str(e)}')
                     )
         
-        # Extract keywords for all newly fetched posts
+        # Extract keywords for all newly fetched posts (only for recent posts, not initial bulk fetch)
         total_keywords_extracted = 0
         if all_new_posts_for_keywords:
-            self.stdout.write(f'\nExtracting keywords from {len(all_new_posts_for_keywords)} new posts...')
+            self.stdout.write(f'\nExtracting keywords from {len(all_new_posts_for_keywords)} new posts (recent posts only)...')
             
             max_workers = min(len(all_new_posts_for_keywords), (os.cpu_count() or 4) * 2, 20)
             results = []
@@ -245,7 +246,7 @@ class Command(BaseCommand):
                             InstagramKeyword(
                                 post=post,
                                 keyword=kw_data['keyword'],
-                                similarity=kw_data['similarity']
+                                similarity=kw_data.get('similarity')  # Together AI keywords have no similarity
                             )
                         )
                     
