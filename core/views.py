@@ -31,6 +31,7 @@ from .models import (
 from .forms import InstagramAccountForm, SubredditForm, TwitterAccountForm, SocialAccountForm
 from .services import instagram_service, reddit_service, twitter_service
 from .services.together_ai_service import extract_keywords_with_together_ai
+from .services.ranking_service import RankingService
 
 
 def register_view(request):
@@ -3529,4 +3530,20 @@ def social_user_analytics_view(request, username):
         'ig_carousel_count': len(ig_carousel_posts),
     }
     return render(request, 'core/social_user_analytics.html', context)
+
+
+@login_required
+def ideas_view(request):
+    """
+    Ideas page showing top 5 highest-ranked posts and tweets.
+    Uses the optimal ranking matrix to identify the best performing content.
+    """
+    # Get top 5 ranked items (posts and tweets combined)
+    top_items = RankingService.get_top_ranked_combined(request.user, limit=5)
+    
+    context = {
+        'top_items': top_items,
+    }
+    
+    return render(request, 'core/ideas.html', context)
 

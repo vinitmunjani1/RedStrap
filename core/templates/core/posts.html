@@ -4,22 +4,22 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-5 flex-wrap gap-3">
-    <h1 class="mb-0" style="font-size: 2rem; font-weight: 600;"><i class="bi bi-images"></i> Posts</h1>
+    <h1 class="mb-0"><i class="bi bi-images"></i> Posts</h1>
     <div class="d-flex gap-3 flex-wrap align-items-center">
         <!-- Search by Username -->
         <form method="get" action="{% url 'posts' %}" class="d-flex gap-2 align-items-center" style="max-width: 300px;">
-            <input type="text" name="search" class="form-control form-control-sm" placeholder="Search username..." value="{{ search_query }}" style="padding: 0.5rem 1rem;">
+            <input type="text" name="search" class="form-control form-control-sm" placeholder="Search username..." value="{{ search_query }}">
             {% if sort_by %}
                 <input type="hidden" name="sort" value="{{ sort_by }}">
             {% endif %}
             {% if tw_sort_by %}
                 <input type="hidden" name="tw_sort" value="{{ tw_sort_by }}">
             {% endif %}
-            <button type="submit" class="btn btn-primary btn-sm" style="padding: 0.5rem 1rem; white-space: nowrap;">
+            <button type="submit" class="btn btn-primary btn-sm" style="white-space: nowrap;">
                 <i class="bi bi-search"></i>
             </button>
             {% if search_query %}
-                <a href="{% url 'posts' %}{% if sort_by %}?sort={{ sort_by }}{% endif %}" class="btn btn-outline-secondary btn-sm" style="padding: 0.5rem 1rem;" title="Clear search">
+                <a href="{% url 'posts' %}{% if sort_by %}?sort={{ sort_by }}{% endif %}" class="btn btn-outline-secondary btn-sm" title="Clear search">
                     <i class="bi bi-x"></i>
                 </a>
             {% endif %}
@@ -27,7 +27,7 @@
         
         <!-- Sort Dropdown -->
         <div class="dropdown">
-            <button class="btn btn-info btn-sm dropdown-toggle" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="padding: 0.5rem 1.25rem;">
+            <button class="btn btn-info btn-sm dropdown-toggle" type="button" id="sortDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="bi bi-sort-down"></i> Sort
             </button>
             <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="sortDropdown">
@@ -70,17 +70,27 @@
                     <div class="col-12 col-md-6 col-lg-4">
                         <a href="{% url 'instagram_post_detail' post.id %}" class="text-decoration-none">
                             <div class="card h-100 bg-transparent border" style="border-color: var(--glass-border);">
-                                {% if post.image_url %}
-                                    <img src="{{ post.image_url }}" class="card-img-top" style="height: 200px; object-fit: cover;" alt="Post image">
-                                {% elif post.video_url %}
-                                    <div class="position-relative" style="height: 200px; background: rgba(30,41,59,0.6);">
-                                        <div class="d-flex align-items-center justify-content-center h-100 w-100">
-                                            <i class="bi bi-play-circle text-primary fs-1"></i>
-                                        </div>
+                                {% if post.is_reel or post.is_video %}
+                                    <div class="media-portrait-compact">
+                                        {% if post.video_url %}
+                                            <video muted loop playsinline preload="metadata">
+                                                <source src="{{ post.video_url }}" type="video/mp4">
+                                            </video>
+                                        {% else %}
+                                            <div>
+                                                <i class="bi bi-play-circle text-primary" style="font-size: 2rem;"></i>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% elif post.image_url %}
+                                    <div class="media-square-compact">
+                                        <img src="{{ post.image_url }}" alt="Post image">
                                     </div>
                                 {% else %}
-                                    <div class="d-flex align-items-center justify-content-center" style="height: 200px; background: rgba(30,41,59,0.6);">
-                                        <i class="bi bi-image fs-1 text-muted"></i>
+                                    <div class="media-square-compact">
+                                        <div>
+                                            <i class="bi bi-image text-muted" style="font-size: 2rem;"></i>
+                                        </div>
                                     </div>
                                 {% endif %}
                                 <div class="card-body">
@@ -133,39 +143,56 @@
                              data-media-video="{{ media_item.video_url|default_if_none:'' }}"
                              {% endwith %}
                              {% endif %}>
-                            <div class="card-body">
-                                {% if tweet.media %}
-                                    {% for media_item in tweet.media|slice:":1" %}
+                            {% if tweet.media %}
+                                {% for media_item in tweet.media|slice:":1" %}
+                                    <div class="media-square-compact">
                                         {% if media_item.type == "photo" %}
-                                        <div class="mb-2 rounded overflow-hidden" style="height: 180px; background: rgba(30,41,59,0.6);">
-                                            <img src="{{ media_item.url }}" alt="Tweet media" style="width: 100%; height: 100%; object-fit: cover;">
-                                        </div>
+                                            <img src="{{ media_item.url }}" alt="Tweet media">
                                         {% elif media_item.type == "video" %}
-                                        <div class="mb-2 position-relative rounded overflow-hidden" style="height: 180px; background: rgba(30,41,59,0.6);">
                                             {% if media_item.video_url %}
-                                            <video class="w-100 h-100" muted loop playsinline preload="metadata" style="object-fit: cover;">
-                                                <source src="{{ media_item.video_url }}" type="video/mp4">
-                                            </video>
+                                                <video muted loop playsinline preload="metadata">
+                                                    <source src="{{ media_item.video_url }}" type="video/mp4">
+                                                </video>
                                             {% else %}
-                                            <img src="{{ media_item.url }}" alt="Tweet media" style="width: 100%; height: 100%; object-fit: cover;">
+                                                <img src="{{ media_item.url }}" alt="Tweet media">
                                             {% endif %}
                                             <div class="position-absolute top-50 start-50 translate-middle" style="pointer-events: none;">
-                                                <i class="bi bi-play-circle-fill text-white" style="font-size: 2.25rem; opacity: 0.9;"></i>
+                                                <i class="bi bi-play-circle-fill text-white" style="font-size: 1.5rem; opacity: 0.9;"></i>
                                             </div>
-                                        </div>
                                         {% endif %}
-                                    {% endfor %}
-                                {% endif %}
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                            <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                     <div class="fw-semibold">@{{ tweet.account.username }}</div>
                                     <small class="text-muted">{{ tweet.created_at|date:"M d, Y" }}</small>
                                 </div>
                                 <div class="text-muted mb-2" style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">{{ tweet.text|default:"No text" }}</div>
+                                {% if tweet.keywords.all %}
+                                <div class="mb-2" style="
+                                    background: rgba(129, 140, 248, 0.08);
+                                    border: 1px solid rgba(129, 140, 248, 0.2);
+                                    border-radius: 8px;
+                                    padding: 0.5rem 0.65rem;
+                                ">
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for keyword in tweet.keywords.all|slice:":4" %}
+                                            <span class="keyword-badge">
+                                                {{ keyword.keyword }}
+                                            </span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
                                 <div class="small text-muted d-flex gap-3 flex-wrap">
-                                    <span><i class="bi bi-activity"></i> {{ item.engagement_total }}</span>
-                                    <span><i class="bi bi-heart"></i> {{ tweet.favorite_count }}</span>
-                                    <span><i class="bi bi-repeat"></i> {{ tweet.retweet_count }}</span>
-                                    <span><i class="bi bi-chat"></i> {{ tweet.reply_count }}</span>
+                                    {% if tweet.view_count %}
+                                        <span><i class="bi bi-eye"></i> {{ tweet.view_count|floatformat:0 }}</span>
+                                    {% endif %}
+                                    <span><i class="bi bi-heart"></i> {{ tweet.favorite_count|floatformat:0 }}</span>
+                                    <span><i class="bi bi-repeat"></i> {{ tweet.retweet_count|floatformat:0 }}</span>
+                                    <span><i class="bi bi-chat"></i> {{ tweet.reply_count|floatformat:0 }}</span>
+                                    <span><i class="bi bi-activity"></i> {{ item.engagement_total|floatformat:0 }} total</span>
                                 </div>
                             </div>
                         </div>
@@ -216,22 +243,29 @@
                             <div class="glass-card post-card post-card-item" style="border: 1px solid var(--glass-border); padding: 0; overflow: hidden; border-radius: 12px; background: rgba(30, 41, 59, 0.4);" data-caption="{{ post.caption|lower|default:'' }}" data-username="{{ username_data.username|lower }}">
                                 <a href="{% url 'instagram_post_detail' post.id %}" class="text-decoration-none">
                                     <div style="position: relative; overflow: hidden;">
-                                        {# For reels and videos, always prefer showing the video instead of the image thumbnail #}
-                                        {% if post.is_reel and post.video_url %}
-                                            <video class="post-video-thumbnail" data-video-url="{{ post.video_url }}" style="width: 100%; height: 380px; object-fit: cover; background: rgba(30, 41, 59, 0.3);" muted loop playsinline preload="metadata">
-                                                <source src="{{ post.video_url }}" type="video/mp4">
-                                            </video>
-                                        {% elif post.is_video and post.video_url %}
-                                            <video class="post-video-thumbnail" data-video-url="{{ post.video_url }}" style="width: 100%; height: 380px; object-fit: cover; background: rgba(30, 41, 59, 0.3);" muted loop playsinline preload="metadata">
-                                                <source src="{{ post.video_url }}" type="video/mp4">
-                                            </video>
-                                        {% elif post.image_url %}
-                                            <img src="{{ post.image_url }}" alt="Post image" class="post-image" style="width: 100%; height: 380px; object-fit: cover; background: rgba(30, 41, 59, 0.3);">
-                                        {% else %}
-                                            <div style="width: 100%; height: 380px; background: rgba(30, 41, 59, 0.3); display: flex; align-items: center; justify-content: center;">
-                                                <i class="bi bi-image" style="font-size: 3rem; color: var(--text-muted); opacity: 0.5;"></i>
+                                    {% if post.is_reel or post.is_video %}
+                                        <div class="media-portrait-compact">
+                                            {% if post.video_url %}
+                                                <video class="post-video-thumbnail" data-video-url="{{ post.video_url }}" muted loop playsinline preload="metadata">
+                                                    <source src="{{ post.video_url }}" type="video/mp4">
+                                                </video>
+                                            {% else %}
+                                                <div>
+                                                    <i class="bi bi-play-circle text-primary" style="font-size: 2rem;"></i>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    {% elif post.image_url %}
+                                        <div class="media-square-compact">
+                                            <img src="{{ post.image_url }}" alt="Post image" class="post-image">
+                                        </div>
+                                    {% else %}
+                                        <div class="media-square-compact">
+                                            <div>
+                                                <i class="bi bi-image text-muted" style="font-size: 2rem; opacity: 0.5;"></i>
                                             </div>
-                                        {% endif %}
+                                        </div>
+                                    {% endif %}
                                         
                                         <div class="post-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.4); opacity: 0; transition: opacity 0.3s ease; display: flex; align-items: center; justify-content: center;">
                                             <i class="bi bi-arrow-right-circle" style="font-size: 3rem; color: white;"></i>
@@ -448,39 +482,56 @@
                                  data-media-video="{{ media_item.video_url|default_if_none:'' }}"
                                  {% endwith %}
                                  {% endif %}>
-                                <div class="card-body">
-                                    {% if tweet.media %}
-                                        {% for media_item in tweet.media|slice:":1" %}
+                                {% if tweet.media %}
+                                    {% for media_item in tweet.media|slice:":1" %}
+                                        <div class="media-square-compact">
                                             {% if media_item.type == "photo" %}
-                                            <div class="mb-2 rounded overflow-hidden" style="height: 180px; background: rgba(30,41,59,0.6);">
-                                                <img src="{{ media_item.url }}" alt="Tweet media" style="width: 100%; height: 100%; object-fit: cover;">
-                                            </div>
+                                                <img src="{{ media_item.url }}" alt="Tweet media">
                                             {% elif media_item.type == "video" %}
-                                            <div class="mb-2 position-relative rounded overflow-hidden" style="height: 180px; background: rgba(30,41,59,0.6);">
                                                 {% if media_item.video_url %}
-                                                <video class="w-100 h-100" muted loop playsinline preload="metadata" style="object-fit: cover;">
-                                                    <source src="{{ media_item.video_url }}" type="video/mp4">
-                                                </video>
+                                                    <video muted loop playsinline preload="metadata">
+                                                        <source src="{{ media_item.video_url }}" type="video/mp4">
+                                                    </video>
                                                 {% else %}
-                                                <img src="{{ media_item.url }}" alt="Tweet media" style="width: 100%; height: 100%; object-fit: cover;">
+                                                    <img src="{{ media_item.url }}" alt="Tweet media">
                                                 {% endif %}
                                                 <div class="position-absolute top-50 start-50 translate-middle" style="pointer-events: none;">
-                                                    <i class="bi bi-play-circle-fill text-white" style="font-size: 2.25rem; opacity: 0.9;"></i>
+                                                    <i class="bi bi-play-circle-fill text-white" style="font-size: 1.5rem; opacity: 0.9;"></i>
                                                 </div>
-                                            </div>
                                             {% endif %}
-                                        {% endfor %}
-                                    {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                {% endif %}
+                                <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <div class="fw-semibold">@{{ tweet.account.username }}</div>
                                         <small class="text-muted">{{ tweet.created_at|date:"M d, Y" }}</small>
                                     </div>
                                     <div class="text-muted mb-2" style="white-space: pre-wrap; word-break: break-word; max-height: 4.5em; overflow: hidden;">{{ tweet.text|default:"No text" }}</div>
+                                    {% if tweet.keywords.all %}
+                                    <div class="mb-2" style="
+                                        background: rgba(129, 140, 248, 0.08);
+                                        border: 1px solid rgba(129, 140, 248, 0.2);
+                                        border-radius: 8px;
+                                        padding: 0.5rem 0.65rem;
+                                    ">
+                                        <div class="d-flex flex-wrap gap-1">
+                                            {% for keyword in tweet.keywords.all|slice:":4" %}
+                                                <span class="keyword-badge">
+                                                    {{ keyword.keyword }}
+                                                </span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
                                     <div class="small text-muted d-flex gap-3 flex-wrap">
-                                        <span><i class="bi bi-activity"></i> {{ tweet.favorite_count|add:tweet.retweet_count|add:tweet.reply_count }}</span>
-                                        <span><i class="bi bi-heart"></i> {{ tweet.favorite_count }}</span>
-                                        <span><i class="bi bi-repeat"></i> {{ tweet.retweet_count }}</span>
-                                        <span><i class="bi bi-chat"></i> {{ tweet.reply_count }}</span>
+                                        {% if tweet.view_count %}
+                                            <span><i class="bi bi-eye"></i> {{ tweet.view_count|floatformat:0 }}</span>
+                                        {% endif %}
+                                        <span><i class="bi bi-heart"></i> {{ tweet.favorite_count|floatformat:0 }}</span>
+                                        <span><i class="bi bi-repeat"></i> {{ tweet.retweet_count|floatformat:0 }}</span>
+                                        <span><i class="bi bi-chat"></i> {{ tweet.reply_count|floatformat:0 }}</span>
+                                        <span><i class="bi bi-activity"></i> {{ tweet.favorite_count|add:tweet.retweet_count|add:tweet.reply_count|floatformat:0 }} total</span>
                                     </div>
                                 </div>
                             </div>
@@ -1095,19 +1146,27 @@
                     data.tweets.forEach(t => {
                         const media = t.media || {};
                         const hasMedia = media.type && (media.url || media.video_url);
-                        const mediaHtml = hasMedia ? `
-                            <div class="mb-2 ${media.type === 'video' ? 'position-relative' : ''} rounded overflow-hidden" style="height: 180px; background: rgba(30,41,59,0.6);">
-                                ${media.type === 'video' && media.video_url ? `
-                                    <video class="w-100 h-100" muted loop playsinline preload="metadata" style="object-fit: cover;">
-                                        <source src="${media.video_url}" type="video/mp4">
-                                    </video>
-                                ` : `<img src="${media.url || ''}" alt="Tweet media" style="width: 100%; height: 100%; object-fit: cover;">`}
-                                ${media.type === 'video' ? `
-                                    <div class="position-absolute top-50 start-50 translate-middle" style="pointer-events: none;">
-                                        <i class="bi bi-play-circle-fill text-white" style="font-size: 2.25rem; opacity: 0.9;"></i>
-                                    </div>` : ''}
+                        const keywords = t.keywords || [];
+                        const keywordsHtml = keywords.length > 0 ? `
+                            <div class="mb-2" style="background: rgba(129, 140, 248, 0.08); border: 1px solid rgba(129, 140, 248, 0.2); border-radius: 8px; padding: 0.5rem 0.65rem;">
+                                <div class="d-flex flex-wrap gap-1">
+                                    ${keywords.slice(0, 4).map(k => `<span class="keyword-badge">${k.keyword || k}</span>`).join('')}
+                                </div>
                             </div>
                         ` : '';
+                        const mediaHtml = hasMedia ? `
+                            <div class="media-square-compact">
+                                ${media.type === 'video' && media.video_url ? `
+                                    <video muted loop playsinline preload="metadata">
+                                        <source src="${media.video_url}" type="video/mp4">
+                                    </video>
+                                    <div class="position-absolute top-50 start-50 translate-middle" style="pointer-events: none;">
+                                        <i class="bi bi-play-circle-fill text-white" style="font-size: 1.5rem; opacity: 0.9;"></i>
+                                    </div>
+                                ` : `<img src="${media.url || ''}" alt="Tweet media">`}
+                            </div>
+                        ` : '';
+                        const viewCountHtml = t.view_count ? `<span><i class="bi bi-eye"></i> ${t.view_count}</span>` : '';
                         const cardHtml = `
                             <div class="col-12 col-md-6 col-lg-4">
                                 <div class="card h-100 bg-transparent border text-white" style="border-color: var(--glass-border); cursor: pointer;"
@@ -1121,18 +1180,20 @@
                                      data-tweet-replies="${t.reply_count}"
                                      data-tweet-url="${t.twitter_url}"
                                      ${hasMedia ? `data-media-type="${media.type || ''}" data-media-url="${media.url || ''}" data-media-video="${media.video_url || ''}"` : ''}>
+                                    ${mediaHtml}
                                     <div class="card-body">
-                                        ${mediaHtml}
                                         <div class="d-flex justify-content-between align-items-start">
                                             <div class="fw-semibold">@${t.username}</div>
                                             <small class="text-muted">${t.created_at ? new Date(t.created_at).toLocaleDateString() : ''}</small>
                                         </div>
                                         <div class="text-muted mb-2" style="white-space: pre-wrap; word-break: break-word; max-height: 4.5em; overflow: hidden;">${t.text || 'No text'}</div>
+                                        ${keywordsHtml}
                                         <div class="small text-muted d-flex gap-3 flex-wrap">
-                                            <span><i class="bi bi-activity"></i> ${(t.favorite_count + t.retweet_count + t.reply_count)}</span>
+                                            ${viewCountHtml}
                                             <span><i class="bi bi-heart"></i> ${t.favorite_count}</span>
                                             <span><i class="bi bi-repeat"></i> ${t.retweet_count}</span>
                                             <span><i class="bi bi-chat"></i> ${t.reply_count}</span>
+                                            <span><i class="bi bi-activity"></i> ${(t.favorite_count + t.retweet_count + t.reply_count)} total</span>
                                         </div>
                                     </div>
                                 </div>

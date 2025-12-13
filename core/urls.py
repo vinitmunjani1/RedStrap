@@ -53,5 +53,8 @@ urlpatterns = [
     path('social/', views.social_dashboard_view, name='social_dashboard'),
     path('social/delete/<str:username>/', views.delete_social_username_view, name='delete_social_username'),
     path('social/analytics/<str:username>/', views.social_user_analytics_view, name='social_user_analytics'),
+    
+    # Ideas
+    path('ideas/', views.ideas_view, name='ideas'),
 ]
 
