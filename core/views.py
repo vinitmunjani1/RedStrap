@@ -21,17 +21,21 @@ import os
 import uuid
 import threading
 import time
+import requests
 
 logger = logging.getLogger(__name__)
 from .models import (
     InstagramAccount, InstagramPost, InstagramCarouselItem, InstagramKeyword,
     Subreddit, RedditPost, RedditKeyword,
-    TwitterAccount, TwitterTweet, TwitterKeyword, SocialUsername
+    TwitterAccount, TwitterTweet, TwitterKeyword, SocialUsername,
+    VideoIdeaExtraction, IdeaVideoPrompt
 )
+from django.contrib.contenttypes.models import ContentType
 from .forms import InstagramAccountForm, SubredditForm, TwitterAccountForm, SocialAccountForm
 from .services import instagram_service, reddit_service, twitter_service
-from .services.together_ai_service import extract_keywords_with_together_ai
+from .services.together_ai_service import extract_keywords_with_together_ai, generate_video_prompt_from_idea
 from .services.ranking_service import RankingService
+from .services.gemini_service import convert_video_url_to_mp4_bytes, extract_video_ideas
 
 
 def register_view(request):
@@ -204,10 +208,20 @@ def posts_view(request):
         key=lambda p: (p.like_count or 0) + (p.comment_count or 0),
         reverse=True
     )[:TOP_ENGAGEMENT_LIMIT]
+    
+    # Check for existing extractions for top engagement posts
+    top_post_ids = [post.id for post in top_ig_engagement_posts]
+    top_extractions = VideoIdeaExtraction.objects.filter(
+        source_type='instagram',
+        source_id__in=top_post_ids
+    ).values_list('source_id', flat=True)
+    top_extraction_set = set(top_extractions)
+    
     top_ig_engagement = [
         {
             'post': post,
             'engagement_total': (post.like_count or 0) + (post.comment_count or 0),
+            'has_extraction': post.id in top_extraction_set,
         }
         for post in top_ig_engagement_posts
     ]
@@ -223,10 +237,20 @@ def posts_view(request):
         key=lambda t: (t.favorite_count or 0) + (t.retweet_count or 0) + (t.reply_count or 0),
         reverse=True
     )[:TOP_ENGAGEMENT_LIMIT]
+    
+    # Check for existing extractions for top engagement tweets
+    top_tweet_ids = [tweet.id for tweet in top_tw_engagement_posts]
+    top_tweet_extractions = VideoIdeaExtraction.objects.filter(
+        source_type='twitter',
+        source_id__in=top_tweet_ids
+    ).values_list('source_id', flat=True)
+    top_tweet_extraction_set = set(top_tweet_extractions)
+    
     top_tw_engagement = [
         {
             'tweet': tweet,
             'engagement_total': (tweet.favorite_count or 0) + (tweet.retweet_count or 0) + (tweet.reply_count or 0),
+            'has_extraction': tweet.id in top_tweet_extraction_set,
         }
         for tweet in top_tw_engagement_posts
     ]
@@ -290,6 +314,21 @@ def posts_view(request):
                 'has_more': len(posts) > 6  # Whether there are more posts to load
             })
     
+    # Check for existing extractions for posts
+    post_ids = [post.id for posts in posts_by_username.values() for post in posts]
+    existing_extractions = VideoIdeaExtraction.objects.filter(
+        source_type='instagram',
+        source_id__in=post_ids
+    ).values_list('source_id', flat=True)
+    extraction_set = set(existing_extractions)
+    
+    # Add has_extraction flag to each post
+    for username_data in username_posts_list:
+        for post in username_data['posts']:
+            post.has_extraction = post.id in extraction_set
+        for post in username_data.get('all_posts', []):
+            post.has_extraction = post.id in extraction_set
+    
     # Sort username groups by most recent post (or by username if search is active)
     if search_query:
         # When searching, sort by username alphabetically
@@ -309,6 +348,14 @@ def posts_view(request):
         if tweet.account.username not in tw_account_id_map:
             tw_account_id_map[tweet.account.username] = tweet.account.id
 
+    # Check for existing extractions for tweets
+    tweet_ids = [tweet.id for tweets in tweets_by_username.values() for tweet in tweets]
+    existing_tweet_extractions = VideoIdeaExtraction.objects.filter(
+        source_type='twitter',
+        source_id__in=tweet_ids
+    ).values_list('source_id', flat=True)
+    tweet_extraction_set = set(existing_tweet_extractions)
+    
     tweets_username_list = []
     for username, tweets in tweets_by_username.items():
         if tw_sort_by == 'likes_desc':
@@ -3535,15 +3582,398 @@ def social_user_analytics_view(request, username):
 @login_required
 def ideas_view(request):
     """
-    Ideas page showing top 5 highest-ranked posts and tweets.
-    Uses the optimal ranking matrix to identify the best performing content.
+    Ideas page showing top 5 highest-ranked posts and tweets from recently fetched content.
+    Uses the optimal ranking matrix to identify the best performing content from the last 7 days.
     """
-    # Get top 5 ranked items (posts and tweets combined)
-    top_items = RankingService.get_top_ranked_combined(request.user, limit=5)
+    # Get top 5 ranked items from recently fetched posts and tweets (last 7 days)
+    top_items = RankingService.get_top_ranked_combined(request.user, limit=5, days_recent=7)
+    
+    # Check which items already have video idea extractions and add to each item
+    for item in top_items:
+        source_type = item['type']  # 'instagram' or 'twitter'
+        source_id = item['post'].id if source_type == 'instagram' else item['tweet'].id
+        item['has_extraction'] = VideoIdeaExtraction.objects.filter(
+            source_type=source_type,
+            source_id=source_id
+        ).exists()
     
     context = {
         'top_items': top_items,
     }
     
     return render(request, 'core/ideas.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def extract_video_idea_view(request):
+    """
+    Extract video ideas from Instagram post or Twitter tweet using Gemini AI.
+    
+    Accepts POST request with:
+    - source_type: 'instagram' or 'twitter'
+    - source_id: ID of the post or tweet
+    
+    Returns JSON response with success/error status.
+    """
+    try:
+        # Get request data
+        source_type = request.POST.get('source_type')
+        source_id = request.POST.get('source_id')
+        
+        if not source_type or not source_id:
+            return JsonResponse({'error': 'Missing source_type or source_id'}, status=400)
+        
+        if source_type not in ['instagram', 'twitter']:
+            return JsonResponse({'error': 'Invalid source_type. Must be "instagram" or "twitter"'}, status=400)
+        
+        try:
+            source_id = int(source_id)
+        except ValueError:
+            return JsonResponse({'error': 'Invalid source_id. Must be an integer'}, status=400)
+        
+        # Get the post or tweet and verify ownership
+        if source_type == 'instagram':
+            post = get_object_or_404(InstagramPost, id=source_id, account__user=request.user)
+            video_url = post.video_url
+            caption = post.caption
+        else:  # twitter
+            tweet = get_object_or_404(TwitterTweet, id=source_id, account__user=request.user)
+            # Find first video media item
+            video_url = None
+            for media_item in tweet.media or []:
+                if media_item.get('type') == 'video' and media_item.get('video_url'):
+                    video_url = media_item.get('video_url')
+                    break
+            caption = tweet.text
+        
+        # Check if video URL exists
+        if not video_url:
+            return JsonResponse({'error': 'No video URL found for this post/tweet'}, status=400)
+        
+        # Check if extraction already exists (prevent duplicates)
+        if VideoIdeaExtraction.objects.filter(source_type=source_type, source_id=source_id).exists():
+            return JsonResponse({'error': 'Video ideas have already been extracted for this post/tweet'}, status=400)
+        
+        # Download video bytes
+        try:
+            video_bytes = convert_video_url_to_mp4_bytes(video_url)
+            if not video_bytes or len(video_bytes) == 0:
+                return JsonResponse({'error': 'Downloaded video is empty. The video URL may be expired or invalid.'}, status=500)
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 403:
+                logger.error(f"403 Forbidden error downloading video from Instagram CDN")
+                return JsonResponse({
+                    'error': 'Unable to download video: Instagram CDN returned 403 Forbidden. The video URL may be expired, require authentication, or be protected. Please try fetching the post again to get a fresh video URL.'
+                }, status=500)
+            else:
+                logger.error(f"HTTP error downloading video: {str(e)}")
+                return JsonResponse({'error': f'Failed to download video (HTTP {e.response.status_code}): {str(e)}'}, status=500)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error downloading video: {str(e)}")
+            error_msg = str(e)
+            if '403' in error_msg or 'Forbidden' in error_msg:
+                return JsonResponse({
+                    'error': 'Unable to download video: The video URL is protected or expired. Instagram CDN URLs often expire. Please try fetching the post again to get a fresh video URL.'
+                }, status=500)
+            return JsonResponse({'error': f'Failed to download video: {error_msg}'}, status=500)
+        except Exception as e:
+            logger.error(f"Unexpected error downloading video: {str(e)}")
+            return JsonResponse({'error': f'Failed to download video: {str(e)}'}, status=500)
+        
+        # Extract video ideas using Gemini
+        try:
+            result = extract_video_ideas(video_bytes, caption)
+            
+            # Check for errors in result
+            if 'error' in result:
+                return JsonResponse({'error': f"Gemini API error: {result.get('error')}"}, status=500)
+            
+        except Exception as e:
+            logger.error(f"Error extracting video ideas: {str(e)}")
+            return JsonResponse({'error': f'Failed to extract video ideas: {str(e)}'}, status=500)
+        
+        # Get ContentType for the source object
+        if source_type == 'instagram':
+            content_type = ContentType.objects.get_for_model(InstagramPost)
+            content_object = post
+        else:
+            content_type = ContentType.objects.get_for_model(TwitterTweet)
+            content_object = tweet
+        
+        # Save extraction to database
+        extraction = VideoIdeaExtraction.objects.create(
+            content_type=content_type,
+            object_id=source_id,
+            source_type=source_type,
+            source_id=source_id,
+            video_analysis=result.get('video_analysis', {}),
+            video_ideas=result.get('video_ideas', []),
+            best_idea=result.get('best_idea', {}),
+            video_prompt=result.get('video_prompt', {}),
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Video ideas extracted successfully',
+            'extraction_id': extraction.id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in extract_video_idea_view: {str(e)}")
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+
+
+@login_required
+def ai_ideas_view(request):
+    """
+    Display all extracted AI ideas from video extractions.
+    Shows video_ideas array from all VideoIdeaExtraction records.
+    """
+    # Get all video idea extractions for the user
+    # Filter by checking if the content_object belongs to user's accounts
+    extractions = VideoIdeaExtraction.objects.filter(
+        source_type='instagram',
+        source_id__in=InstagramPost.objects.filter(account__user=request.user).values_list('id', flat=True)
+    ) | VideoIdeaExtraction.objects.filter(
+        source_type='twitter',
+        source_id__in=TwitterTweet.objects.filter(account__user=request.user).values_list('id', flat=True)
+    )
+    
+    # Order by most recent
+    extractions = extractions.order_by('-extracted_at')
+    
+    # Build list of all ideas with source information
+    all_ideas = []
+    for extraction in extractions:
+        # Get source object
+        if extraction.source_type == 'instagram':
+            try:
+                source_post = InstagramPost.objects.get(id=extraction.source_id, account__user=request.user)
+                source_name = f"@{source_post.account.username}"
+                source_url = source_post.instagram_url
+            except InstagramPost.DoesNotExist:
+                continue
+        else:  # twitter
+            try:
+                source_tweet = TwitterTweet.objects.get(id=extraction.source_id, account__user=request.user)
+                source_name = f"@{source_tweet.account.username}"
+                source_url = source_tweet.twitter_url
+            except TwitterTweet.DoesNotExist:
+                continue
+        
+        # Add each idea from video_ideas array
+        video_ideas = extraction.video_ideas or []
+        for idea in video_ideas:
+            idea_id = idea.get('idea_id', '')
+            # Check if prompt already exists for this idea
+            has_prompt = IdeaVideoPrompt.objects.filter(
+                extraction=extraction,
+                idea_id=idea_id
+            ).exists()
+            
+            all_ideas.append({
+                'idea': idea,
+                'extraction': extraction,
+                'extraction_id': extraction.id,
+                'idea_id': idea_id,
+                'source_type': extraction.source_type,
+                'source_name': source_name,
+                'source_url': source_url,
+                'extracted_at': extraction.extracted_at,
+                'has_prompt': has_prompt,
+            })
+    
+    context = {
+        'all_ideas': all_ideas,
+    }
+    
+    return render(request, 'core/ai_ideas.html', context)
+
+
+@login_required
+def video_prompts_view(request):
+    """
+    Display all extracted video prompts from video extractions and idea-generated prompts.
+    Shows video_prompt objects from both VideoIdeaExtraction records and IdeaVideoPrompt records.
+    """
+    # Get all video idea extractions for the user
+    extractions = VideoIdeaExtraction.objects.filter(
+        source_type='instagram',
+        source_id__in=InstagramPost.objects.filter(account__user=request.user).values_list('id', flat=True)
+    ) | VideoIdeaExtraction.objects.filter(
+        source_type='twitter',
+        source_id__in=TwitterTweet.objects.filter(account__user=request.user).values_list('id', flat=True)
+    )
+    
+    # Order by most recent
+    extractions = extractions.order_by('-extracted_at')
+    
+    # Build list of prompts with source information
+    all_prompts = []
+    
+    # Add prompts from VideoIdeaExtraction (original extraction prompts)
+    for extraction in extractions:
+        # Get source object
+        if extraction.source_type == 'instagram':
+            try:
+                source_post = InstagramPost.objects.get(id=extraction.source_id, account__user=request.user)
+                source_name = f"@{source_post.account.username}"
+                source_url = source_post.instagram_url
+                source_caption = source_post.caption[:100] if source_post.caption else "No caption"
+            except InstagramPost.DoesNotExist:
+                continue
+        else:  # twitter
+            try:
+                source_tweet = TwitterTweet.objects.get(id=extraction.source_id, account__user=request.user)
+                source_name = f"@{source_tweet.account.username}"
+                source_url = source_tweet.twitter_url
+                source_caption = source_tweet.text[:100] if source_tweet.text else "No text"
+            except TwitterTweet.DoesNotExist:
+                continue
+        
+        # Add video prompt from extraction
+        video_prompt = extraction.video_prompt or {}
+        if video_prompt:  # Only add if prompt exists
+            all_prompts.append({
+                'prompt': video_prompt,
+                'extraction': extraction,
+                'source_type': extraction.source_type,
+                'source_name': source_name,
+                'source_url': source_url,
+                'source_caption': source_caption,
+                'extracted_at': extraction.extracted_at,
+                'best_idea': extraction.best_idea or {},
+                'prompt_type': 'extraction',  # Mark as extraction prompt
+            })
+    
+    # Add prompts from IdeaVideoPrompt (idea-generated prompts)
+    idea_prompts = IdeaVideoPrompt.objects.filter(
+        source_type='instagram',
+        source_id__in=InstagramPost.objects.filter(account__user=request.user).values_list('id', flat=True)
+    ) | IdeaVideoPrompt.objects.filter(
+        source_type='twitter',
+        source_id__in=TwitterTweet.objects.filter(account__user=request.user).values_list('id', flat=True)
+    )
+    
+    idea_prompts = idea_prompts.order_by('-generated_at')
+    
+    for idea_prompt in idea_prompts:
+        # Get source object
+        if idea_prompt.source_type == 'instagram':
+            try:
+                source_post = InstagramPost.objects.get(id=idea_prompt.source_id, account__user=request.user)
+                source_name = f"@{source_post.account.username}"
+                source_url = source_post.instagram_url
+                source_caption = source_post.caption[:100] if source_post.caption else "No caption"
+            except InstagramPost.DoesNotExist:
+                continue
+        else:  # twitter
+            try:
+                source_tweet = TwitterTweet.objects.get(id=idea_prompt.source_id, account__user=request.user)
+                source_name = f"@{source_tweet.account.username}"
+                source_url = source_tweet.twitter_url
+                source_caption = source_tweet.text[:100] if source_tweet.text else "No text"
+            except TwitterTweet.DoesNotExist:
+                continue
+        
+        # Add idea-generated prompt
+        all_prompts.append({
+            'prompt': idea_prompt.video_prompt or {},
+            'extraction': idea_prompt.extraction,
+            'source_type': idea_prompt.source_type,
+            'source_name': source_name,
+            'source_url': source_url,
+            'source_caption': source_caption,
+            'extracted_at': idea_prompt.generated_at,
+            'best_idea': {'title': idea_prompt.idea_title},  # Use idea title as best idea
+            'prompt_type': 'idea',  # Mark as idea-generated prompt
+            'idea_title': idea_prompt.idea_title,
+        })
+    
+    # Sort all prompts by date (most recent first)
+    all_prompts.sort(key=lambda x: x['extracted_at'], reverse=True)
+    
+    context = {
+        'all_prompts': all_prompts,
+    }
+    
+    return render(request, 'core/video_prompts.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def generate_idea_video_prompt_view(request):
+    """
+    Generate a video prompt for a specific AI idea using Together AI.
+    
+    Accepts POST request with:
+    - extraction_id: ID of the VideoIdeaExtraction
+    - idea_id: UUID of the specific idea from video_ideas array
+    
+    Returns JSON response with success/error status.
+    """
+    try:
+        # Get request data
+        extraction_id = request.POST.get('extraction_id')
+        idea_id = request.POST.get('idea_id')
+        
+        if not extraction_id or not idea_id:
+            return JsonResponse({'error': 'Missing extraction_id or idea_id'}, status=400)
+        
+        try:
+            extraction_id = int(extraction_id)
+        except ValueError:
+            return JsonResponse({'error': 'Invalid extraction_id. Must be an integer'}, status=400)
+        
+        # Get the extraction and verify ownership
+        extraction = get_object_or_404(VideoIdeaExtraction, id=extraction_id)
+        
+        # Verify user owns the source post/tweet
+        if extraction.source_type == 'instagram':
+            post = get_object_or_404(InstagramPost, id=extraction.source_id, account__user=request.user)
+        else:  # twitter
+            tweet = get_object_or_404(TwitterTweet, id=extraction.source_id, account__user=request.user)
+        
+        # Check if prompt already exists for this idea
+        if IdeaVideoPrompt.objects.filter(extraction=extraction, idea_id=idea_id).exists():
+            return JsonResponse({'error': 'Video prompt has already been generated for this idea'}, status=400)
+        
+        # Find the specific idea in video_ideas array
+        video_ideas = extraction.video_ideas or []
+        target_idea = None
+        for idea in video_ideas:
+            if idea.get('idea_id') == idea_id:
+                target_idea = idea
+                break
+        
+        if not target_idea:
+            return JsonResponse({'error': 'Idea not found in extraction'}, status=404)
+        
+        # Generate video prompt using Together AI
+        try:
+            video_prompt = generate_video_prompt_from_idea(target_idea)
+        except Exception as e:
+            logger.error(f"Error generating video prompt: {str(e)}")
+            return JsonResponse({'error': f'Failed to generate video prompt: {str(e)}'}, status=500)
+        
+        # Save to database
+        idea_prompt = IdeaVideoPrompt.objects.create(
+            extraction=extraction,
+            idea_id=idea_id,
+            idea_title=target_idea.get('title', 'Untitled Idea'),
+            video_prompt=video_prompt,
+            source_type=extraction.source_type,
+            source_id=extraction.source_id,
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Video prompt generated successfully',
+            'prompt_id': idea_prompt.id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in generate_idea_video_prompt_view: {str(e)}")
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 

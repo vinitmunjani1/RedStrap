@@ -5,7 +5,8 @@ from django.contrib import admin
 from .models import (
     InstagramAccount, InstagramPost, InstagramCarouselItem, InstagramKeyword,
     Subreddit, RedditPost, RedditKeyword,
-    TwitterAccount, TwitterTweet, TwitterKeyword, SocialUsername
+    TwitterAccount, TwitterTweet, TwitterKeyword, SocialUsername,
+    VideoIdeaExtraction, IdeaVideoPrompt
 )
 
 
@@ -105,4 +106,48 @@ class TwitterKeywordAdmin(admin.ModelAdmin):
     list_filter = ['extracted_at', 'similarity']
     search_fields = ['keyword', 'post__text', 'post__tweet_id']
     readonly_fields = ['extracted_at']
+
+
+@admin.register(VideoIdeaExtraction)
+class VideoIdeaExtractionAdmin(admin.ModelAdmin):
+    list_display = ['id', 'source_type', 'source_id', 'extracted_at']
+    list_filter = ['source_type', 'extracted_at']
+    search_fields = ['source_id', 'source_type']
+    readonly_fields = ['extracted_at', 'content_type', 'object_id', 'source_type', 'source_id']
+    date_hierarchy = 'extracted_at'
+    raw_id_fields = ['content_type']
+    
+    fieldsets = (
+        ('Source Information', {
+            'fields': ('content_type', 'object_id', 'source_type', 'source_id')
+        }),
+        ('Extracted Data', {
+            'fields': ('video_analysis', 'video_ideas', 'best_idea', 'video_prompt')
+        }),
+        ('Metadata', {
+            'fields': ('extracted_at',)
+        }),
+    )
+
+
+@admin.register(IdeaVideoPrompt)
+class IdeaVideoPromptAdmin(admin.ModelAdmin):
+    list_display = ['id', 'idea_title', 'extraction', 'source_type', 'source_id', 'generated_at']
+    list_filter = ['source_type', 'generated_at']
+    search_fields = ['idea_title', 'idea_id', 'source_id']
+    readonly_fields = ['generated_at', 'idea_id']
+    date_hierarchy = 'generated_at'
+    raw_id_fields = ['extraction']
+    
+    fieldsets = (
+        ('Source Information', {
+            'fields': ('extraction', 'idea_id', 'idea_title', 'source_type', 'source_id')
+        }),
+        ('Generated Prompt', {
+            'fields': ('video_prompt',)
+        }),
+        ('Metadata', {
+            'fields': ('generated_at',)
+        }),
+    )
 

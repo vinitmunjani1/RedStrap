@@ -94,6 +94,24 @@
                                     </div>
                                 {% endif %}
                                 <div class="card-body">
+                                    <!-- Extract Idea Button for Videos -->
+                                    {% if post.is_reel or post.is_video %}
+                                        {% if post.video_url %}
+                                        <div class="mb-2">
+                                        <button 
+                                            type="button" 
+                                            class="btn btn-sm btn-warning w-100 extract-video-btn" 
+                                            data-source-type="instagram"
+                                            data-source-id="{{ post.id }}"
+                                            {% if item.has_extraction %}disabled{% endif %}
+                                        >
+                                                <i class="bi bi-magic"></i> 
+                                                <span class="btn-text">{% if item.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
+                                            </button>
+                                        </div>
+                                        {% endif %}
+                                    {% endif %}
+                                    
                                     <div class="d-flex justify-content-between align-items-start mb-1">
                                         <div class="fw-semibold text-white">@{{ post.account.username }}</div>
                                         <small class="text-muted">{{ post.taken_at|date:"M d, Y" }}</small>
@@ -342,6 +360,24 @@
                                         </div>
                                     </div>
                                 {% endif %}
+                                
+                                <!-- Extract Idea Button for Videos -->
+                                {% if post.is_reel or post.is_video %}
+                                    {% if post.video_url %}
+                                    <div class="mb-3">
+                                        <button 
+                                            type="button" 
+                                            class="btn btn-sm btn-warning w-100 extract-video-btn" 
+                                            data-source-type="instagram"
+                                            data-source-id="{{ post.id }}"
+                                            {% if post.has_extraction %}disabled{% endif %}
+                                        >
+                                            <i class="bi bi-magic"></i> 
+                                            <span class="btn-text">{% if post.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
+                                        </button>
+                                    </div>
+                                    {% endif %}
+                                {% endif %}
                                     
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div class="d-flex gap-3 flex-wrap">
@@ -503,6 +539,26 @@
                                     {% endfor %}
                                 {% endif %}
                                 <div class="card-body">
+                                    <!-- Extract Idea Button for Videos -->
+                                    {% if tweet.media %}
+                                        {% for media_item in tweet.media %}
+                                            {% if media_item.type == "video" and media_item.video_url %}
+                                            <div class="mb-2">
+                                                <button 
+                                                    type="button" 
+                                                    class="btn btn-sm btn-warning w-100 extract-video-btn" 
+                                                    data-source-type="twitter"
+                                                    data-source-id="{{ tweet.id }}"
+                                                    {% if item.has_extraction %}disabled{% endif %}
+                                                >
+                                                    <i class="bi bi-magic"></i> 
+                                                    <span class="btn-text">{% if item.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
+                                                </button>
+                                            </div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                    
                                     <div class="d-flex justify-content-between align-items-start">
                                         <div class="fw-semibold">@{{ tweet.account.username }}</div>
                                         <small class="text-muted">{{ tweet.created_at|date:"M d, Y" }}</small>
@@ -524,6 +580,27 @@
                                         </div>
                                     </div>
                                     {% endif %}
+                                    
+                                    <!-- Extract Idea Button for Videos -->
+                                    {% if tweet.media %}
+                                        {% for media_item in tweet.media %}
+                                            {% if media_item.type == "video" and media_item.video_url %}
+                                            <div class="mb-2">
+                                                <button 
+                                                    type="button" 
+                                                    class="btn btn-sm btn-warning w-100 extract-video-btn" 
+                                                    data-source-type="twitter"
+                                                    data-source-id="{{ tweet.id }}"
+                                                    {% if tweet.has_extraction %}disabled{% endif %}
+                                                >
+                                                    <i class="bi bi-magic"></i> 
+                                                    <span class="btn-text">{% if tweet.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
+                                                </button>
+                                            </div>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                    
                                     <div class="small text-muted d-flex gap-3 flex-wrap">
                                         {% if tweet.view_count %}
                                             <span><i class="bi bi-eye"></i> {{ tweet.view_count|floatformat:0 }}</span>
@@ -746,6 +823,96 @@
 
 <script>
     // Infinite scroll and post loading functionality
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    // Helper function to show messages
+    function showMessage(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        document.body.appendChild(alertDiv);
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+    
+    // Function to handle extract video idea button click
+    function handleExtractVideoIdea(button) {
+        if (button.disabled) return;
+        
+        const sourceType = button.getAttribute('data-source-type');
+        const sourceId = button.getAttribute('data-source-id');
+        const btnTextSpan = button.querySelector('.btn-text');
+        const originalText = btnTextSpan ? btnTextSpan.textContent : 'Extract Idea';
+        const originalHTML = button.innerHTML;
+        
+        // Disable button and show loading state
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span><span class="btn-text">Extracting...</span>';
+        
+        // Make AJAX request
+        fetch('{% url "extract_video_idea" %}', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `source_type=${sourceType}&source_id=${sourceId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Success - update button state
+                button.classList.remove('btn-warning');
+                button.classList.add('btn-success');
+                button.innerHTML = '<i class="bi bi-check-circle"></i> <span class="btn-text">Idea Extracted</span>';
+                showMessage('Video ideas extracted successfully!', 'success');
+            } else {
+                // Error - re-enable button
+                button.disabled = false;
+                button.innerHTML = originalHTML;
+                showMessage('Error: ' + (data.error || 'Failed to extract ideas'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            button.disabled = false;
+            button.innerHTML = originalHTML;
+            showMessage('An unexpected error occurred.', 'error');
+        });
+    }
+    
+    // Handle extract video idea button clicks (event delegation for dynamically loaded content)
+    document.addEventListener('click', function(e) {
+        const button = e.target.closest('.extract-video-btn');
+        if (button) {
+            e.preventDefault();
+            e.stopPropagation();
+            handleExtractVideoIdea(button);
+        }
+    });
+    
     document.addEventListener('DOMContentLoaded', function() {
         // Video autoplay on hover functionality
         function setupVideoAutoplay() {

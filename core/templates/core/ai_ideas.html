@@ -1,0 +1,191 @@
+{% extends 'core/base.html' %}
+
+{% block title %}AI Ideas - REDSTRAP{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-1"><i class="bi bi-sparkles text-primary"></i> AI Ideas</h1>
+            <p class="text-muted mb-0">Creative video ideas extracted from your top-performing content</p>
+        </div>
+    </div>
+
+    {% if all_ideas %}
+        <div class="row g-4">
+            {% for item in all_ideas %}
+                <div class="col-12 col-md-6 col-lg-4">
+                    <div class="card h-100 bg-transparent border" style="border-color: var(--glass-border);">
+                        <div class="card-header d-flex justify-content-between align-items-center" style="background: var(--vuexy-dark-bg); border-bottom: 1px solid var(--vuexy-border);">
+                            <div class="d-flex align-items-center gap-2">
+                                {% if item.source_type == 'instagram' %}
+                                    <i class="bi bi-instagram text-danger"></i>
+                                {% else %}
+                                    <i class="bi bi-twitter text-info"></i>
+                                {% endif %}
+                                <span class="fw-semibold text-white">{{ item.source_type|title }}</span>
+                            </div>
+                            <small class="text-muted">{{ item.extracted_at|date:"M d, Y" }}</small>
+                        </div>
+                        
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <small class="text-muted">From:</small>
+                                <a href="{{ item.source_url }}" target="_blank" class="text-info text-decoration-none">
+                                    {{ item.source_name }}
+                                </a>
+                            </div>
+                            
+                            <h5 class="card-title text-white mb-3">{{ item.idea.title|default:"Untitled Idea" }}</h5>
+                            
+                            <p class="card-text small mb-3" style="color: var(--text-secondary);">
+                                <strong>Concept:</strong> {{ item.idea.concept|default:"No concept provided" }}
+                            </p>
+                            
+                            {% if item.idea.main_visual_elements %}
+                            <div class="mb-3">
+                                <strong class="text-white small">Visual Elements:</strong>
+                                <p class="small text-muted mb-0">{{ item.idea.main_visual_elements }}</p>
+                            </div>
+                            {% endif %}
+                            
+                            {% if item.idea.intended_mood %}
+                            <div class="mb-3">
+                                <span class="badge bg-warning text-dark">
+                                    <i class="bi bi-emoji-smile"></i> {{ item.idea.intended_mood }}
+                                </span>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="mb-3">
+                                <button 
+                                    type="button" 
+                                    class="btn btn-sm btn-info w-100 generate-prompt-btn" 
+                                    data-extraction-id="{{ item.extraction_id }}"
+                                    data-idea-id="{{ item.idea_id }}"
+                                    {% if item.has_prompt %}disabled{% endif %}
+                                >
+                                    <i class="bi bi-camera-video"></i> 
+                                    <span class="btn-text">{% if item.has_prompt %}Prompt Generated{% else %}Generate Video Prompt{% endif %}</span>
+                                </button>
+                            </div>
+                            
+                            <div class="mt-auto">
+                                <small class="text-muted">
+                                    <i class="bi bi-clock"></i> Extracted {{ item.extracted_at|timesince }} ago
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox" style="font-size: 4rem; color: var(--text-muted); opacity: 0.5;"></i>
+            <h4 class="mt-3 text-muted">No AI ideas yet</h4>
+            <p class="text-muted">Extract ideas from videos on the Ideas page to see them here.</p>
+            <a href="{% url 'ideas' %}" class="btn btn-primary mt-3">
+                <i class="bi bi-arrow-left"></i> Go to Ideas
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+// Helper function to get CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle generate video prompt button clicks
+    const generateButtons = document.querySelectorAll('.generate-prompt-btn');
+    
+    generateButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const extractionId = this.getAttribute('data-extraction-id');
+            const ideaId = this.getAttribute('data-idea-id');
+            const buttonElement = this;
+            const originalHTML = buttonElement.innerHTML;
+            
+            // Disable button and show loading state
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span><span class="btn-text">Generating...</span>';
+            
+            // Make AJAX request
+            const formData = new FormData();
+            formData.append('extraction_id', extractionId);
+            formData.append('idea_id', ideaId);
+            
+            fetch('{% url "generate_idea_video_prompt" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Success - update button state
+                    buttonElement.classList.remove('btn-info');
+                    buttonElement.classList.add('btn-success');
+                    buttonElement.innerHTML = '<i class="bi bi-check-circle"></i> <span class="btn-text">Prompt Generated</span>';
+                    
+                    showMessage('Video prompt generated successfully! View it in Video Prompts page.', 'success');
+                } else {
+                    // Error - re-enable button
+                    buttonElement.disabled = false;
+                    buttonElement.innerHTML = originalHTML;
+                    
+                    showMessage(data.error || 'Failed to generate video prompt', 'error');
+                }
+            })
+            .catch(error => {
+                // Network error - re-enable button
+                buttonElement.disabled = false;
+                buttonElement.innerHTML = originalHTML;
+                
+                showMessage('Network error. Please try again.', 'error');
+                console.error('Error:', error);
+            });
+        });
+    });
+    
+    // Function to show messages
+    function showMessage(message, type) {
+        // Create a temporary alert element
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+});
+</script>
+{% endblock %}
+

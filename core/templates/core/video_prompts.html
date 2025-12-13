@@ -1,0 +1,261 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Video Prompts - REDSTRAP{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-1"><i class="bi bi-camera-video text-info"></i> Video Prompts</h1>
+            <p class="text-muted mb-0">AI-generated video prompts for creating new social media content</p>
+        </div>
+    </div>
+
+    {% if all_prompts %}
+        <div class="row g-4">
+            {% for item in all_prompts %}
+                <div class="col-12 col-lg-6">
+                    <div class="card h-100 bg-transparent border" style="border-color: var(--glass-border);">
+                        <div class="card-header d-flex justify-content-between align-items-center" style="background: var(--vuexy-dark-bg); border-bottom: 1px solid var(--vuexy-border);">
+                            <div class="d-flex align-items-center gap-2">
+                                {% if item.source_type == 'instagram' %}
+                                    <i class="bi bi-instagram text-danger"></i>
+                                {% else %}
+                                    <i class="bi bi-twitter text-info"></i>
+                                {% endif %}
+                                <span class="fw-semibold text-white">{{ item.source_type|title }}</span>
+                            </div>
+                            <small class="text-muted">{{ item.extracted_at|date:"M d, Y" }}</small>
+                        </div>
+                        
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <small class="text-muted">Source:</small>
+                                <a href="{{ item.source_url }}" target="_blank" class="text-info text-decoration-none">
+                                    {{ item.source_name }}
+                                </a>
+                                <p class="small text-muted mb-0 mt-1">{{ item.source_caption|truncatewords:20 }}</p>
+                            </div>
+                            
+                            {% if item.best_idea.title or item.idea_title %}
+                            <div class="mb-3 p-3 rounded" style="background: rgba(115, 103, 240, 0.1); border-left: 3px solid var(--vuexy-primary);">
+                                <h6 class="text-white mb-2">
+                                    <i class="bi bi-star-fill text-warning"></i> 
+                                    {% if item.prompt_type == 'idea' %}
+                                        Idea: {{ item.idea_title }}
+                                    {% else %}
+                                        Best Idea: {{ item.best_idea.title }}
+                                    {% endif %}
+                                </h6>
+                                {% if item.best_idea.concept %}
+                                <p class="small text-muted mb-0">{{ item.best_idea.concept }}</p>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="text-white mb-0">
+                                        <i class="bi bi-pencil"></i> Video Prompt
+                                    </h6>
+                                    <button 
+                                        type="button" 
+                                        class="btn btn-sm btn-outline-primary copy-prompt-btn" 
+                                        data-prompt-text="{{ item.prompt.prompt|default:''|escapejs }}"
+                                        data-negative-prompt="{{ item.prompt.negative_prompt|default:''|escapejs }}"
+                                        {% if item.prompt.shot_list %}
+                                        data-shot-list="{% for shot in item.prompt.shot_list %}{{ shot|escapejs }}{% if not forloop.last %}|||{% endif %}{% endfor %}"
+                                        {% else %}
+                                        data-shot-list=""
+                                        {% endif %}
+                                        title="Copy full prompt to clipboard"
+                                    >
+                                        <i class="bi bi-clipboard"></i> Copy Prompt
+                                    </button>
+                                </div>
+                                <div class="p-3 rounded" style="background: var(--vuexy-darker-bg); border: 1px solid var(--vuexy-border);">
+                                    <p class="text-white small mb-0" id="prompt-text-{{ forloop.counter }}">{{ item.prompt.prompt|default:"No prompt provided" }}</p>
+                                </div>
+                            </div>
+                            
+                            {% if item.prompt.negative_prompt %}
+                            <div class="mb-3">
+                                <h6 class="text-white mb-2">
+                                    <i class="bi bi-x-circle"></i> Negative Prompt
+                                </h6>
+                                <div class="p-3 rounded" style="background: rgba(234, 84, 85, 0.1); border: 1px solid rgba(234, 84, 85, 0.3);">
+                                    <p class="text-muted small mb-0">{{ item.prompt.negative_prompt }}</p>
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            {% if item.prompt.shot_list %}
+                            <div class="mb-3">
+                                <h6 class="text-white mb-2">
+                                    <i class="bi bi-list-ul"></i> Shot List
+                                </h6>
+                                <ul class="list-unstyled">
+                                    {% for shot in item.prompt.shot_list %}
+                                        <li class="mb-2">
+                                            <div class="d-flex align-items-start gap-2">
+                                                <span class="badge bg-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 24px; height: 24px; font-size: 0.7rem; flex-shrink: 0;">{{ forloop.counter }}</span>
+                                                <span class="text-muted small">{{ shot }}</span>
+                                            </div>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="mt-auto pt-3 border-top" style="border-color: var(--vuexy-border);">
+                                <small class="text-muted">
+                                    <i class="bi bi-clock"></i> Extracted {{ item.extracted_at|timesince }} ago
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox" style="font-size: 4rem; color: var(--text-muted); opacity: 0.5;"></i>
+            <h4 class="mt-3 text-muted">No video prompts yet</h4>
+            <p class="text-muted">Extract ideas from videos on the Ideas page to generate video prompts here.</p>
+            <a href="{% url 'ideas' %}" class="btn btn-primary mt-3">
+                <i class="bi bi-arrow-left"></i> Go to Ideas
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle copy prompt button clicks
+    const copyButtons = document.querySelectorAll('.copy-prompt-btn');
+    
+    copyButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const promptText = this.getAttribute('data-prompt-text');
+            const negativePrompt = this.getAttribute('data-negative-prompt');
+            const shotListJson = this.getAttribute('data-shot-list');
+            const buttonElement = this;
+            const originalHTML = buttonElement.innerHTML;
+            
+            // Function to decode Unicode escape sequences
+            function decodeUnicodeEscapes(str) {
+                if (!str) return '';
+                // Replace \u002D with -, \u0027 with ', etc.
+                return str.replace(/\\u([0-9a-fA-F]{4})/g, function(match, hex) {
+                    return String.fromCharCode(parseInt(hex, 16));
+                });
+            }
+            
+            // Build complete prompt text
+            let fullPromptText = '';
+            
+            // Add video prompt (decode Unicode escapes)
+            if (promptText && promptText.trim() !== '') {
+                fullPromptText += 'VIDEO PROMPT:\n';
+                fullPromptText += decodeUnicodeEscapes(promptText.trim()) + '\n\n';
+            }
+            
+            // Add negative prompt (decode Unicode escapes)
+            if (negativePrompt && negativePrompt.trim() !== '') {
+                fullPromptText += 'NEGATIVE PROMPT:\n';
+                fullPromptText += decodeUnicodeEscapes(negativePrompt.trim()) + '\n\n';
+            }
+            
+            // Add shot list (decode Unicode escapes)
+            if (shotListJson && shotListJson.trim() !== '') {
+                // Split by ||| separator (used in template)
+                const shotList = shotListJson.split('|||').filter(shot => shot.trim() !== '');
+                if (shotList.length > 0) {
+                    fullPromptText += 'SHOT LIST:\n';
+                    shotList.forEach((shot, index) => {
+                        fullPromptText += `${index + 1}. ${decodeUnicodeEscapes(shot.trim())}\n`;
+                    });
+                }
+            }
+            
+            if (fullPromptText.trim() === '') {
+                showMessage('No prompt text to copy', 'error');
+                return;
+            }
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(fullPromptText.trim()).then(function() {
+                // Success feedback
+                buttonElement.innerHTML = '<i class="bi bi-check-circle"></i> Copied!';
+                buttonElement.classList.remove('btn-outline-primary');
+                buttonElement.classList.add('btn-success');
+                buttonElement.disabled = true;
+                
+                showMessage('Prompt copied to clipboard!', 'success');
+                
+                // Reset button after 2 seconds
+                setTimeout(function() {
+                    buttonElement.innerHTML = originalHTML;
+                    buttonElement.classList.remove('btn-success');
+                    buttonElement.classList.add('btn-outline-primary');
+                    buttonElement.disabled = false;
+                }, 2000);
+            }).catch(function(err) {
+                // Fallback for older browsers
+                try {
+                    const textArea = document.createElement('textarea');
+                    textArea.value = fullPromptText.trim();
+                    textArea.style.position = 'fixed';
+                    textArea.style.left = '-999999px';
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    
+                    // Success feedback
+                    buttonElement.innerHTML = '<i class="bi bi-check-circle"></i> Copied!';
+                    buttonElement.classList.remove('btn-outline-primary');
+                    buttonElement.classList.add('btn-success');
+                    buttonElement.disabled = true;
+                    
+                    showMessage('Prompt copied to clipboard!', 'success');
+                    
+                    // Reset button after 2 seconds
+                    setTimeout(function() {
+                        buttonElement.innerHTML = originalHTML;
+                        buttonElement.classList.remove('btn-success');
+                        buttonElement.classList.add('btn-outline-primary');
+                        buttonElement.disabled = false;
+                    }, 2000);
+                } catch (fallbackErr) {
+                    console.error('Failed to copy:', fallbackErr);
+                    showMessage('Failed to copy prompt to clipboard', 'error');
+                }
+            });
+        });
+    });
+    
+    // Function to show messages
+    function showMessage(message, type) {
+        // Create a temporary alert element
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 3000);
+    }
+});
+</script>
+{% endblock %}
+

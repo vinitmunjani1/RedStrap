@@ -298,20 +298,27 @@ class RankingService:
         return score
     
     @staticmethod
-    def get_top_ranked_posts(user, limit: int = 5) -> List[Dict[str, Any]]:
+    def get_top_ranked_posts(user, limit: int = 5, days_recent: int = 7) -> List[Dict[str, Any]]:
         """
-        Get top ranked Instagram posts for a user.
+        Get top ranked Instagram posts for a user from recently fetched posts.
         
         Args:
             user: User instance
             limit: Number of top posts to return
+            days_recent: Number of days to look back for recently fetched posts (default: 7)
         
         Returns:
             List of dicts with 'post', 'score', and 'type'='instagram'
         """
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # Filter to only recently fetched posts (based on when they were added to our database)
+        cutoff_date = timezone.now() - timedelta(days=days_recent)
         posts = InstagramPost.objects.filter(
-            account__user=user
-        ).select_related('account').prefetch_related('keywords')[:500]  # Limit for performance
+            account__user=user,
+            created_at__gte=cutoff_date  # created_at is when post was added to our database
+        ).select_related('account').prefetch_related('keywords').order_by('-created_at')[:200]  # Limit for performance
         
         scored_posts = []
         for post in posts:
@@ -327,20 +334,27 @@ class RankingService:
         return scored_posts[:limit]
     
     @staticmethod
-    def get_top_ranked_tweets(user, limit: int = 5) -> List[Dict[str, Any]]:
+    def get_top_ranked_tweets(user, limit: int = 5, days_recent: int = 7) -> List[Dict[str, Any]]:
         """
-        Get top ranked Twitter tweets for a user.
+        Get top ranked Twitter tweets for a user from recently fetched tweets.
         
         Args:
             user: User instance
             limit: Number of top tweets to return
+            days_recent: Number of days to look back for recently fetched tweets (default: 7)
         
         Returns:
             List of dicts with 'tweet', 'score', and 'type'='twitter'
         """
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # Filter to only recently fetched tweets (based on when they were added to our database)
+        cutoff_date = timezone.now() - timedelta(days=days_recent)
         tweets = TwitterTweet.objects.filter(
-            account__user=user
-        ).select_related('account').prefetch_related('keywords')[:500]  # Limit for performance
+            account__user=user,
+            created_at_db__gte=cutoff_date  # created_at_db is when tweet was added to our database
+        ).select_related('account').prefetch_related('keywords').order_by('-created_at_db')[:200]  # Limit for performance
         
         scored_tweets = []
         for tweet in tweets:
@@ -356,19 +370,20 @@ class RankingService:
         return scored_tweets[:limit]
     
     @staticmethod
-    def get_top_ranked_combined(user, limit: int = 5) -> List[Dict[str, Any]]:
+    def get_top_ranked_combined(user, limit: int = 5, days_recent: int = 7) -> List[Dict[str, Any]]:
         """
-        Get top ranked posts and tweets combined, sorted by score.
+        Get top ranked posts and tweets combined from recently fetched content, sorted by score.
         
         Args:
             user: User instance
             limit: Total number of top items to return
+            days_recent: Number of days to look back for recently fetched posts/tweets (default: 7)
         
         Returns:
             List of dicts with either 'post' or 'tweet', 'score', and 'type'
         """
-        top_posts = RankingService.get_top_ranked_posts(user, limit=limit * 2)
-        top_tweets = RankingService.get_top_ranked_tweets(user, limit=limit * 2)
+        top_posts = RankingService.get_top_ranked_posts(user, limit=limit * 2, days_recent=days_recent)
+        top_tweets = RankingService.get_top_ranked_tweets(user, limit=limit * 2, days_recent=days_recent)
         
         # Combine and sort by score
         combined = top_posts + top_tweets

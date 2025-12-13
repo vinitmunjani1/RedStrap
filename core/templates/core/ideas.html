@@ -80,9 +80,25 @@
                                     </div>
                                 {% endif %}
                                 
-                                <a href="{% url 'instagram_post_detail' post.id %}" class="btn btn-sm btn-primary w-100">
-                                    <i class="bi bi-eye"></i> View Details
-                                </a>
+                                <div class="d-flex gap-2 mb-2">
+                                    <a href="{% url 'instagram_post_detail' post.id %}" class="btn btn-sm btn-primary flex-fill">
+                                        <i class="bi bi-eye"></i> View Details
+                                    </a>
+                                    {% if post.is_reel or post.is_video %}
+                                        {% if post.video_url %}
+                                        <button 
+                                            type="button" 
+                                            class="btn btn-sm btn-warning flex-fill extract-video-btn" 
+                                            data-source-type="instagram" 
+                                            data-source-id="{{ post.id }}"
+                                            {% if item.has_extraction %}disabled{% endif %}
+                                        >
+                                            <i class="bi bi-magic"></i> 
+                                            <span class="btn-text">Extract Idea</span>
+                                        </button>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -149,9 +165,27 @@
                                     </div>
                                 {% endif %}
                                 
-                                <a href="{{ tweet.twitter_url }}" target="_blank" class="btn btn-sm btn-info w-100">
-                                    <i class="bi bi-twitter"></i> View on Twitter
-                                </a>
+                                <div class="d-flex gap-2">
+                                    <a href="{{ tweet.twitter_url }}" target="_blank" class="btn btn-sm btn-info flex-fill">
+                                        <i class="bi bi-twitter"></i> View on Twitter
+                                    </a>
+                                    {% if tweet.media %}
+                                        {% for media_item in tweet.media|slice:":1" %}
+                                            {% if media_item.type == "video" and media_item.video_url %}
+                                                <button 
+                                                    type="button" 
+                                                    class="btn btn-sm btn-warning flex-fill extract-video-btn" 
+                                                    data-source-type="twitter" 
+                                                    data-source-id="{{ tweet.id }}"
+                                                    {% if item.has_extraction %}disabled{% endif %}
+                                                >
+                                                    <i class="bi bi-magic"></i> 
+                                                    <span class="btn-text">Extract Idea</span>
+                                                </button>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -170,5 +204,105 @@
         </div>
     {% endif %}
 </div>
+
+<script>
+// Helper function to get CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle extract video idea button clicks
+    const extractButtons = document.querySelectorAll('.extract-video-btn');
+    
+    extractButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const sourceType = this.getAttribute('data-source-type');
+            const sourceId = this.getAttribute('data-source-id');
+            const btnText = this.querySelector('.btn-text');
+            const originalText = btnText.textContent;
+            const buttonElement = this;
+            
+            // Disable button and show loading state
+            this.disabled = true;
+            btnText.textContent = 'Extracting...';
+            this.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span><span class="btn-text">Extracting...</span>';
+            
+            // Make AJAX request
+            const formData = new FormData();
+            formData.append('source_type', sourceType);
+            formData.append('source_id', sourceId);
+            
+            fetch('{% url "extract_video_idea" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Success - keep button disabled and show success message
+                    buttonElement.classList.remove('btn-warning');
+                    buttonElement.classList.add('btn-success');
+                    buttonElement.innerHTML = '<i class="bi bi-check-circle"></i> <span class="btn-text">Extracted</span>';
+                    
+                    // Show success message
+                    showMessage('Video ideas extracted successfully!', 'success');
+                } else {
+                    // Error - re-enable button and show error
+                    buttonElement.disabled = false;
+                    buttonElement.innerHTML = '<i class="bi bi-magic"></i> <span class="btn-text">' + originalText + '</span>';
+                    
+                    showMessage(data.error || 'Failed to extract video ideas', 'error');
+                }
+            })
+            .catch(error => {
+                // Network error - re-enable button
+                buttonElement.disabled = false;
+                buttonElement.innerHTML = '<i class="bi bi-magic"></i> <span class="btn-text">' + originalText + '</span>';
+                
+                showMessage('Network error. Please try again.', 'error');
+                console.error('Error:', error);
+            });
+        });
+    });
+    
+    // Function to show messages (you can customize this based on your message system)
+    function showMessage(message, type) {
+        // Create a temporary alert element
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+});
+</script>
 {% endblock %}
+
 

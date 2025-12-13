@@ -198,6 +198,11 @@ TWITTER_RAPIDAPI_HOST = os.environ.get('TWITTER_RAPIDAPI_HOST', 'twitter241.p.ra
 # Set to None or 0 to disable test mode and fetch all tweets
 TEST_MODE_TWEETS_LIMIT = int(os.environ.get('TEST_MODE_TWEETS_LIMIT', '100')) if os.environ.get('TEST_MODE_TWEETS_LIMIT') else None
 
+# Google Gemini API Configuration
+# Gemini API key for video idea extraction feature
+# Set GEMINI_API_KEY in environment variable (.env file)
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+
 # Discord Webhook Configuration
 # Discord webhook URL for sending notifications about new Instagram posts
 # Set in environment variable DISCORD_WEBHOOK_URL

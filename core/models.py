@@ -4,6 +4,10 @@ Django models for Instagram and Reddit data.
 from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericForeignKey
 
 
 class SocialUsername(models.Model):
@@ -307,4 +311,73 @@ class TwitterKeyword(models.Model):
         if self.similarity is not None:
             return f"{self.keyword} (similarity: {self.similarity:.2f})"
         return f"{self.keyword}"
+
+
+class VideoIdeaExtraction(models.Model):
+    """
+    Stores extracted video ideas from Instagram posts or Twitter tweets using Gemini AI.
+    Contains video analysis, generated ideas, best idea selection, and video generation prompts.
+    """
+    # Generic foreign key to support both InstagramPost and TwitterTweet
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')
+    
+    # Source type for easier querying ('instagram' or 'twitter')
+    source_type = models.CharField(max_length=20, db_index=True, help_text="Source platform: 'instagram' or 'twitter'")
+    source_id = models.IntegerField(db_index=True, help_text="ID of the source post or tweet")
+    
+    # Gemini AI response data stored as JSON
+    video_analysis = models.JSONField(help_text="Video analysis containing id, title, duration, keywords, context, transcript")
+    video_ideas = models.JSONField(help_text="Array of 5 generated video ideas")
+    best_idea = models.JSONField(help_text="The selected best idea from the generated ideas")
+    video_prompt = models.JSONField(help_text="Video generation prompt with prompt, negative_prompt, and shot_list")
+    
+    # Metadata
+    extracted_at = models.DateTimeField(auto_now_add=True, help_text="When the extraction was performed")
+    
+    class Meta:
+        ordering = ['-extracted_at']
+        indexes = [
+            models.Index(fields=['source_type', 'source_id']),
+            models.Index(fields=['-extracted_at']),
+        ]
+        # Ensure one extraction per post/tweet
+        unique_together = [['source_type', 'source_id']]
+    
+    def __str__(self):
+        return f"Video idea extraction for {self.source_type} #{self.source_id} ({self.extracted_at})"
+
+
+class IdeaVideoPrompt(models.Model):
+    """
+    Stores generated video prompts for individual AI ideas using Together AI.
+    Each prompt is generated from a specific idea in the video_ideas array.
+    """
+    extraction = models.ForeignKey(VideoIdeaExtraction, on_delete=models.CASCADE, related_name='idea_prompts', help_text="The video extraction this prompt was generated from")
+    idea_id = models.CharField(max_length=255, db_index=True, help_text="UUID of the specific idea from video_ideas array")
+    idea_title = models.CharField(max_length=500, help_text="Title of the idea for easy reference")
+    
+    # Generated prompt data stored as JSON
+    video_prompt = models.JSONField(help_text="Video generation prompt with prompt, negative_prompt, and shot_list (with timestamps)")
+    
+    # Source information for easier querying
+    source_type = models.CharField(max_length=20, db_index=True, help_text="Source platform: 'instagram' or 'twitter'")
+    source_id = models.IntegerField(db_index=True, help_text="ID of the source post or tweet")
+    
+    # Metadata
+    generated_at = models.DateTimeField(auto_now_add=True, help_text="When the prompt was generated")
+    
+    class Meta:
+        ordering = ['-generated_at']
+        indexes = [
+            models.Index(fields=['extraction', 'idea_id']),
+            models.Index(fields=['source_type', 'source_id']),
+            models.Index(fields=['-generated_at']),
+        ]
+        # Ensure one prompt per idea
+        unique_together = [['extraction', 'idea_id']]
+    
+    def __str__(self):
+        return f"Video prompt for idea '{self.idea_title}' ({self.generated_at})"
 
