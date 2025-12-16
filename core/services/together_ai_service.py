@@ -239,7 +239,12 @@ REQUIREMENTS:
 - shot_list must contain exactly 4-6 shots with timestamps
 - Each shot should have a clear timestamp range in format "[X-Ys]:" followed by description
 - CRITICAL: shot_list items must be plain text strings WITHOUT bullet points, numbers, or list markers
-- shot_list format should be: "[timestamp]: Description text" (no bullets, no numbers, no dashes)
+- CRITICAL: Each shot_list item MUST include the story structure label: "HOOK", "BUILD", "TRANSITION", or "PAYOFF"
+- shot_list format should be: "[timestamp]: LABEL - Description text" where LABEL is HOOK, BUILD, TRANSITION, or PAYOFF
+- The first shot (0-2s) MUST be labeled "HOOK"
+- The last shot (8-10s) MUST be labeled "PAYOFF"
+- Middle shots should be labeled "BUILD" or "TRANSITION"
+- Example format: "[0-2s]: HOOK - Immediate attention-grabbing moment..."
 - The prompt should capture the mood and visual style described in the idea
 - Negative prompt should list specific things to avoid
 - The opening hook is the most important element for user retention - make it compelling
@@ -316,6 +321,7 @@ Return ONLY the JSON object, no additional text or explanation."""
                 logger.debug(f"Truncated shot_list to 6 items")
             
             # Clean up shot_list: Remove bullet points, numbers, and list markers
+            # BUT PRESERVE HOOK, BUILD, TRANSITION, PAYOFF labels
             cleaned_shot_list = []
             for shot in result.get('shot_list', []):
                 if isinstance(shot, str):
@@ -324,9 +330,23 @@ Return ONLY the JSON object, no additional text or explanation."""
                     # Remove leading numbers with dots, dashes, or spaces (e.g., "1.", "1-", "1 ", "2.", etc.)
                     cleaned = re.sub(r'^\d+[\.\-\s]+\s*', '', cleaned)
                     # Remove common bullet markers (•, -, *, +, >, →, etc.) and Unicode bullets
+                    # BUT only if they're at the very start, before the timestamp
                     cleaned = re.sub(r'^[•\-\*\+\>\→\u2022\u2023\u25E6\u2043\u2219\s]+\s*', '', cleaned)
                     # Remove patterns like "- [timestamp]" or "• [timestamp]" or "1. [timestamp]"
+                    # BUT preserve the timestamp and everything after it
                     cleaned = re.sub(r'^[\d\-\•\*\+\>\→\s]*\[', '[', cleaned)
+                    # Ensure HOOK, BUILD, TRANSITION, PAYOFF labels are preserved
+                    # If the shot doesn't have a label, try to infer from position or add one
+                    if not re.search(r'\b(HOOK|BUILD|TRANSITION|PAYOFF)\b', cleaned, re.IGNORECASE):
+                        # Try to add label based on timestamp
+                        if re.match(r'\[0-2s?\]', cleaned, re.IGNORECASE):
+                            cleaned = re.sub(r'(\[0-2s?\]:\s*)', r'\1HOOK - ', cleaned, flags=re.IGNORECASE)
+                        elif re.match(r'\[8-10s?\]', cleaned, re.IGNORECASE):
+                            cleaned = re.sub(r'(\[8-10s?\]:\s*)', r'\1PAYOFF - ', cleaned, flags=re.IGNORECASE)
+                        elif re.match(r'\[6-8s?\]', cleaned, re.IGNORECASE):
+                            cleaned = re.sub(r'(\[6-8s?\]:\s*)', r'\1TRANSITION - ', cleaned, flags=re.IGNORECASE)
+                        else:
+                            cleaned = re.sub(r'(\[\d+-\d+s?\]:\s*)', r'\1BUILD - ', cleaned, flags=re.IGNORECASE)
                     # Remove any leading/trailing whitespace
                     cleaned = cleaned.strip()
                     if cleaned:
