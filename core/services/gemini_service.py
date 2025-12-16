@@ -12,8 +12,8 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# Hard cap on video download size to avoid memory/worker crashes (60 MB)
-MAX_VIDEO_BYTES = 60 * 1024 * 1024  # 60 MB
+# Hard cap on video download size to avoid memory/worker crashes (30 MB)
+MAX_VIDEO_BYTES = 30 * 1024 * 1024  # 30 MB
 
 def convert_video_url_to_mp4_bytes(url):
     """
@@ -167,6 +167,11 @@ def extract_video_ideas(video_bytes, caption, duration=None):
         ValueError: If Gemini API key is not configured
         Exception: If API call fails or response is invalid
     """
+    # Enforce size cap defensively in case upstream download limit is bypassed
+    if video_bytes and len(video_bytes) > MAX_VIDEO_BYTES:
+        raise requests.exceptions.RequestException(
+            f"Video too large (> {MAX_VIDEO_BYTES // (1024 * 1024)} MB). Size: {len(video_bytes)/(1024*1024):.2f} MB"
+        )
     # Check if API key is configured
     api_key = getattr(settings, 'GEMINI_API_KEY', '')
     if not api_key:
