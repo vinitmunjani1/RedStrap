@@ -74,13 +74,34 @@
                                             <p class="card-text small mb-2" style="color: var(--text-secondary); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                                                 {{ post.caption|default:"No caption"|truncatewords:12 }}
                                             </p>
-                                            <div class="d-flex justify-content-between align-items-center">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
                                                 <div class="d-flex gap-3">
                                                     <span class="text-muted small"><i class="bi bi-heart"></i> {{ post.like_count|floatformat:0 }}</span>
                                                     <span class="text-muted small"><i class="bi bi-chat"></i> {{ post.comment_count|floatformat:0 }}</span>
                                                 </div>
                                                 <span class="badge bg-success" style="font-size: 0.75rem;">{{ item.engagement_total|floatformat:0 }} total</span>
                                             </div>
+                                            {% if post.is_reel or post.is_video %}
+                                                {% if post.video_url %}
+                                                <div class="d-flex gap-2">
+                                                    <button 
+                                                        type="button" 
+                                                        class="btn btn-sm btn-primary flex-fill extract-video-btn" 
+                                                        data-source-type="instagram"
+                                                        data-source-id="{{ post.id }}"
+                                                        {% if item.has_extraction %}disabled{% endif %}
+                                                    >
+                                                        <i class="bi bi-magic"></i> 
+                                                        <span class="btn-text">{% if item.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
+                                                    </button>
+                                                    {% if item.has_extraction %}
+                                                    <a href="{% url 'ideas' %}?source_type=instagram&source_id={{ post.id }}" class="btn btn-sm btn-info flex-fill">
+                                                        <i class="bi bi-sparkles"></i> Ideas
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                                {% endif %}
+                                            {% endif %}
                                         </div>
                                     </div>
                                 </a>
@@ -150,7 +171,7 @@
                                             </div>
                                         </div>
                                         {% endif %}
-                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                                             <div class="d-flex gap-3 text-muted small flex-wrap">
                                                 {% if tweet.view_count %}
                                                     <span><i class="bi bi-eye"></i> {{ tweet.view_count|floatformat:0 }}</span>
@@ -161,6 +182,29 @@
                                             </div>
                                             <span class="badge bg-info" style="font-size: 0.75rem;">{{ item.engagement_total|floatformat:0 }} total</span>
                                         </div>
+                                        {% if tweet.media %}
+                                            {% for media_item in tweet.media|slice:":1" %}
+                                                {% if media_item.type == "video" and media_item.video_url %}
+                                                <div class="d-flex gap-2 mb-2">
+                                                    <button 
+                                                        type="button" 
+                                                        class="btn btn-sm btn-primary flex-fill extract-video-btn" 
+                                                        data-source-type="twitter"
+                                                        data-source-id="{{ tweet.id }}"
+                                                        {% if item.has_extraction %}disabled{% endif %}
+                                                    >
+                                                        <i class="bi bi-magic"></i> 
+                                                        <span class="btn-text">{% if item.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
+                                                    </button>
+                                                    {% if item.has_extraction %}
+                                                    <a href="{% url 'ideas' %}?source_type=twitter&source_id={{ tweet.id }}" class="btn btn-sm btn-info flex-fill">
+                                                        <i class="bi bi-sparkles"></i> Ideas
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endif %}
                                         <div class="mt-2">
                                             <a href="{{ tweet.twitter_url }}" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">
                                                 <i class="bi bi-box-arrow-up-right"></i> View
@@ -224,10 +268,31 @@
                                                 <small class="text-muted">{{ post.taken_at|date:"M d, Y" }}</small>
                                             </div>
                                             <div class="small mb-2" style="color: var(--text-primary); display:-webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">{{ post.caption|default:"No caption" |truncatewords:14 }}</div>
-                                            <div class="small text-muted d-flex gap-3">
+                                            <div class="small text-muted d-flex gap-3 mb-2">
                                                 <span><i class="bi bi-heart"></i> {{ post.like_count }}</span>
                                                 <span><i class="bi bi-chat"></i> {{ post.comment_count }}</span>
                                             </div>
+                                            {% if post.is_reel or post.is_video %}
+                                                {% if post.video_url %}
+                                                <div class="d-flex gap-2 mb-2">
+                                                    <button 
+                                                        type="button" 
+                                                        class="btn btn-sm btn-primary flex-fill extract-video-btn" 
+                                                        data-source-type="instagram"
+                                                        data-source-id="{{ post.id }}"
+                                                        {% if post.has_extraction %}disabled{% endif %}
+                                                    >
+                                                        <i class="bi bi-magic"></i> 
+                                                        <span class="btn-text">{% if post.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
+                                                    </button>
+                                                    {% if post.has_extraction %}
+                                                    <a href="{% url 'ideas' %}?source_type=instagram&source_id={{ post.id }}" class="btn btn-sm btn-info flex-fill">
+                                                        <i class="bi bi-sparkles"></i> Ideas
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                                {% endif %}
+                                            {% endif %}
                                             {% if post.keywords.all %}
                                             <div class="mt-2" style="
                                                 background: rgba(129, 140, 248, 0.08);
@@ -324,7 +389,7 @@
                                             </div>
                                         </div>
                                         {% endif %}
-                                        <div class="small text-muted d-flex gap-3 flex-wrap">
+                                        <div class="small text-muted d-flex gap-3 flex-wrap mb-2">
                                             {% if tweet.view_count %}
                                                 <span><i class="bi bi-eye"></i> {{ tweet.view_count|floatformat:0 }}</span>
                                             {% endif %}
@@ -333,6 +398,29 @@
                                             <span><i class="bi bi-chat"></i> {{ tweet.reply_count|floatformat:0 }}</span>
                                             <span><i class="bi bi-activity"></i> {{ tweet.favorite_count|add:tweet.retweet_count|add:tweet.reply_count|floatformat:0 }} total</span>
                                         </div>
+                                        {% if tweet.media %}
+                                            {% for media_item in tweet.media|slice:":1" %}
+                                                {% if media_item.type == "video" and media_item.video_url %}
+                                                <div class="d-flex gap-2 mb-2">
+                                                    <button 
+                                                        type="button" 
+                                                        class="btn btn-sm btn-primary flex-fill extract-video-btn" 
+                                                        data-source-type="twitter"
+                                                        data-source-id="{{ tweet.id }}"
+                                                        {% if tweet.has_extraction %}disabled{% endif %}
+                                                    >
+                                                        <i class="bi bi-magic"></i> 
+                                                        <span class="btn-text">{% if tweet.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
+                                                    </button>
+                                                    {% if tweet.has_extraction %}
+                                                    <a href="{% url 'ideas' %}?source_type=twitter&source_id={{ tweet.id }}" class="btn btn-sm btn-info flex-fill">
+                                                        <i class="bi bi-sparkles"></i> Ideas
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endif %}
                                         <div class="mt-2">
                                             <a href="{{ tweet.twitter_url }}" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">
                                                 <i class="bi bi-box-arrow-up-right"></i> View on Twitter
@@ -441,7 +529,7 @@
                                                 </div>
                                             </div>
                                             {% endif %}
-                                            <div class="d-flex justify-content-between align-items-center">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
                                                 <div class="d-flex gap-3 flex-wrap">
                                                     <span class="engagement-compact likes" style="font-size: 0.9rem; font-weight: 500;">
                                                         <i class="bi bi-heart-fill" style="color: #ef4444;"></i> {{ post.like_count|floatformat:0 }}
@@ -452,6 +540,27 @@
                                                 </div>
                                                 <small class="text-muted" style="font-size: 0.85rem; font-weight: 500;">{{ post.taken_at|date:"M d" }}</small>
                                             </div>
+                                            {% if post.is_reel or post.is_video %}
+                                                {% if post.video_url %}
+                                                <div class="d-flex gap-2">
+                                                    <button 
+                                                        type="button" 
+                                                        class="btn btn-sm btn-primary flex-fill extract-video-btn" 
+                                                        data-source-type="instagram"
+                                                        data-source-id="{{ post.id }}"
+                                                        {% if post.has_extraction %}disabled{% endif %}
+                                                    >
+                                                        <i class="bi bi-magic"></i> 
+                                                        <span class="btn-text">{% if post.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
+                                                    </button>
+                                                    {% if post.has_extraction %}
+                                                    <a href="{% url 'ideas' %}?source_type=instagram&source_id={{ post.id }}" class="btn btn-sm btn-info flex-fill">
+                                                        <i class="bi bi-sparkles"></i> Ideas
+                                                    </a>
+                                                    {% endif %}
+                                                </div>
+                                                {% endif %}
+                                            {% endif %}
                                         </div>
                                     </div>
                                 {% endfor %}
@@ -515,7 +624,7 @@
                                                 </div>
                                             </div>
                                             {% endif %}
-                                            <div class="d-flex gap-3 text-muted small flex-wrap">
+                                            <div class="d-flex gap-3 text-muted small flex-wrap mb-2">
                                                 {% if tweet.view_count %}
                                                     <span><i class="bi bi-eye"></i> {{ tweet.view_count|floatformat:0 }}</span>
                                                 {% endif %}
@@ -524,6 +633,29 @@
                                                 <span><i class="bi bi-chat"></i> {{ tweet.reply_count|floatformat:0 }}</span>
                                                 <span><i class="bi bi-activity"></i> {{ tweet.favorite_count|add:tweet.retweet_count|add:tweet.reply_count|floatformat:0 }} total</span>
                                             </div>
+                                            {% if tweet.media %}
+                                                {% for media_item in tweet.media|slice:":1" %}
+                                                    {% if media_item.type == "video" and media_item.video_url %}
+                                                    <div class="d-flex gap-2 mb-2">
+                                                        <button 
+                                                            type="button" 
+                                                            class="btn btn-sm btn-primary flex-fill extract-video-btn" 
+                                                            data-source-type="twitter"
+                                                            data-source-id="{{ tweet.id }}"
+                                                            {% if tweet.has_extraction %}disabled{% endif %}
+                                                        >
+                                                            <i class="bi bi-magic"></i> 
+                                                            <span class="btn-text">{% if tweet.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
+                                                        </button>
+                                                        {% if tweet.has_extraction %}
+                                                        <a href="{% url 'ideas' %}?source_type=twitter&source_id={{ tweet.id }}" class="btn btn-sm btn-info flex-fill">
+                                                            <i class="bi bi-sparkles"></i> Ideas
+                                                        </a>
+                                                        {% endif %}
+                                                    </div>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% endif %}
                                             <div class="mt-2">
                                                 <a href="{{ tweet.twitter_url }}" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">
                                                     <i class="bi bi-box-arrow-up-right"></i> View on Twitter
@@ -681,6 +813,108 @@
 </style>
 
 <script>
+    // Helper function to get CSRF token from cookies (needed before DOMContentLoaded)
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    // Function to handle extract video idea button click (needed before DOMContentLoaded)
+    function handleExtractVideoIdea(button) {
+        if (button.disabled) return;
+        
+        const sourceType = button.getAttribute('data-source-type');
+        const sourceId = button.getAttribute('data-source-id');
+        const btnTextSpan = button.querySelector('.btn-text');
+        const originalText = btnTextSpan ? btnTextSpan.textContent : 'Extract Idea';
+        const originalHTML = button.innerHTML;
+        
+        // Disable button and show loading state
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span><span class="btn-text">Extracting...</span>';
+        
+        // Make AJAX request
+        fetch('{% url "extract_video_idea" %}', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `source_type=${sourceType}&source_id=${sourceId}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Success - update button state
+                button.classList.remove('btn-primary');
+                button.classList.add('btn-success');
+                button.innerHTML = '<i class="bi bi-check-circle"></i> <span class="btn-text">Idea Extracted</span>';
+                
+                // Show Ideas button if it doesn't exist
+                const ideasButton = button.nextElementSibling;
+                if (!ideasButton || !ideasButton.classList.contains('btn-info')) {
+                    const ideasLink = document.createElement('a');
+                    ideasLink.href = `{% url 'ideas' %}?source_type=${sourceType}&source_id=${sourceId}`;
+                    ideasLink.className = 'btn btn-sm btn-info flex-fill';
+                    ideasLink.innerHTML = '<i class="bi bi-sparkles"></i> Ideas';
+                    button.parentElement.appendChild(ideasLink);
+                }
+                
+                showMessage('Video ideas extracted successfully!', 'success');
+            } else {
+                // Error - re-enable button
+                button.disabled = false;
+                button.innerHTML = originalHTML;
+                showMessage('Error: ' + (data.error || 'Failed to extract ideas'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            button.disabled = false;
+            button.innerHTML = originalHTML;
+            showMessage('An unexpected error occurred.', 'error');
+        });
+    }
+    
+    // Function to show messages (needed before DOMContentLoaded)
+    function showMessage(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        document.body.appendChild(alertDiv);
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+    
+    // Handle extract video idea button clicks (event delegation) - set up immediately, not in DOMContentLoaded
+    document.addEventListener('click', function(e) {
+        const button = e.target.closest('.extract-video-btn');
+        if (button && !button.disabled) {
+            e.preventDefault();
+            e.stopPropagation();
+            handleExtractVideoIdea(button);
+            return false;
+        }
+    });
+    
     // Search functionality for dashboard - search by username only
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('searchDashboard');
@@ -719,6 +953,7 @@
                 });
             }
         });
+        
     });
 </script>
 

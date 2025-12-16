@@ -57,7 +57,6 @@ urlpatterns = [
     # AI Ideas and Video Prompts
     path('ideas/', views.ideas_view, name='ideas'),
     path('ideas/extract-video/', views.extract_video_idea_view, name='extract_video_idea'),
-    path('ai-ideas/', views.ai_ideas_view, name='ai_ideas'),
     path('ai-ideas/generate-prompt/', views.generate_idea_video_prompt_view, name='generate_idea_video_prompt'),
     path('video-prompts/', views.video_prompts_view, name='video_prompts'),
 ]

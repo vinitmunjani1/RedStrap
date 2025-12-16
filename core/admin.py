@@ -132,12 +132,10 @@ class VideoIdeaExtractionAdmin(admin.ModelAdmin):
 
 @admin.register(IdeaVideoPrompt)
 class IdeaVideoPromptAdmin(admin.ModelAdmin):
-    list_display = ['id', 'idea_title', 'extraction', 'source_type', 'source_id', 'generated_at']
-    list_filter = ['source_type', 'generated_at']
-    search_fields = ['idea_title', 'idea_id', 'source_id']
-    readonly_fields = ['generated_at', 'idea_id']
-    date_hierarchy = 'generated_at'
-    raw_id_fields = ['extraction']
+    list_display = ['id', 'idea_title', 'source_type', 'source_id', 'generated_at']
+    list_filter = ['source_type']
+    search_fields = ['idea_title', 'idea_id']
+    readonly_fields = ['generated_at', 'idea_id', 'source_type', 'source_id', 'extraction']
     
     fieldsets = (
         ('Source Information', {

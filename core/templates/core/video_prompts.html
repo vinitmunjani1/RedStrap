@@ -6,9 +6,19 @@
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="mb-1"><i class="bi bi-camera-video text-info"></i> Video Prompts</h1>
-            <p class="text-muted mb-0">AI-generated video prompts for creating new social media content</p>
+            {% if filtered_idea_info %}
+                <h1 class="mb-1"><i class="bi bi-camera-video text-info"></i> Prompt for "{{ filtered_idea_info.title }}"</h1>
+                <p class="text-muted mb-0">Video prompt generated for this specific idea</p>
+            {% else %}
+                <h1 class="mb-1"><i class="bi bi-camera-video text-info"></i> Video Prompts</h1>
+                <p class="text-muted mb-0">AI-generated video prompts for creating new social media content</p>
+            {% endif %}
         </div>
+        {% if filtered_idea_info %}
+        <a href="{% url 'video_prompts' %}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-arrow-left"></i> View All Prompts
+        </a>
+        {% endif %}
     </div>
 
     {% if all_prompts %}

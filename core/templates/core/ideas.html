@@ -1,206 +1,120 @@
 {% extends 'core/base.html' %}
 
-{% block title %}Ideas - REDSTRAP{% endblock %}
+{% block title %}AI Ideas - REDSTRAP{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="mb-1"><i class="bi bi-lightbulb text-warning"></i> Top Ideas</h1>
-            <p class="text-muted mb-0">Highest-ranked posts and tweets based on optimal engagement matrix</p>
+            {% if filtered_source_info %}
+                <h1 class="mb-1"><i class="bi bi-sparkles text-primary"></i> Ideas from {{ filtered_source_info.name }}</h1>
+                <p class="text-muted mb-0">Creative video ideas extracted from <a href="{{ filtered_source_info.url }}" target="_blank" class="text-info">{{ filtered_source_info.name }}</a></p>
+            {% else %}
+                <h1 class="mb-1"><i class="bi bi-sparkles text-primary"></i> AI Ideas</h1>
+                <p class="text-muted mb-0">Creative video ideas extracted from your top-performing content</p>
+            {% endif %}
         </div>
+        {% if filtered_source_info %}
+        <a href="{% url 'ideas' %}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-arrow-left"></i> View All Ideas
+        </a>
+        {% endif %}
     </div>
 
-    {% if top_items %}
+    {% if all_ideas %}
         <div class="row g-4">
-            {% for item in top_items %}
-                {% if item.type == 'instagram' %}
-                    {% with post=item.post %}
-                    <div class="col-12 col-md-6 col-lg-4">
-                        <div class="card h-100 bg-transparent border" style="border-color: var(--glass-border);">
-                            <div class="card-header d-flex justify-content-between align-items-center" style="background: var(--vuexy-dark-bg); border-bottom: 1px solid var(--vuexy-border);">
-                                <div class="d-flex align-items-center gap-2">
+            {% for item in all_ideas %}
+                <div class="col-12 col-md-6 col-lg-4">
+                    <div class="card h-100 bg-transparent border" style="border-color: var(--glass-border);">
+                        <div class="card-header d-flex justify-content-between align-items-center" style="background: var(--vuexy-dark-bg); border-bottom: 1px solid var(--vuexy-border);">
+                            <div class="d-flex align-items-center gap-2">
+                                {% if item.source_type == 'instagram' %}
                                     <i class="bi bi-instagram text-danger"></i>
-                                    <span class="fw-semibold text-white">Instagram</span>
-                                </div>
-                                <span class="badge bg-primary" style="font-size: 0.75rem;">Score: {{ item.score }}</span>
-                            </div>
-                            
-                            {% if post.is_reel or post.is_video %}
-                                <div class="media-portrait-compact">
-                                    {% if post.video_url %}
-                                        <video muted loop playsinline preload="metadata">
-                                            <source src="{{ post.video_url }}" type="video/mp4">
-                                        </video>
-                                    {% else %}
-                                        <div>
-                                            <i class="bi bi-play-circle text-primary" style="font-size: 2rem;"></i>
-                                        </div>
-                                    {% endif %}
-                                </div>
-                            {% elif post.image_url %}
-                                <div class="media-square-compact">
-                                    <img src="{{ post.image_url }}" alt="Post image">
-                                </div>
-                            {% else %}
-                                <div class="media-square-compact">
-                                    <div>
-                                        <i class="bi bi-image text-muted" style="font-size: 2rem;"></i>
-                                    </div>
-                                </div>
-                            {% endif %}
-                            
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div>
-                                        <div class="fw-semibold text-white">@{{ post.account.username }}</div>
-                                        <small class="text-muted">{{ post.taken_at|date:"M d, Y" }}</small>
-                                    </div>
-                                </div>
-                                
-                                <p class="card-text small mb-3" style="color: var(--text-secondary); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
-                                    {{ post.caption|default:"No caption"|truncatewords:20 }}
-                                </p>
-                                
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <div class="d-flex gap-3">
-                                        <span class="text-muted small"><i class="bi bi-heart"></i> {{ post.like_count|floatformat:0 }}</span>
-                                        <span class="text-muted small"><i class="bi bi-chat"></i> {{ post.comment_count|floatformat:0 }}</span>
-                                        {% if post.is_reel or post.is_video %}
-                                            <span class="text-muted small"><i class="bi bi-play"></i> {{ post.play_count|floatformat:0 }}</span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                
-                                {% if post.keywords.exists %}
-                                    <div class="mb-2">
-                                        {% for keyword in post.keywords.all|slice:":5" %}
-                                            <span class="badge bg-secondary me-1 mb-1" style="font-size: 0.7rem;">{{ keyword.keyword }}</span>
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-                                
-                                <div class="d-flex gap-2 mb-2">
-                                    <a href="{% url 'instagram_post_detail' post.id %}" class="btn btn-sm btn-primary flex-fill">
-                                        <i class="bi bi-eye"></i> View Details
-                                    </a>
-                                    {% if post.is_reel or post.is_video %}
-                                        {% if post.video_url %}
-                                        <button 
-                                            type="button" 
-                                            class="btn btn-sm btn-warning flex-fill extract-video-btn" 
-                                            data-source-type="instagram" 
-                                            data-source-id="{{ post.id }}"
-                                            {% if item.has_extraction %}disabled{% endif %}
-                                        >
-                                            <i class="bi bi-magic"></i> 
-                                            <span class="btn-text">Extract Idea</span>
-                                        </button>
-                                        {% endif %}
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endwith %}
-                {% elif item.type == 'twitter' %}
-                    {% with tweet=item.tweet %}
-                    <div class="col-12 col-md-6 col-lg-4">
-                        <div class="card h-100 bg-transparent border" style="border-color: var(--glass-border);">
-                            <div class="card-header d-flex justify-content-between align-items-center" style="background: var(--vuexy-dark-bg); border-bottom: 1px solid var(--vuexy-border);">
-                                <div class="d-flex align-items-center gap-2">
+                                {% else %}
                                     <i class="bi bi-twitter text-info"></i>
-                                    <span class="fw-semibold text-white">Twitter</span>
-                                </div>
-                                <span class="badge bg-primary" style="font-size: 0.75rem;">Score: {{ item.score }}</span>
+                                {% endif %}
+                                <span class="fw-semibold text-white">{{ item.source_type|title }}</span>
+                            </div>
+                            <small class="text-muted">{{ item.extracted_at|date:"M d, Y" }}</small>
+                        </div>
+                        
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <small class="text-muted">From:</small>
+                                <a href="{{ item.source_url }}" target="_blank" class="text-info text-decoration-none">
+                                    {{ item.source_name }}
+                                </a>
                             </div>
                             
-                            {% if tweet.media %}
-                                {% for media_item in tweet.media|slice:":1" %}
-                                    <div class="media-square-compact">
-                                        {% if media_item.type == "photo" %}
-                                            <img src="{{ media_item.url }}" alt="Tweet media">
-                                        {% elif media_item.type == "video" %}
-                                            {% if media_item.video_url %}
-                                                <video muted loop playsinline preload="metadata">
-                                                    <source src="{{ media_item.video_url }}" type="video/mp4">
-                                                </video>
-                                            {% else %}
-                                                <img src="{{ media_item.url }}" alt="Tweet media">
-                                            {% endif %}
-                                            <div class="position-absolute top-50 start-50 translate-middle" style="pointer-events: none;">
-                                                <i class="bi bi-play-circle-fill text-white" style="font-size: 1.5rem; opacity: 0.9;"></i>
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                {% endfor %}
+                            <h5 class="card-title text-white mb-3">{{ item.idea.title|default:"Untitled Idea" }}</h5>
+                            
+                            <p class="card-text small mb-3" style="color: var(--text-secondary);">
+                                <strong>Concept:</strong> {{ item.idea.concept|default:"No concept provided" }}
+                            </p>
+                            
+                            {% if item.idea.main_visual_elements %}
+                            <div class="mb-3">
+                                <strong class="text-white small">Visual Elements:</strong>
+                                <p class="small text-muted mb-0">{{ item.idea.main_visual_elements }}</p>
+                            </div>
                             {% endif %}
                             
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div>
-                                        <div class="fw-semibold text-white">@{{ tweet.account.username }}</div>
-                                        <small class="text-muted">{{ tweet.created_at|date:"M d, Y" }}</small>
-                                    </div>
-                                </div>
-                                
-                                <p class="card-text small mb-3" style="color: var(--text-secondary); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
-                                    {{ tweet.text|truncatewords:20 }}
-                                </p>
-                                
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <div class="d-flex gap-2 flex-wrap">
-                                        <span class="text-muted small"><i class="bi bi-heart"></i> {{ tweet.favorite_count|floatformat:0 }}</span>
-                                        <span class="text-muted small"><i class="bi bi-arrow-repeat"></i> {{ tweet.retweet_count|floatformat:0 }}</span>
-                                        <span class="text-muted small"><i class="bi bi-chat"></i> {{ tweet.reply_count|floatformat:0 }}</span>
-                                        <span class="text-muted small"><i class="bi bi-eye"></i> {{ tweet.view_count|floatformat:0 }}</span>
-                                    </div>
-                                </div>
-                                
-                                {% if tweet.keywords.exists %}
-                                    <div class="mb-2">
-                                        {% for keyword in tweet.keywords.all|slice:":5" %}
-                                            <span class="badge bg-secondary me-1 mb-1" style="font-size: 0.7rem;">{{ keyword.keyword }}</span>
-                                        {% endfor %}
-                                    </div>
+                            {% if item.idea.intended_mood %}
+                            <div class="mb-3">
+                                <span class="badge bg-warning text-dark">
+                                    <i class="bi bi-emoji-smile"></i> {{ item.idea.intended_mood }}
+                                </span>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="mb-3 d-flex gap-2">
+                                <button 
+                                    type="button" 
+                                    class="btn btn-sm btn-info flex-fill generate-prompt-btn" 
+                                    data-extraction-id="{{ item.extraction_id }}"
+                                    data-idea-id="{{ item.idea_id }}"
+                                    {% if item.has_prompt %}disabled{% endif %}
+                                >
+                                    <i class="bi bi-camera-video"></i> 
+                                    <span class="btn-text">{% if item.has_prompt %}Prompt Generated{% else %}Generate Video Prompt{% endif %}</span>
+                                </button>
+                                {% if item.has_prompt %}
+                                <a href="{% url 'video_prompts' %}?extraction_id={{ item.extraction_id }}&idea_id={{ item.idea_id }}" class="btn btn-sm btn-success flex-fill">
+                                    <i class="bi bi-camera-video"></i> Prompts
+                                </a>
                                 {% endif %}
-                                
-                                <div class="d-flex gap-2">
-                                    <a href="{{ tweet.twitter_url }}" target="_blank" class="btn btn-sm btn-info flex-fill">
-                                        <i class="bi bi-twitter"></i> View on Twitter
-                                    </a>
-                                    {% if tweet.media %}
-                                        {% for media_item in tweet.media|slice:":1" %}
-                                            {% if media_item.type == "video" and media_item.video_url %}
-                                                <button 
-                                                    type="button" 
-                                                    class="btn btn-sm btn-warning flex-fill extract-video-btn" 
-                                                    data-source-type="twitter" 
-                                                    data-source-id="{{ tweet.id }}"
-                                                    {% if item.has_extraction %}disabled{% endif %}
-                                                >
-                                                    <i class="bi bi-magic"></i> 
-                                                    <span class="btn-text">Extract Idea</span>
-                                                </button>
-                                            {% endif %}
-                                        {% endfor %}
-                                    {% endif %}
-                                </div>
+                            </div>
+                            
+                            <div class="mt-auto">
+                                <small class="text-muted">
+                                    <i class="bi bi-clock"></i> Extracted {{ item.extracted_at|timesince }} ago
+                                </small>
                             </div>
                         </div>
                     </div>
-                    {% endwith %}
-                {% endif %}
+                </div>
             {% endfor %}
         </div>
     {% else %}
         <div class="text-center py-5">
             <i class="bi bi-inbox" style="font-size: 4rem; color: var(--text-muted); opacity: 0.5;"></i>
-            <h4 class="mt-3 text-muted">No ideas yet</h4>
-            <p class="text-muted">Start fetching posts and tweets to see top-ranked content here.</p>
+            <h4 class="mt-3 text-muted">No AI ideas yet</h4>
+            <p class="text-muted">
+                {% if filtered_source_info %}
+                    No ideas have been extracted from this post/tweet yet. Use the "Extract Idea" button to generate ideas.
+                {% else %}
+                    Extract ideas from videos on the Dashboard or Posts page to see them here.
+                {% endif %}
+            </p>
+            {% if filtered_source_info %}
             <a href="{% url 'dashboard' %}" class="btn btn-primary mt-3">
                 <i class="bi bi-arrow-left"></i> Go to Dashboard
             </a>
+            {% else %}
+            <a href="{% url 'dashboard' %}" class="btn btn-primary mt-3">
+                <i class="bi bi-arrow-left"></i> Go to Dashboard
+            </a>
+            {% endif %}
         </div>
     {% endif %}
 </div>
@@ -223,28 +137,26 @@ function getCookie(name) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Handle extract video idea button clicks
-    const extractButtons = document.querySelectorAll('.extract-video-btn');
+    // Handle generate video prompt button clicks
+    const generateButtons = document.querySelectorAll('.generate-prompt-btn');
     
-    extractButtons.forEach(button => {
+    generateButtons.forEach(button => {
         button.addEventListener('click', function() {
-            const sourceType = this.getAttribute('data-source-type');
-            const sourceId = this.getAttribute('data-source-id');
-            const btnText = this.querySelector('.btn-text');
-            const originalText = btnText.textContent;
+            const extractionId = this.getAttribute('data-extraction-id');
+            const ideaId = this.getAttribute('data-idea-id');
             const buttonElement = this;
+            const originalHTML = buttonElement.innerHTML;
             
             // Disable button and show loading state
             this.disabled = true;
-            btnText.textContent = 'Extracting...';
-            this.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span><span class="btn-text">Extracting...</span>';
+            this.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span><span class="btn-text">Generating...</span>';
             
             // Make AJAX request
             const formData = new FormData();
-            formData.append('source_type', sourceType);
-            formData.append('source_id', sourceId);
+            formData.append('extraction_id', extractionId);
+            formData.append('idea_id', ideaId);
             
-            fetch('{% url "extract_video_idea" %}', {
+            fetch('{% url "generate_idea_video_prompt" %}', {
                 method: 'POST',
                 body: formData,
                 headers: {
@@ -255,25 +167,36 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Success - keep button disabled and show success message
-                    buttonElement.classList.remove('btn-warning');
+                    // Success - update button state
+                    buttonElement.classList.remove('btn-info');
                     buttonElement.classList.add('btn-success');
-                    buttonElement.innerHTML = '<i class="bi bi-check-circle"></i> <span class="btn-text">Extracted</span>';
+                    buttonElement.innerHTML = '<i class="bi bi-check-circle"></i> <span class="btn-text">Prompt Generated</span>';
                     
-                    // Show success message
-                    showMessage('Video ideas extracted successfully!', 'success');
+                    // Show Prompts button if it doesn't exist
+                    const extractionId = buttonElement.getAttribute('data-extraction-id');
+                    const ideaId = buttonElement.getAttribute('data-idea-id');
+                    const promptsButton = buttonElement.nextElementSibling;
+                    if (!promptsButton || !promptsButton.classList.contains('btn-success')) {
+                        const promptsLink = document.createElement('a');
+                        promptsLink.href = `{% url 'video_prompts' %}?extraction_id=${extractionId}&idea_id=${ideaId}`;
+                        promptsLink.className = 'btn btn-sm btn-success flex-fill';
+                        promptsLink.innerHTML = '<i class="bi bi-camera-video"></i> Prompts';
+                        buttonElement.parentElement.appendChild(promptsLink);
+                    }
+                    
+                    showMessage('Video prompt generated successfully! View it in Video Prompts page.', 'success');
                 } else {
-                    // Error - re-enable button and show error
+                    // Error - re-enable button
                     buttonElement.disabled = false;
-                    buttonElement.innerHTML = '<i class="bi bi-magic"></i> <span class="btn-text">' + originalText + '</span>';
+                    buttonElement.innerHTML = originalHTML;
                     
-                    showMessage(data.error || 'Failed to extract video ideas', 'error');
+                    showMessage(data.error || 'Failed to generate video prompt', 'error');
                 }
             })
             .catch(error => {
                 // Network error - re-enable button
                 buttonElement.disabled = false;
-                buttonElement.innerHTML = '<i class="bi bi-magic"></i> <span class="btn-text">' + originalText + '</span>';
+                buttonElement.innerHTML = originalHTML;
                 
                 showMessage('Network error. Please try again.', 'error');
                 console.error('Error:', error);
@@ -281,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Function to show messages (you can customize this based on your message system)
+    // Function to show messages
     function showMessage(message, type) {
         // Create a temporary alert element
         const alertDiv = document.createElement('div');
@@ -304,5 +227,3 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
-
-

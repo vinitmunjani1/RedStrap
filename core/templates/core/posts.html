@@ -97,10 +97,10 @@
                                     <!-- Extract Idea Button for Videos -->
                                     {% if post.is_reel or post.is_video %}
                                         {% if post.video_url %}
-                                        <div class="mb-2">
+                                        <div class="mb-2 d-flex gap-2">
                                         <button 
                                             type="button" 
-                                            class="btn btn-sm btn-warning w-100 extract-video-btn" 
+                                            class="btn btn-sm btn-primary flex-fill extract-video-btn" 
                                             data-source-type="instagram"
                                             data-source-id="{{ post.id }}"
                                             {% if item.has_extraction %}disabled{% endif %}
@@ -108,6 +108,11 @@
                                                 <i class="bi bi-magic"></i> 
                                                 <span class="btn-text">{% if item.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
                                             </button>
+                                            {% if item.has_extraction %}
+                                            <a href="{% url 'ideas' %}?source_type=instagram&source_id={{ post.id }}" class="btn btn-sm btn-info flex-fill">
+                                                <i class="bi bi-sparkles"></i> Ideas
+                                            </a>
+                                            {% endif %}
                                         </div>
                                         {% endif %}
                                     {% endif %}
@@ -364,10 +369,10 @@
                                 <!-- Extract Idea Button for Videos -->
                                 {% if post.is_reel or post.is_video %}
                                     {% if post.video_url %}
-                                    <div class="mb-3">
+                                    <div class="mb-3 d-flex gap-2">
                                         <button 
                                             type="button" 
-                                            class="btn btn-sm btn-warning w-100 extract-video-btn" 
+                                            class="btn btn-sm btn-primary flex-fill extract-video-btn" 
                                             data-source-type="instagram"
                                             data-source-id="{{ post.id }}"
                                             {% if post.has_extraction %}disabled{% endif %}
@@ -375,6 +380,11 @@
                                             <i class="bi bi-magic"></i> 
                                             <span class="btn-text">{% if post.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
                                         </button>
+                                        {% if post.has_extraction %}
+                                        <a href="{% url 'ideas' %}?source_type=instagram&source_id={{ post.id }}" class="btn btn-sm btn-info flex-fill">
+                                            <i class="bi bi-sparkles"></i> Ideas
+                                        </a>
+                                        {% endif %}
                                     </div>
                                     {% endif %}
                                 {% endif %}
@@ -543,10 +553,10 @@
                                     {% if tweet.media %}
                                         {% for media_item in tweet.media %}
                                             {% if media_item.type == "video" and media_item.video_url %}
-                                            <div class="mb-2">
+                                            <div class="mb-2 d-flex gap-2">
                                                 <button 
                                                     type="button" 
-                                                    class="btn btn-sm btn-warning w-100 extract-video-btn" 
+                                                    class="btn btn-sm btn-primary flex-fill extract-video-btn" 
                                                     data-source-type="twitter"
                                                     data-source-id="{{ tweet.id }}"
                                                     {% if item.has_extraction %}disabled{% endif %}
@@ -554,6 +564,11 @@
                                                     <i class="bi bi-magic"></i> 
                                                     <span class="btn-text">{% if item.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
                                                 </button>
+                                                {% if item.has_extraction %}
+                                                <a href="{% url 'ideas' %}?source_type=twitter&source_id={{ tweet.id }}" class="btn btn-sm btn-info flex-fill">
+                                                    <i class="bi bi-sparkles"></i> Ideas
+                                                </a>
+                                                {% endif %}
                                             </div>
                                             {% endif %}
                                         {% endfor %}
@@ -585,10 +600,10 @@
                                     {% if tweet.media %}
                                         {% for media_item in tweet.media %}
                                             {% if media_item.type == "video" and media_item.video_url %}
-                                            <div class="mb-2">
+                                            <div class="mb-2 d-flex gap-2">
                                                 <button 
                                                     type="button" 
-                                                    class="btn btn-sm btn-warning w-100 extract-video-btn" 
+                                                    class="btn btn-sm btn-primary flex-fill extract-video-btn" 
                                                     data-source-type="twitter"
                                                     data-source-id="{{ tweet.id }}"
                                                     {% if tweet.has_extraction %}disabled{% endif %}
@@ -596,6 +611,11 @@
                                                     <i class="bi bi-magic"></i> 
                                                     <span class="btn-text">{% if tweet.has_extraction %}Idea Extracted{% else %}Extract Idea{% endif %}</span>
                                                 </button>
+                                                {% if tweet.has_extraction %}
+                                                <a href="{% url 'ideas' %}?source_type=twitter&source_id={{ tweet.id }}" class="btn btn-sm btn-info flex-fill">
+                                                    <i class="bi bi-sparkles"></i> Ideas
+                                                </a>
+                                                {% endif %}
                                             </div>
                                             {% endif %}
                                         {% endfor %}
@@ -884,9 +904,22 @@
         .then(data => {
             if (data.success) {
                 // Success - update button state
-                button.classList.remove('btn-warning');
+                button.classList.remove('btn-primary');
                 button.classList.add('btn-success');
                 button.innerHTML = '<i class="bi bi-check-circle"></i> <span class="btn-text">Idea Extracted</span>';
+                
+                // Show Ideas button if it doesn't exist
+                const sourceType = button.getAttribute('data-source-type');
+                const sourceId = button.getAttribute('data-source-id');
+                const ideasButton = button.nextElementSibling;
+                if (!ideasButton || !ideasButton.classList.contains('btn-info')) {
+                    const ideasLink = document.createElement('a');
+                    ideasLink.href = `{% url 'ideas' %}?source_type=${sourceType}&source_id=${sourceId}`;
+                    ideasLink.className = 'btn btn-sm btn-info flex-fill';
+                    ideasLink.innerHTML = '<i class="bi bi-sparkles"></i> Ideas';
+                    button.parentElement.appendChild(ideasLink);
+                }
+                
                 showMessage('Video ideas extracted successfully!', 'success');
             } else {
                 // Error - re-enable button

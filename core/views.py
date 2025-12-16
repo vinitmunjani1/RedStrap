@@ -61,14 +61,38 @@ def dashboard_view(request):
     accounts = InstagramAccount.objects.filter(user=request.user)
 
     # Recent Instagram posts (latest 6 overall)
-    recent_instagram_posts = InstagramPost.objects.filter(
+    recent_instagram_posts = list(InstagramPost.objects.filter(
         account__user=request.user
-    ).select_related('account').prefetch_related('keywords').order_by('-taken_at')[:6]
+    ).select_related('account').prefetch_related('keywords').order_by('-taken_at')[:6])
+    
+    # Check for existing extractions for recent Instagram posts
+    recent_post_ids = [post.id for post in recent_instagram_posts]
+    recent_extractions = VideoIdeaExtraction.objects.filter(
+        source_type='instagram',
+        source_id__in=recent_post_ids
+    ).values_list('source_id', flat=True)
+    recent_extraction_set = set(recent_extractions)
+    
+    # Add has_extraction flag to each post
+    for post in recent_instagram_posts:
+        post.has_extraction = post.id in recent_extraction_set
 
     # Recent tweets (latest 6 overall) with keywords
-    recent_tweets = TwitterTweet.objects.filter(
+    recent_tweets = list(TwitterTweet.objects.filter(
         account__user=request.user
-    ).select_related('account').prefetch_related('keywords').order_by('-created_at')[:6]
+    ).select_related('account').prefetch_related('keywords').order_by('-created_at')[:6])
+    
+    # Check for existing extractions for recent tweets
+    recent_tweet_ids = [tweet.id for tweet in recent_tweets]
+    recent_tweet_extractions = VideoIdeaExtraction.objects.filter(
+        source_type='twitter',
+        source_id__in=recent_tweet_ids
+    ).values_list('source_id', flat=True)
+    recent_tweet_extraction_set = set(recent_tweet_extractions)
+    
+    # Add has_extraction flag to each tweet
+    for tweet in recent_tweets:
+        tweet.has_extraction = tweet.id in recent_tweet_extraction_set
     
     # Compute top engagement tweets (faves + retweets + replies) from recent tweets
     RECENT_ENGAGEMENT_SAMPLE = 200
@@ -84,10 +108,19 @@ def dashboard_view(request):
         key=lambda t: (t.favorite_count or 0) + (t.retweet_count or 0) + (t.reply_count or 0),
         reverse=True
     )[:TOP_ENGAGEMENT_LIMIT]
+    # Check for existing extractions for top engagement tweets
+    top_tweet_ids = [tweet.id for tweet in top_tw_engagement_posts]
+    top_tweet_extractions = VideoIdeaExtraction.objects.filter(
+        source_type='twitter',
+        source_id__in=top_tweet_ids
+    ).values_list('source_id', flat=True)
+    top_tweet_extraction_set = set(top_tweet_extractions)
+    
     top_tw_engagement = [
         {
             'tweet': tweet,
             'engagement_total': (tweet.favorite_count or 0) + (tweet.retweet_count or 0) + (tweet.reply_count or 0),
+            'has_extraction': tweet.id in top_tweet_extraction_set,
         }
         for tweet in top_tw_engagement_posts
     ]
@@ -104,10 +137,20 @@ def dashboard_view(request):
         key=lambda p: (p.like_count or 0) + (p.comment_count or 0),
         reverse=True
     )[:TOP_ENGAGEMENT_LIMIT]
+    
+    # Check for existing extractions for top engagement posts
+    top_post_ids = [post.id for post in top_ig_engagement_posts]
+    top_extractions = VideoIdeaExtraction.objects.filter(
+        source_type='instagram',
+        source_id__in=top_post_ids
+    ).values_list('source_id', flat=True)
+    top_extraction_set = set(top_extractions)
+    
     top_ig_engagement = [
         {
             'post': post,
             'engagement_total': (post.like_count or 0) + (post.comment_count or 0),
+            'has_extraction': post.id in top_extraction_set,
         }
         for post in top_ig_engagement_posts
     ]
@@ -145,10 +188,33 @@ def dashboard_view(request):
         entry['tw_tweets'].append(tweet)
         entry['tw_account_id'] = entry['tw_account_id'] or tweet.account.id
 
+    # Check for existing extractions for username cards posts and tweets
+    all_username_post_ids = [post.id for posts in by_username.values() for post in posts['ig_posts']]
+    all_username_tweet_ids = [tweet.id for tweets in by_username.values() for tweet in tweets['tw_tweets']]
+    
+    username_post_extractions = VideoIdeaExtraction.objects.filter(
+        source_type='instagram',
+        source_id__in=all_username_post_ids
+    ).values_list('source_id', flat=True)
+    username_post_extraction_set = set(username_post_extractions)
+    
+    username_tweet_extractions = VideoIdeaExtraction.objects.filter(
+        source_type='twitter',
+        source_id__in=all_username_tweet_ids
+    ).values_list('source_id', flat=True)
+    username_tweet_extraction_set = set(username_tweet_extractions)
+    
     username_cards = []
     for username, data in by_username.items():
         ig_sorted = sorted(data['ig_posts'], key=lambda p: p.taken_at, reverse=True)
         tw_sorted = sorted(data['tw_tweets'], key=lambda t: t.created_at, reverse=True)
+        
+        # Add has_extraction flag to each post and tweet
+        for post in ig_sorted:
+            post.has_extraction = post.id in username_post_extraction_set
+        for tweet in tw_sorted:
+            tweet.has_extraction = tweet.id in username_tweet_extraction_set
+        
         latest_dt = None
         if ig_sorted:
             latest_dt = ig_sorted[0].taken_at
@@ -3582,23 +3648,106 @@ def social_user_analytics_view(request, username):
 @login_required
 def ideas_view(request):
     """
-    Ideas page showing top 5 highest-ranked posts and tweets from recently fetched content.
-    Uses the optimal ranking matrix to identify the best performing content from the last 7 days.
+    Display all extracted AI ideas from video extractions.
+    Shows video_ideas array from all VideoIdeaExtraction records.
+    Supports filtering by source_type and source_id query parameters.
     """
-    # Get top 5 ranked items from recently fetched posts and tweets (last 7 days)
-    top_items = RankingService.get_top_ranked_combined(request.user, limit=5, days_recent=7)
+    # Get filter parameters from query string
+    source_type_filter = request.GET.get('source_type')
+    source_id_filter = request.GET.get('source_id')
     
-    # Check which items already have video idea extractions and add to each item
-    for item in top_items:
-        source_type = item['type']  # 'instagram' or 'twitter'
-        source_id = item['post'].id if source_type == 'instagram' else item['tweet'].id
-        item['has_extraction'] = VideoIdeaExtraction.objects.filter(
-            source_type=source_type,
-            source_id=source_id
-        ).exists()
+    # Get all video idea extractions for the user
+    # Filter by checking if the content_object belongs to user's accounts
+    extractions = VideoIdeaExtraction.objects.filter(
+        source_type='instagram',
+        source_id__in=InstagramPost.objects.filter(account__user=request.user).values_list('id', flat=True)
+    ) | VideoIdeaExtraction.objects.filter(
+        source_type='twitter',
+        source_id__in=TwitterTweet.objects.filter(account__user=request.user).values_list('id', flat=True)
+    )
+    
+    # Apply filters if provided
+    if source_type_filter and source_id_filter:
+        try:
+            source_id_int = int(source_id_filter)
+            extractions = extractions.filter(
+                source_type=source_type_filter,
+                source_id=source_id_int
+            )
+        except ValueError:
+            pass  # Invalid source_id, ignore filter
+    
+    # Order by most recent
+    extractions = extractions.order_by('-extracted_at')
+    
+    # Build list of all ideas with source information
+    all_ideas = []
+    for extraction in extractions:
+        # Get source object
+        if extraction.source_type == 'instagram':
+            try:
+                source_post = InstagramPost.objects.get(id=extraction.source_id, account__user=request.user)
+                source_name = f"@{source_post.account.username}"
+                source_url = source_post.instagram_url
+            except InstagramPost.DoesNotExist:
+                continue
+        else:  # twitter
+            try:
+                source_tweet = TwitterTweet.objects.get(id=extraction.source_id, account__user=request.user)
+                source_name = f"@{source_tweet.account.username}"
+                source_url = source_tweet.twitter_url
+            except TwitterTweet.DoesNotExist:
+                continue
+        
+        # Add each idea from video_ideas array
+        video_ideas = extraction.video_ideas or []
+        for idea in video_ideas:
+            idea_id = idea.get('idea_id', '')
+            # Check if prompt already exists for this idea
+            has_prompt = IdeaVideoPrompt.objects.filter(
+                extraction=extraction,
+                idea_id=idea_id
+            ).exists()
+            
+            all_ideas.append({
+                'idea': idea,
+                'extraction': extraction,
+                'extraction_id': extraction.id,
+                'idea_id': idea_id,
+                'source_type': extraction.source_type,
+                'source_name': source_name,
+                'source_url': source_url,
+                'extracted_at': extraction.extracted_at,
+                'has_prompt': has_prompt,
+            })
+    
+    # Get source info for filtered view
+    filtered_source_info = None
+    if source_type_filter and source_id_filter:
+        try:
+            source_id_int = int(source_id_filter)
+            if source_type_filter == 'instagram':
+                source_post = InstagramPost.objects.filter(id=source_id_int, account__user=request.user).first()
+                if source_post:
+                    filtered_source_info = {
+                        'type': 'instagram',
+                        'name': f"@{source_post.account.username}",
+                        'url': source_post.instagram_url,
+                    }
+            else:  # twitter
+                source_tweet = TwitterTweet.objects.filter(id=source_id_int, account__user=request.user).first()
+                if source_tweet:
+                    filtered_source_info = {
+                        'type': 'twitter',
+                        'name': f"@{source_tweet.account.username}",
+                        'url': source_tweet.twitter_url,
+                    }
+        except ValueError:
+            pass
     
     context = {
-        'top_items': top_items,
+        'all_ideas': all_ideas,
+        'filtered_source_info': filtered_source_info,
     }
     
     return render(request, 'core/ideas.html', context)
@@ -3725,78 +3874,16 @@ def extract_video_idea_view(request):
 
 
 @login_required
-def ai_ideas_view(request):
-    """
-    Display all extracted AI ideas from video extractions.
-    Shows video_ideas array from all VideoIdeaExtraction records.
-    """
-    # Get all video idea extractions for the user
-    # Filter by checking if the content_object belongs to user's accounts
-    extractions = VideoIdeaExtraction.objects.filter(
-        source_type='instagram',
-        source_id__in=InstagramPost.objects.filter(account__user=request.user).values_list('id', flat=True)
-    ) | VideoIdeaExtraction.objects.filter(
-        source_type='twitter',
-        source_id__in=TwitterTweet.objects.filter(account__user=request.user).values_list('id', flat=True)
-    )
-    
-    # Order by most recent
-    extractions = extractions.order_by('-extracted_at')
-    
-    # Build list of all ideas with source information
-    all_ideas = []
-    for extraction in extractions:
-        # Get source object
-        if extraction.source_type == 'instagram':
-            try:
-                source_post = InstagramPost.objects.get(id=extraction.source_id, account__user=request.user)
-                source_name = f"@{source_post.account.username}"
-                source_url = source_post.instagram_url
-            except InstagramPost.DoesNotExist:
-                continue
-        else:  # twitter
-            try:
-                source_tweet = TwitterTweet.objects.get(id=extraction.source_id, account__user=request.user)
-                source_name = f"@{source_tweet.account.username}"
-                source_url = source_tweet.twitter_url
-            except TwitterTweet.DoesNotExist:
-                continue
-        
-        # Add each idea from video_ideas array
-        video_ideas = extraction.video_ideas or []
-        for idea in video_ideas:
-            idea_id = idea.get('idea_id', '')
-            # Check if prompt already exists for this idea
-            has_prompt = IdeaVideoPrompt.objects.filter(
-                extraction=extraction,
-                idea_id=idea_id
-            ).exists()
-            
-            all_ideas.append({
-                'idea': idea,
-                'extraction': extraction,
-                'extraction_id': extraction.id,
-                'idea_id': idea_id,
-                'source_type': extraction.source_type,
-                'source_name': source_name,
-                'source_url': source_url,
-                'extracted_at': extraction.extracted_at,
-                'has_prompt': has_prompt,
-            })
-    
-    context = {
-        'all_ideas': all_ideas,
-    }
-    
-    return render(request, 'core/ai_ideas.html', context)
-
-
-@login_required
 def video_prompts_view(request):
     """
     Display all extracted video prompts from video extractions and idea-generated prompts.
     Shows video_prompt objects from both VideoIdeaExtraction records and IdeaVideoPrompt records.
+    Supports filtering by extraction_id and idea_id query parameters.
     """
+    # Get filter parameters from query string
+    extraction_id_filter = request.GET.get('extraction_id')
+    idea_id_filter = request.GET.get('idea_id')
+    
     # Get all video idea extractions for the user
     extractions = VideoIdeaExtraction.objects.filter(
         source_type='instagram',
@@ -3805,6 +3892,14 @@ def video_prompts_view(request):
         source_type='twitter',
         source_id__in=TwitterTweet.objects.filter(account__user=request.user).values_list('id', flat=True)
     )
+    
+    # Apply extraction filter if provided
+    if extraction_id_filter:
+        try:
+            extraction_id_int = int(extraction_id_filter)
+            extractions = extractions.filter(id=extraction_id_int)
+        except ValueError:
+            pass  # Invalid extraction_id, ignore filter
     
     # Order by most recent
     extractions = extractions.order_by('-extracted_at')
@@ -3813,39 +3908,41 @@ def video_prompts_view(request):
     all_prompts = []
     
     # Add prompts from VideoIdeaExtraction (original extraction prompts)
-    for extraction in extractions:
-        # Get source object
-        if extraction.source_type == 'instagram':
-            try:
-                source_post = InstagramPost.objects.get(id=extraction.source_id, account__user=request.user)
-                source_name = f"@{source_post.account.username}"
-                source_url = source_post.instagram_url
-                source_caption = source_post.caption[:100] if source_post.caption else "No caption"
-            except InstagramPost.DoesNotExist:
-                continue
-        else:  # twitter
-            try:
-                source_tweet = TwitterTweet.objects.get(id=extraction.source_id, account__user=request.user)
-                source_name = f"@{source_tweet.account.username}"
-                source_url = source_tweet.twitter_url
-                source_caption = source_tweet.text[:100] if source_tweet.text else "No text"
-            except TwitterTweet.DoesNotExist:
-                continue
-        
-        # Add video prompt from extraction
-        video_prompt = extraction.video_prompt or {}
-        if video_prompt:  # Only add if prompt exists
-            all_prompts.append({
-                'prompt': video_prompt,
-                'extraction': extraction,
-                'source_type': extraction.source_type,
-                'source_name': source_name,
-                'source_url': source_url,
-                'source_caption': source_caption,
-                'extracted_at': extraction.extracted_at,
-                'best_idea': extraction.best_idea or {},
-                'prompt_type': 'extraction',  # Mark as extraction prompt
-            })
+    # Skip extraction prompts if filtering by idea_id (only show idea-generated prompts in that case)
+    if not idea_id_filter:
+        for extraction in extractions:
+            # Get source object
+            if extraction.source_type == 'instagram':
+                try:
+                    source_post = InstagramPost.objects.get(id=extraction.source_id, account__user=request.user)
+                    source_name = f"@{source_post.account.username}"
+                    source_url = source_post.instagram_url
+                    source_caption = source_post.caption[:100] if source_post.caption else "No caption"
+                except InstagramPost.DoesNotExist:
+                    continue
+            else:  # twitter
+                try:
+                    source_tweet = TwitterTweet.objects.get(id=extraction.source_id, account__user=request.user)
+                    source_name = f"@{source_tweet.account.username}"
+                    source_url = source_tweet.twitter_url
+                    source_caption = source_tweet.text[:100] if source_tweet.text else "No text"
+                except TwitterTweet.DoesNotExist:
+                    continue
+            
+            # Add video prompt from extraction
+            video_prompt = extraction.video_prompt or {}
+            if video_prompt:  # Only add if prompt exists
+                all_prompts.append({
+                    'prompt': video_prompt,
+                    'extraction': extraction,
+                    'source_type': extraction.source_type,
+                    'source_name': source_name,
+                    'source_url': source_url,
+                    'source_caption': source_caption,
+                    'extracted_at': extraction.extracted_at,
+                    'best_idea': extraction.best_idea or {},
+                    'prompt_type': 'extraction',  # Mark as extraction prompt
+                })
     
     # Add prompts from IdeaVideoPrompt (idea-generated prompts)
     idea_prompts = IdeaVideoPrompt.objects.filter(
@@ -3855,6 +3952,17 @@ def video_prompts_view(request):
         source_type='twitter',
         source_id__in=TwitterTweet.objects.filter(account__user=request.user).values_list('id', flat=True)
     )
+    
+    # Apply filters if provided
+    if extraction_id_filter:
+        try:
+            extraction_id_int = int(extraction_id_filter)
+            idea_prompts = idea_prompts.filter(extraction_id=extraction_id_int)
+        except ValueError:
+            pass  # Invalid extraction_id, ignore filter
+    
+    if idea_id_filter:
+        idea_prompts = idea_prompts.filter(idea_id=idea_id_filter)
     
     idea_prompts = idea_prompts.order_by('-generated_at')
     
@@ -3894,8 +4002,30 @@ def video_prompts_view(request):
     # Sort all prompts by date (most recent first)
     all_prompts.sort(key=lambda x: x['extracted_at'], reverse=True)
     
+    # Get filtered idea info if filtering by specific idea
+    filtered_idea_info = None
+    if extraction_id_filter and idea_id_filter:
+        try:
+            extraction_id_int = int(extraction_id_filter)
+            extraction = VideoIdeaExtraction.objects.filter(id=extraction_id_int).first()
+            if extraction:
+                # Find the idea in video_ideas array
+                video_ideas = extraction.video_ideas or []
+                for idea in video_ideas:
+                    if idea.get('idea_id') == idea_id_filter:
+                        filtered_idea_info = {
+                            'title': idea.get('title', 'Untitled Idea'),
+                            'concept': idea.get('concept', ''),
+                        }
+                        break
+        except ValueError:
+            pass  # Invalid extraction_id, ignore filter
+    
     context = {
         'all_prompts': all_prompts,
+        'filtered_idea_info': filtered_idea_info,
+        'extraction_id_filter': extraction_id_filter,
+        'idea_id_filter': idea_id_filter,
     }
     
     return render(request, 'core/video_prompts.html', context)
