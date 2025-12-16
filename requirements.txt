@@ -7,3 +7,5 @@ python-dateutil>=2.8.0
 together>=1.0.0
 google-generativeai>=0.3.0
 gunicorn
+dj-database-url>=2.1.0
+psycopg2-binary>=2.9.9
