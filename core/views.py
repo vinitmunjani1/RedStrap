@@ -3889,7 +3889,7 @@ def extract_video_idea_view(request):
                 return JsonResponse({'error': f"Gemini API error: {result.get('error')}"}, status=500)
             
         except Exception as e:
-            logger.error(f"Error extracting video ideas: {str(e)}")
+            logger.exception(f"Error extracting video ideas: {str(e)}")
             return JsonResponse({'error': f'Failed to extract video ideas: {str(e)}'}, status=500)
         
         # Get ContentType for the source object
@@ -3919,7 +3919,7 @@ def extract_video_idea_view(request):
         })
         
     except Exception as e:
-        logger.error(f"Error in extract_video_idea_view: {str(e)}")
+        logger.exception(f"Error in extract_video_idea_view: {str(e)}")
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 
 
