@@ -85,15 +85,31 @@ WSGI_APPLICATION = 'redstrap_project.wsgi.application'
 # Check for DATABASE_URL environment variable (Railway provides this for PostgreSQL)
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
-if DATABASE_URL:
-    # Use PostgreSQL if DATABASE_URL is provided (Railway production)
-    DATABASES = {
-        "default": dj_database_url.parse(
-            DATABASE_URL,
-            conn_max_age=600,
-            ssl_require=True,
-        )
-    }
+# Check if we're running on Railway (Railway sets RAILWAY_ENVIRONMENT or RAILWAY_DEPLOYMENT_ID)
+IS_RAILWAY = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_DEPLOYMENT_ID"))
+
+# Only use PostgreSQL if:
+# 1. DATABASE_URL is provided AND
+# 2. We're running on Railway (to avoid trying to connect to Railway DB from local machine)
+# OR DATABASE_URL doesn't contain Railway internal hostnames
+if DATABASE_URL and (IS_RAILWAY or "railway.internal" not in DATABASE_URL.lower()):
+    # Use PostgreSQL if DATABASE_URL is provided and we're on Railway or it's a public database
+    try:
+        DATABASES = {
+            "default": dj_database_url.parse(
+                DATABASE_URL,
+                conn_max_age=600,
+                ssl_require=True,
+            )
+        }
+    except Exception:
+        # If parsing fails, fall back to SQLite3
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 else:
     # Fall back to SQLite3 for local development
     DATABASES = {
