@@ -42,6 +42,7 @@ MAX_RETRIES = 3
 RETRY_DELAY = 1.0  # seconds
 NUM_KEYWORDS = 5
 VIDEO_PROMPT_MAX_TOKENS = 2000  # More tokens needed for detailed video prompts
+VIDEO_PROMPT_MAX_CHARS = 2000  # Hard character ceiling to keep responses manageable
 
 
 def extract_keywords_with_together_ai(post_id: str, caption: str) -> List[Dict]:
@@ -211,7 +212,7 @@ def generate_video_prompt_from_idea(idea: Dict) -> Dict:
     mood_impact = idea.get('intended_mood/impact', idea.get('intended_mood', idea.get('impact', '')))
     
     # Build comprehensive prompt for Together AI
-    prompt = f"""You are an expert video prompt engineer specialized in maximum audience engagement and user retention. Generate a professional video generation prompt for a 10 second social media video based on the following creative idea.
+    prompt = f"""You are an expert video prompt engineer specialized in maximum audience engagement and user retention. Generate a professional video generation prompt for a 10 second social media video based on the following creative idea. The video MUST tell a clear, coherent story with meaning that the audience can understand and derive value from.
 
 IDEA DETAILS:
 Title: {idea_title}
@@ -221,21 +222,30 @@ Intended Mood/Impact: {mood_impact}
 
 Generate a detailed video prompt following this exact JSON structure:
 {{
-  "prompt": "A detailed, positive and creative description for a video generator. MUST START WITH A POWERFUL HOOK (first 1-2 seconds) that immediately grabs attention and creates curiosity, intrigue, or emotional connection to maximize user retention. The hook should be visually striking, unexpected, or pose a question that makes viewers want to continue watching. Then include: pacing (fast/slow/medium), visual style (cinematic/realistic/stylized), atmosphere (mood, lighting, colors), camera movements (tracking shots, close-ups, wide angles), product/hook elements, and video timestamps (0-10 seconds). Make it vivid and specific. The opening hook is critical for retention.",
-  "negative_prompt": "Things to avoid: bad quality, blurry, off-topic elements, slow starts, boring openings, generic visuals, etc. Be specific about what NOT to include.",
+  "prompt": "A detailed, positive and creative description for a video generator that tells a COMPLETE STORY with CLEAR MEANING. MUST START WITH A POWERFUL HOOK (first 1-2 seconds) that immediately grabs attention and creates curiosity, intrigue, or emotional connection. The hook should introduce a character, situation, or question that sets up the story. Then the video must progress through a clear narrative arc: establish a goal/challenge, show progression or transformation, and deliver a meaningful resolution or insight that the audience can understand and take away. The story must have visual continuity - the same subject/character throughout, consistent setting, and logical progression. Include: pacing (fast/slow/medium), visual style (cinematic/realistic/stylized), atmosphere (mood, lighting, colors), camera movements (tracking shots, close-ups, wide angles), and video timestamps (0-10 seconds). The story must be self-contained and meaningful - the audience should understand what happened and why it matters. Make it vivid, specific, and emotionally resonant.",
+  "negative_prompt": "Things to avoid: bad quality, blurry, off-topic elements, slow starts, boring openings, generic visuals, random disconnected shots, no story progression, confusing narrative, inconsistent characters/subjects, meaningless visuals, abstract concepts without context, etc. Be specific about what NOT to include.",
   "shot_list": [
-    "[0-2s]: HOOK - Immediate attention-grabbing moment with specific visual details. Camera + lighting + mood.",
-    "[2-4s]: BUILD - Develop action or reveal. Camera + movement + mood.",
-    "[4-6s]: BUILD - Escalate or progress story. Camera + framing + motion.",
-    "[6-8s]: BUILD/TRANSITION - Lead toward resolution. Camera + visual elements.",
-    "[8-10s]: PAYOFF - Resolve or deliver punchline/CTA. Camera + composition."
+    "[0-2s]: HOOK - Introduce the main character/subject and the central question, challenge, or situation. Establish the story's starting point with specific visual details. Camera + lighting + mood.",
+    "[2-4s]: BUILD - Show the character/subject taking action, facing the challenge, or progressing toward a goal. Develop the story with clear visual progression. Camera + movement + mood.",
+    "[4-6s]: BUILD - Escalate the story - show transformation, revelation, or approaching resolution. Maintain visual continuity with the same subject. Camera + framing + motion.",
+    "[6-8s]: TRANSITION - Lead toward the resolution or reveal the outcome. Show the story reaching its climax or turning point. Camera + visual elements.",
+    "[8-10s]: PAYOFF - Deliver the resolution, insight, or meaningful conclusion. The audience should understand the story's message or takeaway. Camera + composition."
   ]
 }}
 
-REQUIREMENTS:
+CRITICAL STORY REQUIREMENTS:
+- The video MUST tell a complete, coherent story with a clear beginning, middle, and end
+- The story must have MEANING - the audience should be able to understand what happened and derive value or insight from it
+- Visual continuity is essential - the same subject/character must appear throughout (or clearly connected elements)
+- Each shot must logically connect to the previous one, building a narrative arc
+- The story should have a clear message, transformation, or resolution that the audience can understand
+- Avoid random, disconnected visuals - every element should serve the story
+- The hook should set up a question or situation that the rest of the video answers or resolves
+- The payoff must deliver a clear conclusion, insight, or emotional resolution
+
+TECHNICAL REQUIREMENTS:
 - The prompt MUST start with an optimal hook (first 1-2 seconds) designed for maximum user retention - this is critical
 - The hook should be visually striking, create curiosity, intrigue, or emotional connection
-- The prompt should be detailed and creative, suitable for AI video generation
 - shot_list must contain exactly 4-6 shots with timestamps
 - Each shot should have a clear timestamp range in format "[X-Ys]:" followed by description
 - CRITICAL: shot_list items must be plain text strings WITHOUT bullet points, numbers, or list markers
@@ -244,7 +254,7 @@ REQUIREMENTS:
 - The first shot (0-2s) MUST be labeled "HOOK"
 - The last shot (8-10s) MUST be labeled "PAYOFF"
 - Middle shots should be labeled "BUILD" or "TRANSITION"
-- Example format: "[0-2s]: HOOK - Immediate attention-grabbing moment..."
+- Each shot description must specify what happens in that moment to advance the story
 - The prompt should capture the mood and visual style described in the idea
 - Negative prompt should list specific things to avoid
 - The opening hook is the most important element for user retention - make it compelling
@@ -267,7 +277,7 @@ Return ONLY the JSON object, no additional text or explanation."""
                         "content": prompt
                     }
                 ],
-                temperature=0.10,  # Slightly higher for more creative prompts
+                temperature=0.01,  # Slightly higher for more creative prompts
                 max_tokens=VIDEO_PROMPT_MAX_TOKENS,
             )
             
@@ -355,6 +365,19 @@ Return ONLY the JSON object, no additional text or explanation."""
                     cleaned_shot_list.append(str(shot))
             
             result['shot_list'] = cleaned_shot_list
+            
+            # Enforce max length on prompt-related fields to avoid oversized responses
+            def _truncate_field(field_name: str, limit: int):
+                val = result.get(field_name)
+                if isinstance(val, str) and len(val) > limit:
+                    truncated = val[:limit].rsplit(' ', 1)[0] or val[:limit]
+                    logger.warning(
+                        f"{field_name} exceeded {limit} chars ({len(val)}). Truncated to {len(truncated)}."
+                    )
+                    result[field_name] = truncated
+
+            _truncate_field('prompt', VIDEO_PROMPT_MAX_CHARS)
+            _truncate_field('negative_prompt', VIDEO_PROMPT_MAX_CHARS)
             
             logger.info(f"Successfully generated video prompt for idea '{idea_title}'")
             return result
