@@ -77,8 +77,8 @@ class InstagramPost(models.Model):
     post_code = models.CharField(max_length=255, blank=True, help_text="Instagram post shortcode for URL")
     caption = models.TextField(blank=True, help_text="Post caption/description")
     taken_at = models.DateTimeField(help_text="When the post was originally created on Instagram")
-    image_url = models.URLField(max_length=500, blank=True, help_text="URL to the post image")
-    video_url = models.URLField(max_length=500, blank=True, help_text="URL to the post video if it's a video")
+    image_url = models.TextField(blank=True, help_text="URL to the post image (unlimited length)")
+    video_url = models.TextField(blank=True, help_text="URL to the post video if it's a video (unlimited length)")
     is_video = models.BooleanField(default=False, help_text="Whether this post is a video")
     is_reel = models.BooleanField(default=False, help_text="Whether this post is a reel (Instagram Reels)")
     is_carousel = models.BooleanField(default=False, help_text="Whether this post is a carousel with multiple media")
@@ -117,8 +117,8 @@ class InstagramCarouselItem(models.Model):
     """
     post = models.ForeignKey(InstagramPost, on_delete=models.CASCADE, related_name='carousel_items')
     item_index = models.IntegerField(help_text="Index of this item in the carousel (0-based)")
-    image_url = models.URLField(max_length=500, blank=True, help_text="URL to the image if this is an image")
-    video_url = models.URLField(max_length=500, blank=True, help_text="URL to the video if this is a video")
+    image_url = models.TextField(blank=True, help_text="URL to the image if this is an image (unlimited length)")
+    video_url = models.TextField(blank=True, help_text="URL to the video if this is a video (unlimited length)")
     is_video = models.BooleanField(default=False, help_text="Whether this carousel item is a video")
     
     class Meta:

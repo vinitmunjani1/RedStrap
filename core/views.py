@@ -1026,13 +1026,6 @@ def _fetch_posts_with_progress(user, task_id):
                             return truncated
                         return caption or ''
                     
-                    def truncate_url(url, max_length=500):
-                        """Truncate URL to fit database constraint."""
-                        if url and len(url) > max_length:
-                            truncated = url[:max_length]
-                            logger.warning(f"Truncated URL from {len(url)} to {max_length} characters")
-                            return truncated
-                        return url or ''
                     
                     for post_data in posts_batch:
                         def safe_bool(value, default=False):
@@ -1048,10 +1041,9 @@ def _fetch_posts_with_progress(user, task_id):
                         
                         is_reel = safe_bool(post_data.get('is_reel'), False)
                         
-                        # Truncate fields to fit database constraints (VARCHAR(500))
+                        # Truncate caption to fit database constraint (VARCHAR(500))
+                        # Note: image_url and video_url are now TEXT fields (unlimited length)
                         caption = truncate_caption(post_data.get('caption', ''))
-                        image_url = truncate_url(post_data.get('image_url', ''))
-                        video_url = truncate_url(post_data.get('video_url', ''))
                         
                         post, created = InstagramPost.objects.update_or_create(
                             account=account,
@@ -1060,8 +1052,8 @@ def _fetch_posts_with_progress(user, task_id):
                                 'post_code': post_data.get('post_code', ''),
                                 'caption': caption,
                                 'taken_at': post_data.get('taken_at'),
-                                'image_url': image_url,
-                                'video_url': video_url,
+                                'image_url': post_data.get('image_url', ''),
+                                'video_url': post_data.get('video_url', ''),
                                 'is_video': safe_bool(post_data.get('is_video'), False),
                                 'is_reel': is_reel,
                                 'is_carousel': safe_bool(post_data.get('is_carousel'), False),
@@ -1402,14 +1394,6 @@ def scrape_instagram_view(request):
                         return truncated
                     return caption or ''
                 
-                def truncate_url(url, max_length=500):
-                    """Truncate URL to fit database constraint."""
-                    if url and len(url) > max_length:
-                        truncated = url[:max_length]
-                        logger.warning(f"Truncated URL from {len(url)} to {max_length} characters")
-                        return truncated
-                    return url or ''
-                
                 for post_data in posts_batch:
                     # Ensure boolean fields are always True/False, not empty dicts or other values
                     def safe_bool(value, default=False):
@@ -1427,10 +1411,9 @@ def scrape_instagram_view(request):
                     # Include both posts and reels - save reels with is_reel=True
                     is_reel = safe_bool(post_data.get('is_reel'), False)
                     
-                    # Truncate fields to fit database constraints (VARCHAR(500))
+                    # Truncate caption to fit database constraint (VARCHAR(500))
+                    # Note: image_url and video_url are now TEXT fields (unlimited length)
                     caption = truncate_caption(post_data.get('caption', ''))
-                    image_url = truncate_url(post_data.get('image_url', ''))
-                    video_url = truncate_url(post_data.get('video_url', ''))
                     
                     post, created = InstagramPost.objects.update_or_create(
                         account=account,
@@ -1439,8 +1422,8 @@ def scrape_instagram_view(request):
                             'post_code': post_data.get('post_code', ''),
                             'caption': caption,
                             'taken_at': post_data.get('taken_at'),
-                            'image_url': image_url,
-                            'video_url': video_url,
+                            'image_url': post_data.get('image_url', ''),
+                            'video_url': post_data.get('video_url', ''),
                             'is_video': safe_bool(post_data.get('is_video'), False),
                             'is_reel': is_reel,  # Save reels with is_reel=True
                             'is_carousel': safe_bool(post_data.get('is_carousel'), False),
@@ -1671,19 +1654,11 @@ def fetch_single_account_posts_view(request, account_id):
                             return truncated
                         return caption or ''
                     
-                    def truncate_url(url, max_length=500):
-                        """Truncate URL to fit database constraint."""
-                        if url and len(url) > max_length:
-                            truncated = url[:max_length]
-                            logger.warning(f"Truncated URL from {len(url)} to {max_length} characters")
-                            return truncated
-                        return url or ''
                     
                     for post_data in posts_batch:
-                        # Truncate fields to fit database constraints (VARCHAR(500))
+                        # Truncate caption to fit database constraint (VARCHAR(500))
+                        # Note: image_url and video_url are now TEXT fields (unlimited length)
                         caption = truncate_caption(post_data.get('caption', ''))
-                        image_url = truncate_url(post_data.get('image_url', ''))
-                        video_url = truncate_url(post_data.get('video_url', ''))
                         
                         post, created = InstagramPost.objects.update_or_create(
                             account=account,
@@ -1692,8 +1667,8 @@ def fetch_single_account_posts_view(request, account_id):
                                 'post_code': post_data.get('post_code', ''),
                                 'caption': caption,
                                 'taken_at': post_data.get('taken_at'),
-                                'image_url': image_url,
-                                'video_url': video_url,
+                                'image_url': post_data.get('image_url', ''),
+                                'video_url': post_data.get('video_url', ''),
                                 'is_video': post_data.get('is_video', False),
                                 'is_reel': post_data.get('is_reel', False),
                                 'is_carousel': post_data.get('is_carousel', False),
@@ -1910,14 +1885,6 @@ def fetch_single_account_posts_view(request, account_id):
                     return truncated
                 return caption or ''
             
-            def truncate_url(url, max_length=500):
-                """Truncate URL to fit database constraint."""
-                if url and len(url) > max_length:
-                    truncated = url[:max_length]
-                    logger.warning(f"Truncated URL from {len(url)} to {max_length} characters")
-                    return truncated
-                return url or ''
-            
             for post_data in posts_batch:
                 def safe_bool(value, default=False):
                     if value is None:
@@ -1932,10 +1899,9 @@ def fetch_single_account_posts_view(request, account_id):
                 
                 is_reel = safe_bool(post_data.get('is_reel'), False)
                 
-                # Truncate fields to fit database constraints (VARCHAR(500))
+                # Truncate caption to fit database constraint (VARCHAR(500))
+                # Note: image_url and video_url are now TEXT fields (unlimited length)
                 caption = truncate_caption(post_data.get('caption', ''))
-                image_url = truncate_url(post_data.get('image_url', ''))
-                video_url = truncate_url(post_data.get('video_url', ''))
                 
                 post, created = InstagramPost.objects.update_or_create(
                     account=account,
@@ -1944,8 +1910,8 @@ def fetch_single_account_posts_view(request, account_id):
                         'post_code': post_data.get('post_code', ''),
                         'caption': caption,
                         'taken_at': post_data.get('taken_at'),
-                        'image_url': image_url,
-                        'video_url': video_url,
+                        'image_url': post_data.get('image_url', ''),
+                        'video_url': post_data.get('video_url', ''),
                         'is_video': safe_bool(post_data.get('is_video'), False),
                         'is_reel': is_reel,
                         'is_carousel': safe_bool(post_data.get('is_carousel'), False),
