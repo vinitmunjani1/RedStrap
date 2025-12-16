@@ -116,7 +116,10 @@ def _make_api_request(url: str, params: Dict, method: str = "GET", max_retries: 
     api_keys = [k for k in api_keys if k]
     
     if not api_keys:
-        logger.error("No Twitter RapidAPI keys configured")
+        error_msg = "No Twitter RapidAPI keys configured. Please check your settings."
+        logger.error(error_msg)
+        logger.error(f"TWITTER_RAPIDAPI_KEYS from settings: {api_keys}")
+        logger.error(f"TWITTER_RAPIDAPI_KEY from settings: {getattr(settings, 'TWITTER_RAPIDAPI_KEY', 'NOT SET')}")
         return None
     
     # Try each API key until one works
@@ -130,10 +133,13 @@ def _make_api_request(url: str, params: Dict, method: str = "GET", max_retries: 
         }
         
         try:
+            # Log API request for debugging (without exposing full API key)
+            logger.info(f"Making Twitter API request to {url} with API key: {api_key[:10]}... (attempt {attempt + 1}/{max_retries})")
+            
             if method.upper() == "GET":
-                response = requests.get(url, params=params, headers=headers, timeout=30)
+                response = requests.get(url, params=params, headers=headers, timeout=60)  # Increased timeout for Railway
             else:
-                response = requests.post(url, json=params, headers=headers, timeout=30)
+                response = requests.post(url, json=params, headers=headers, timeout=60)  # Increased timeout for Railway
             
             # Handle 404 specifically - might mean user doesn't exist or endpoint changed
             if response.status_code == 404:
@@ -214,8 +220,25 @@ def _make_api_request(url: str, params: Dict, method: str = "GET", max_retries: 
             else:
                 logger.error(f"All API key attempts failed for URL: {url} with params: {params}")
                 return None
+        except requests.exceptions.Timeout as e:
+            logger.error(f"Request timeout (60s) for {url} with API key {api_key[:10]}... (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                # Try a different key on next iteration with longer wait
+                time.sleep(2)
+            else:
+                logger.error(f"All Twitter API requests timed out after {max_retries} attempts")
+                return None
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"Connection error for {url} with API key {api_key[:10]}... (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                # Try a different key on next iteration
+                time.sleep(2)
+            else:
+                logger.error(f"All Twitter API requests failed with connection errors after {max_retries} attempts")
+                return None
         except requests.exceptions.RequestException as e:
             logger.warning(f"API request failed with key (attempt {attempt + 1}/{max_retries}): {e}")
+            logger.warning(f"Request type: {type(e).__name__}, URL: {url}")
             if attempt < max_retries - 1:
                 time.sleep(1)
             else:

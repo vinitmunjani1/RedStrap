@@ -200,7 +200,10 @@ def _make_api_request(url: str, payload: Dict, method: str = "POST", max_retries
         api_keys = [getattr(settings, 'RAPIDAPI_KEY', '')]
     
     if not api_keys or not api_keys[0]:
-        logger.error("No RapidAPI keys configured")
+        error_msg = "No RapidAPI keys configured. Please check your settings."
+        logger.error(error_msg)
+        logger.error(f"RAPIDAPI_KEYS from settings: {api_keys}")
+        logger.error(f"RAPIDAPI_KEY from settings: {getattr(settings, 'RAPIDAPI_KEY', 'NOT SET')}")
         return None
     
     # Try each API key until one works
@@ -215,10 +218,13 @@ def _make_api_request(url: str, payload: Dict, method: str = "POST", max_retries
         }
         
         try:
+            # Log API request for debugging (without exposing full API key)
+            logger.info(f"Making API request to {url} with API key: {api_key[:10]}... (attempt {attempt + 1}/{max_retries})")
+            
             if method.upper() == "POST":
-                response = requests.post(url, json=payload, headers=headers, timeout=30)
+                response = requests.post(url, json=payload, headers=headers, timeout=60)  # Increased timeout for Railway
             else:
-                response = requests.get(url, params=payload, headers=headers, timeout=30)
+                response = requests.get(url, params=payload, headers=headers, timeout=60)  # Increased timeout for Railway
             
             # Handle 404 specifically - might mean user doesn't exist or endpoint changed
             if response.status_code == 404:
@@ -277,7 +283,10 @@ def _make_api_request(url: str, payload: Dict, method: str = "POST", max_retries
                 else:
                     logger.error(f"Rate limit exceeded after {max_retries} attempts for URL: {url}")
                     return None
-            logger.warning(f"HTTP error {e.response.status_code} (attempt {attempt + 1}/{max_retries}): {e}")
+            error_msg = f"HTTP error {e.response.status_code} (attempt {attempt + 1}/{max_retries}): {e}"
+            logger.warning(error_msg)
+            if e.response:
+                logger.warning(f"Response text: {e.response.text[:500]}")
             if attempt < max_retries - 1:
                 # Exponential backoff for other errors
                 wait_time = min(2 ** attempt, 10)  # 1s, 2s, 4s, max 10s
@@ -285,8 +294,25 @@ def _make_api_request(url: str, payload: Dict, method: str = "POST", max_retries
             else:
                 logger.error(f"All API key attempts failed for URL: {url} with payload: {payload}")
                 return None
+        except requests.exceptions.Timeout as e:
+            logger.error(f"Request timeout (60s) for {url} with API key {api_key[:10]}... (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                # Try a different key on next iteration with longer wait
+                time.sleep(2)
+            else:
+                logger.error(f"All API requests timed out after {max_retries} attempts")
+                return None
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"Connection error for {url} with API key {api_key[:10]}... (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                # Try a different key on next iteration
+                time.sleep(2)
+            else:
+                logger.error(f"All API requests failed with connection errors after {max_retries} attempts")
+                return None
         except requests.exceptions.RequestException as e:
             logger.warning(f"API request failed with key (attempt {attempt + 1}/{max_retries}): {e}")
+            logger.warning(f"Request type: {type(e).__name__}, URL: {url}")
             if attempt < max_retries - 1:
                 # Try a different key on next iteration
                 time.sleep(1)
