@@ -176,14 +176,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 fullPromptText += decodeUnicodeEscapes(negativePrompt.trim()) + '\n\n';
             }
             
-            // Add shot list (decode Unicode escapes)
+            // Add shot list (decode Unicode escapes) - NO bullet points or numbers
             if (shotListJson && shotListJson.trim() !== '') {
                 // Split by ||| separator (used in template)
                 const shotList = shotListJson.split('|||').filter(shot => shot.trim() !== '');
                 if (shotList.length > 0) {
                     fullPromptText += 'SHOT LIST:\n';
-                    shotList.forEach((shot, index) => {
-                        fullPromptText += `${index + 1}. ${decodeUnicodeEscapes(shot.trim())}\n`;
+                    shotList.forEach((shot) => {
+                        // Remove any existing bullet points or numbers from the shot text
+                        let cleanShot = decodeUnicodeEscapes(shot.trim());
+                        // Remove leading numbers with dots/dashes (e.g., "1.", "1-", "2.", etc.)
+                        cleanShot = cleanShot.replace(/^\d+[\.\-\s]+\s*/, '');
+                        // Remove common bullet markers (•, -, *, +, >, →, etc.)
+                        cleanShot = cleanShot.replace(/^[•\-\*\+\>\→\s]+\s*/, '');
+                        // Remove patterns like "- [timestamp]" or "• [timestamp]" or "1. [timestamp]"
+                        cleanShot = cleanShot.replace(/^[\d\-\•\*\+\>\→\s]*\[/, '[');
+                        // Remove any leading/trailing whitespace
+                        cleanShot = cleanShot.trim();
+                        if (cleanShot) {
+                            fullPromptText += `${cleanShot}\n`;
+                        }
                     });
                 }
             }

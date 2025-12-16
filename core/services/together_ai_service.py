@@ -321,10 +321,12 @@ Return ONLY the JSON object, no additional text or explanation."""
                 if isinstance(shot, str):
                     # Remove common bullet point patterns: "1.", "1-", "- ", "• ", "* ", etc.
                     cleaned = shot.strip()
-                    # Remove leading numbers with dots or dashes (e.g., "1.", "1-", "2.", etc.)
-                    cleaned = re.sub(r'^\d+[\.\-]\s*', '', cleaned)
-                    # Remove common bullet markers
-                    cleaned = re.sub(r'^[•\-\*\+\>\s]+\s*', '', cleaned)
+                    # Remove leading numbers with dots, dashes, or spaces (e.g., "1.", "1-", "1 ", "2.", etc.)
+                    cleaned = re.sub(r'^\d+[\.\-\s]+\s*', '', cleaned)
+                    # Remove common bullet markers (•, -, *, +, >, →, etc.) and Unicode bullets
+                    cleaned = re.sub(r'^[•\-\*\+\>\→\u2022\u2023\u25E6\u2043\u2219\s]+\s*', '', cleaned)
+                    # Remove patterns like "- [timestamp]" or "• [timestamp]" or "1. [timestamp]"
+                    cleaned = re.sub(r'^[\d\-\•\*\+\>\→\s]*\[', '[', cleaned)
                     # Remove any leading/trailing whitespace
                     cleaned = cleaned.strip()
                     if cleaned:
