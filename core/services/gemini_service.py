@@ -12,6 +12,8 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
+# Hard cap on video download size to avoid memory/worker crashes (60 MB)
+MAX_VIDEO_BYTES = 60 * 1024 * 1024  # 60 MB
 
 def convert_video_url_to_mp4_bytes(url):
     """
@@ -53,6 +55,15 @@ def convert_video_url_to_mp4_bytes(url):
         for chunk in response.iter_content(chunk_size=8192):
             if chunk:
                 video_bytes += chunk
+                # Enforce max size to prevent OOM on workers
+                if len(video_bytes) > MAX_VIDEO_BYTES:
+                    logger.error(
+                        f"Video download aborted: size exceeded {MAX_VIDEO_BYTES} bytes "
+                        f"({len(video_bytes)} bytes downloaded) for URL: {url}"
+                    )
+                    raise requests.exceptions.RequestException(
+                        f"Video too large (> {MAX_VIDEO_BYTES // (1024 * 1024)} MB)."
+                    )
         logger.info(f"Video content downloaded ({len(video_bytes)} bytes).")
         return video_bytes
     except requests.exceptions.HTTPError as e:
@@ -68,6 +79,14 @@ def convert_video_url_to_mp4_bytes(url):
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         video_bytes += chunk
+                        if len(video_bytes) > MAX_VIDEO_BYTES:
+                            logger.error(
+                                f"Video download aborted (session): size exceeded {MAX_VIDEO_BYTES} bytes "
+                                f"({len(video_bytes)} bytes downloaded) for URL: {url}"
+                            )
+                            raise requests.exceptions.RequestException(
+                                f"Video too large (> {MAX_VIDEO_BYTES // (1024 * 1024)} MB)."
+                            )
                 logger.info(f"Video content downloaded with session ({len(video_bytes)} bytes).")
                 return video_bytes
             except Exception as e2:
