@@ -14,6 +14,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env_path = BASE_DIR / '.env'
 load_dotenv(dotenv_path=env_path)
 
+# Check if we're running on Railway (Railway sets RAILWAY_ENVIRONMENT or RAILWAY_DEPLOYMENT_ID)
+IS_RAILWAY = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_DEPLOYMENT_ID"))
+
+# If DATABASE_URL contains Railway internal hostname and we're not on Railway, unset it
+# This prevents trying to connect to Railway's internal database from local machine
+if not IS_RAILWAY and os.environ.get("DATABASE_URL") and "railway.internal" in os.environ.get("DATABASE_URL", "").lower():
+    # Remove DATABASE_URL from environment to force SQLite3 usage locally
+    os.environ.pop("DATABASE_URL", None)
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -83,16 +92,20 @@ WSGI_APPLICATION = 'redstrap_project.wsgi.application'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
 # Check for DATABASE_URL environment variable (Railway provides this for PostgreSQL)
+# Note: If it was a Railway internal URL and we're not on Railway, it was already removed above
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
-# Check if we're running on Railway (Railway sets RAILWAY_ENVIRONMENT or RAILWAY_DEPLOYMENT_ID)
-IS_RAILWAY = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_DEPLOYMENT_ID"))
+# Determine if DATABASE_URL contains Railway internal hostname (only accessible from Railway network)
+HAS_RAILWAY_INTERNAL_HOST = bool(DATABASE_URL and "railway.internal" in DATABASE_URL.lower())
 
-# Only use PostgreSQL if:
+# Use PostgreSQL only if:
 # 1. DATABASE_URL is provided AND
-# 2. We're running on Railway (to avoid trying to connect to Railway DB from local machine)
-# OR DATABASE_URL doesn't contain Railway internal hostnames
-if DATABASE_URL and (IS_RAILWAY or "railway.internal" not in DATABASE_URL.lower()):
+# 2. We're running on Railway (Railway environment variables are set) OR
+# 3. DATABASE_URL doesn't contain Railway internal hostnames (public database)
+# Otherwise, use SQLite3 for local development
+USE_POSTGRES = bool(DATABASE_URL and (IS_RAILWAY or not HAS_RAILWAY_INTERNAL_HOST))
+
+if USE_POSTGRES:
     # Use PostgreSQL if DATABASE_URL is provided and we're on Railway or it's a public database
     try:
         DATABASES = {
@@ -112,6 +125,9 @@ if DATABASE_URL and (IS_RAILWAY or "railway.internal" not in DATABASE_URL.lower(
         }
 else:
     # Fall back to SQLite3 for local development
+    # This happens when:
+    # - DATABASE_URL is not set, OR
+    # - DATABASE_URL contains railway.internal but we're not on Railway
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
