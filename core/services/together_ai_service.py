@@ -210,7 +210,7 @@ def generate_video_prompt_from_idea(idea: Dict) -> Dict:
     mood_impact = idea.get('intended_mood/impact', idea.get('intended_mood', idea.get('impact', '')))
     
     # Build comprehensive prompt for Together AI
-    prompt = f"""You are an expert video prompt engineer. Generate a professional video generation prompt for a 10 second social media video based on the following creative idea.
+    prompt = f"""You are an expert video prompt engineer specialized in maximum audiance engagement. Generate a professional video generation prompt for a 10 second social media video based on the following creative idea.
 
 IDEA DETAILS:
 Title: {idea_title}
@@ -223,7 +223,7 @@ Generate a detailed video prompt following this exact JSON structure:
   "prompt": "A detailed, positive and creative description for a video generator. Include: pacing (fast/slow/medium), visual style (cinematic/realistic/stylized), atmosphere (mood, lighting, colors), camera movements (tracking shots, close-ups, wide angles), product/hook elements, and video timestamps (0-10 seconds). Make it vivid and specific.",
   "negative_prompt": "Things to avoid: bad quality, blurry, off-topic elements, etc. Be specific about what NOT to include.",
   "shot_list": [
-    "Shot description with timestamp in seconds (e.g., '0-2s: Close-up of...')",
+    "Shot description with timestamp in seconds (e.g., '[0-2s]: Close-up of...')",
     "Shot description with timestamp in seconds",
     "Shot description with timestamp in seconds",
     "Shot description with timestamp in seconds",
@@ -234,7 +234,7 @@ Generate a detailed video prompt following this exact JSON structure:
 
 REQUIREMENTS:
 - The prompt should be detailed and creative, suitable for AI video generation
-- Include specific timestamps in the shot_list (e.g., "0-2s:", "2-5s:", etc.)
+- Include specific timestamps in the shot_list (e.g., "[0-2s]:", "[2-5s]:", etc.)
 - shot_list must contain exactly 4-6 shots
 - Each shot should have a clear timestamp range
 - The prompt should capture the mood and visual style described in the idea
@@ -258,7 +258,7 @@ Return ONLY the JSON object, no additional text or explanation."""
                         "content": prompt
                     }
                 ],
-                temperature=0.7,  # Slightly higher for more creative prompts
+                temperature=0.10,  # Slightly higher for more creative prompts
                 max_tokens=VIDEO_PROMPT_MAX_TOKENS,
             )
             
