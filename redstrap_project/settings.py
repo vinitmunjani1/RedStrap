@@ -41,9 +41,19 @@ CSRF_TRUSTED_ORIGINS = ["https://redstrap-production.up.railway.app"]
 # Trust proxy HTTPS headers (Railway)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# Secure cookies for HTTPS
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+# Session configuration
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # Use database-backed sessions
+SESSION_COOKIE_SECURE = True  # Only send over HTTPS
+SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access
+SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+SESSION_SAVE_EVERY_REQUEST = False
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
+
+# CSRF configuration
+CSRF_COOKIE_SECURE = True  # Only send over HTTPS
+CSRF_COOKIE_HTTPONLY = False  # Allow JavaScript access for AJAX
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 # Application definition
 
@@ -181,8 +191,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
 
 # Login URLs
 LOGIN_URL = 'login'
