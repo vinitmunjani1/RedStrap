@@ -5,6 +5,7 @@ Uses Together AI's LLM to extract 5 context-aware keywords from captions.
 import json
 import logging
 import os
+import re
 import time
 from typing import List, Dict, Optional
 
@@ -210,7 +211,7 @@ def generate_video_prompt_from_idea(idea: Dict) -> Dict:
     mood_impact = idea.get('intended_mood/impact', idea.get('intended_mood', idea.get('impact', '')))
     
     # Build comprehensive prompt for Together AI
-    prompt = f"""You are an expert video prompt engineer specialized in maximum audiance engagement. Generate a professional video generation prompt for a 10 second social media video based on the following creative idea.
+    prompt = f"""You are an expert video prompt engineer specialized in maximum audience engagement and user retention. Generate a professional video generation prompt for a 10 second social media video based on the following creative idea.
 
 IDEA DETAILS:
 Title: {idea_title}
@@ -220,25 +221,28 @@ Intended Mood/Impact: {mood_impact}
 
 Generate a detailed video prompt following this exact JSON structure:
 {{
-  "prompt": "A detailed, positive and creative description for a video generator. Include: pacing (fast/slow/medium), visual style (cinematic/realistic/stylized), atmosphere (mood, lighting, colors), camera movements (tracking shots, close-ups, wide angles), product/hook elements, and video timestamps (0-10 seconds). Make it vivid and specific.",
-  "negative_prompt": "Things to avoid: bad quality, blurry, off-topic elements, etc. Be specific about what NOT to include.",
+  "prompt": "A detailed, positive and creative description for a video generator. MUST START WITH A POWERFUL HOOK (first 1-2 seconds) that immediately grabs attention and creates curiosity, intrigue, or emotional connection to maximize user retention. The hook should be visually striking, unexpected, or pose a question that makes viewers want to continue watching. Then include: pacing (fast/slow/medium), visual style (cinematic/realistic/stylized), atmosphere (mood, lighting, colors), camera movements (tracking shots, close-ups, wide angles), product/hook elements, and video timestamps (0-10 seconds). Make it vivid and specific. The opening hook is critical for retention.",
+  "negative_prompt": "Things to avoid: bad quality, blurry, off-topic elements, slow starts, boring openings, generic visuals, etc. Be specific about what NOT to include.",
   "shot_list": [
-    "Shot description with timestamp in seconds (e.g., '[0-2s]: Close-up of...')",
-    "Shot description with timestamp in seconds",
-    "Shot description with timestamp in seconds",
-    "Shot description with timestamp in seconds",
-    "Shot description with timestamp in seconds",
-    "Shot description with timestamp in seconds"
+    "[0-2s]: HOOK - Immediate attention-grabbing moment with specific visual details. Camera + lighting + mood.",
+    "[2-4s]: BUILD - Develop action or reveal. Camera + movement + mood.",
+    "[4-6s]: BUILD - Escalate or progress story. Camera + framing + motion.",
+    "[6-8s]: BUILD/TRANSITION - Lead toward resolution. Camera + visual elements.",
+    "[8-10s]: PAYOFF - Resolve or deliver punchline/CTA. Camera + composition."
   ]
 }}
 
 REQUIREMENTS:
+- The prompt MUST start with an optimal hook (first 1-2 seconds) designed for maximum user retention - this is critical
+- The hook should be visually striking, create curiosity, intrigue, or emotional connection
 - The prompt should be detailed and creative, suitable for AI video generation
-- Include specific timestamps in the shot_list (e.g., "[0-2s]:", "[2-5s]:", etc.)
-- shot_list must contain exactly 4-6 shots
-- Each shot should have a clear timestamp range
+- shot_list must contain exactly 4-6 shots with timestamps
+- Each shot should have a clear timestamp range in format "[X-Ys]:" followed by description
+- CRITICAL: shot_list items must be plain text strings WITHOUT bullet points, numbers, or list markers
+- shot_list format should be: "[timestamp]: Description text" (no bullets, no numbers, no dashes)
 - The prompt should capture the mood and visual style described in the idea
 - Negative prompt should list specific things to avoid
+- The opening hook is the most important element for user retention - make it compelling
 
 Return ONLY the JSON object, no additional text or explanation."""
     
@@ -310,6 +314,25 @@ Return ONLY the JSON object, no additional text or explanation."""
             elif len(shot_list) > 6:
                 result['shot_list'] = shot_list[:6]
                 logger.debug(f"Truncated shot_list to 6 items")
+            
+            # Clean up shot_list: Remove bullet points, numbers, and list markers
+            cleaned_shot_list = []
+            for shot in result.get('shot_list', []):
+                if isinstance(shot, str):
+                    # Remove common bullet point patterns: "1.", "1-", "- ", "• ", "* ", etc.
+                    cleaned = shot.strip()
+                    # Remove leading numbers with dots or dashes (e.g., "1.", "1-", "2.", etc.)
+                    cleaned = re.sub(r'^\d+[\.\-]\s*', '', cleaned)
+                    # Remove common bullet markers
+                    cleaned = re.sub(r'^[•\-\*\+\>\s]+\s*', '', cleaned)
+                    # Remove any leading/trailing whitespace
+                    cleaned = cleaned.strip()
+                    if cleaned:
+                        cleaned_shot_list.append(cleaned)
+                else:
+                    cleaned_shot_list.append(str(shot))
+            
+            result['shot_list'] = cleaned_shot_list
             
             logger.info(f"Successfully generated video prompt for idea '{idea_title}'")
             return result
