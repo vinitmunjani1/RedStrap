@@ -1,12 +1,11 @@
 """
 Google Gemini AI service for video idea extraction.
-Handles video downloading, duration calculation, and AI-powered idea generation.
+Handles video downloading and AI-powered idea generation.
+Video duration is determined by the Gemini API response.
 """
 import google.generativeai as genai
 import uuid
 import json
-import cv2
-import numpy as np
 import requests
 import logging
 from django.conf import settings
@@ -80,56 +79,14 @@ def convert_video_url_to_mp4_bytes(url):
         raise
 
 
-def get_video_duration(video_bytes):
-    """
-    Get video duration from video bytes using OpenCV.
-    
-    Args:
-        video_bytes (bytes): Video content as bytes
-    
-    Returns:
-        float: Duration in seconds, or None if unable to determine
-    """
-    try:
-        # Convert bytes to numpy array for OpenCV
-        nparr = np.frombuffer(video_bytes, np.uint8)
-        # Create a temporary file-like object in memory
-        # OpenCV can read from memory using cv2.imdecode for images, but for video
-        # we need to use a different approach - write to temp file or use VideoCapture with bytes
-        # For now, we'll use a workaround: write to temp file
-        import tempfile
-        import os
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
-            tmp_file.write(video_bytes)
-            tmp_path = tmp_file.name
-        
-        try:
-            cap = cv2.VideoCapture(tmp_path)
-            if not cap.isOpened():
-                return None
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-            cap.release()
-            duration = frame_count / fps if fps > 0 else None
-            return duration
-        finally:
-            # Clean up temp file
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
-    except Exception as e:
-        logger.error(f"Error getting video duration: {str(e)}")
-        return None
-
-
-def extract_composite_json(response, duration_for_prompt):
+def extract_composite_json(response):
     """
     Extract and parse JSON from Gemini API response.
     Handles markdown code blocks and ensures all required fields are present.
+    Duration is determined from the Gemini API response.
     
     Args:
         response: Gemini API response object
-        duration_for_prompt (float): Duration value to use as fallback
     
     Returns:
         dict: Parsed JSON response with all required fields
@@ -150,8 +107,9 @@ def extract_composite_json(response, duration_for_prompt):
             va = composite["video_analysis"]
             if not va.get("id"):
                 va["id"] = str(uuid.uuid4())
+            # Duration should be provided by Gemini API, use 0 as fallback if missing
             if not va.get("duration"):
-                va["duration"] = duration_for_prompt
+                va["duration"] = 0.0
         if "video_ideas" in composite:
             for idea in composite["video_ideas"]:
                 if not idea.get("idea_id"):
@@ -177,7 +135,7 @@ def extract_video_ideas(video_bytes, caption, duration=None):
     Args:
         video_bytes (bytes): Video content as bytes
         caption (str): Post/tweet caption for additional context
-        duration (float, optional): Video duration in seconds. If not provided, will be calculated.
+        duration (float, optional): Video duration in seconds. If not provided, Gemini will determine it from the video.
     
     Returns:
         dict: Structured response containing:
@@ -198,14 +156,11 @@ def extract_video_ideas(video_bytes, caption, duration=None):
     # Configure Gemini API
     genai.configure(api_key=api_key)
     
-    # Get video duration if not provided
-    if duration is None:
-        duration = get_video_duration(video_bytes)
-    
-    duration_for_prompt = round(duration or 0, 2)
-    
     # Build prompt with caption context
     caption_context = f"\n\nAdditional context from the caption: {caption}" if caption else ""
+    
+    # If duration is provided, include it as a reference; otherwise let Gemini determine it
+    duration_reference = f"\n   - duration: use this value if you cannot determine or as a reference: {round(duration, 2)}" if duration else "\n   - duration: determine the video duration in seconds from the video content"
     
     single_prompt = f"""
 You are an expert in video analysis and creative video concept generation.
@@ -214,8 +169,7 @@ Given the following video input (mp4, content provided), please:
 
 1. ** Deeply Analyze the video context of the video and the caption ** and output a JSON object with:
    - id: unique uuid4
-   - title: concise and descriptive
-   - duration: use this value if you cannot determine or as a reference: {duration_for_prompt}
+   - title: concise and descriptive{duration_reference}
    - keywords: a list of exactly 5 highly relevant keywords
    - context: a detailed, multi-sentence description of what happens in the video
    - transcript: a complete audio transcript; if no speech is present, use "No speech/audio detected"
@@ -266,7 +220,7 @@ RESPONSE MUST BE STRICT VALID JSON. DO NOT add explanations, notes, or any pream
         )
         
         # Extract and parse JSON response
-        full_result_json = extract_composite_json(response, duration_for_prompt)
+        full_result_json = extract_composite_json(response)
         
         # Check for errors in response
         if "error" in full_result_json:
