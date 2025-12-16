@@ -1018,6 +1018,14 @@ def _fetch_posts_with_progress(user, task_id):
                     nonlocal account_saved_count, account_new_posts
                     batch_new_posts = 0
                     
+                    def truncate_caption(caption, max_length=500):
+                        """Truncate caption to fit database constraint."""
+                        if caption and len(caption) > max_length:
+                            truncated = caption[:max_length]
+                            logger.warning(f"Truncated caption from {len(caption)} to {max_length} characters")
+                            return truncated
+                        return caption or ''
+                    
                     for post_data in posts_batch:
                         def safe_bool(value, default=False):
                             if value is None:
@@ -1032,12 +1040,15 @@ def _fetch_posts_with_progress(user, task_id):
                         
                         is_reel = safe_bool(post_data.get('is_reel'), False)
                         
+                        # Truncate caption to fit database constraint (VARCHAR(500))
+                        caption = truncate_caption(post_data.get('caption', ''))
+                        
                         post, created = InstagramPost.objects.update_or_create(
                             account=account,
                             post_id=post_data['post_id'],
                             defaults={
                                 'post_code': post_data.get('post_code', ''),
-                                'caption': post_data.get('caption', ''),
+                                'caption': caption,
                                 'taken_at': post_data.get('taken_at'),
                                 'image_url': post_data.get('image_url', ''),
                                 'video_url': post_data.get('video_url', ''),
@@ -1373,6 +1384,14 @@ def scrape_instagram_view(request):
                 """Save a batch of posts (including reels) to database immediately after API call."""
                 nonlocal saved_count, skipped_reels, new_posts_for_keywords, all_new_posts
                 
+                def truncate_caption(caption, max_length=500):
+                    """Truncate caption to fit database constraint."""
+                    if caption and len(caption) > max_length:
+                        truncated = caption[:max_length]
+                        logger.warning(f"Truncated caption from {len(caption)} to {max_length} characters")
+                        return truncated
+                    return caption or ''
+                
                 for post_data in posts_batch:
                     # Ensure boolean fields are always True/False, not empty dicts or other values
                     def safe_bool(value, default=False):
@@ -1390,12 +1409,15 @@ def scrape_instagram_view(request):
                     # Include both posts and reels - save reels with is_reel=True
                     is_reel = safe_bool(post_data.get('is_reel'), False)
                     
+                    # Truncate caption to fit database constraint (VARCHAR(500))
+                    caption = truncate_caption(post_data.get('caption', ''))
+                    
                     post, created = InstagramPost.objects.update_or_create(
                         account=account,
                         post_id=post_data['post_id'],
                         defaults={
                             'post_code': post_data.get('post_code', ''),
-                            'caption': post_data.get('caption', ''),
+                            'caption': caption,
                             'taken_at': post_data.get('taken_at'),
                             'image_url': post_data.get('image_url', ''),
                             'video_url': post_data.get('video_url', ''),
@@ -1621,13 +1643,24 @@ def fetch_single_account_posts_view(request, account_id):
                     nonlocal account_saved_count, account_new_posts
                     batch_new_posts = 0
                     
+                    def truncate_caption(caption, max_length=500):
+                        """Truncate caption to fit database constraint."""
+                        if caption and len(caption) > max_length:
+                            truncated = caption[:max_length]
+                            logger.warning(f"Truncated caption from {len(caption)} to {max_length} characters")
+                            return truncated
+                        return caption or ''
+                    
                     for post_data in posts_batch:
+                        # Truncate caption to fit database constraint (VARCHAR(500))
+                        caption = truncate_caption(post_data.get('caption', ''))
+                        
                         post, created = InstagramPost.objects.update_or_create(
                             account=account,
                             post_id=post_data['post_id'],
                             defaults={
                                 'post_code': post_data.get('post_code', ''),
-                                'caption': post_data.get('caption', ''),
+                                'caption': caption,
                                 'taken_at': post_data.get('taken_at'),
                                 'image_url': post_data.get('image_url', ''),
                                 'video_url': post_data.get('video_url', ''),
@@ -1853,12 +1886,15 @@ def fetch_single_account_posts_view(request, account_id):
                 
                 is_reel = safe_bool(post_data.get('is_reel'), False)
                 
+                # Truncate caption to fit database constraint (VARCHAR(500))
+                caption = truncate_caption(post_data.get('caption', ''))
+                
                 post, created = InstagramPost.objects.update_or_create(
                     account=account,
                     post_id=post_data['post_id'],
                     defaults={
                         'post_code': post_data.get('post_code', ''),
-                        'caption': post_data.get('caption', ''),
+                        'caption': caption,
                         'taken_at': post_data.get('taken_at'),
                         'image_url': post_data.get('image_url', ''),
                         'video_url': post_data.get('video_url', ''),
