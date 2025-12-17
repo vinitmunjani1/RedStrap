@@ -38,6 +38,7 @@ except ImportError:
 
 # Configuration
 MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+#MODEL_NAME = "Qwen/Qwen3-Next-80B-A3B-Thinking"
 MAX_RETRIES = 3
 RETRY_DELAY = 1.0  # seconds
 NUM_KEYWORDS = 5
@@ -98,7 +99,7 @@ Return only the JSON object, no additional text or explanation."""
                         "content": prompt
                     }
                 ],
-                temperature=0.3,  # Lower temperature for more consistent results
+                temperature=0.2,  # Lower temperature for more consistent results
                 max_tokens=200,  # Enough for JSON response
             )   
             

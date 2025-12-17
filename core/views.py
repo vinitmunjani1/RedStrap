@@ -4047,6 +4047,7 @@ def video_prompts_view(request):
             'best_idea': {'title': idea_prompt.idea_title},  # Use idea title as best idea
             'prompt_type': 'idea',  # Mark as idea-generated prompt
             'idea_title': idea_prompt.idea_title,
+            'idea_prompt_id': idea_prompt.id,  # ID for deletion
         })
     
     # Sort all prompts by date (most recent first)
@@ -4155,5 +4156,85 @@ def generate_idea_video_prompt_view(request):
         
     except Exception as e:
         logger.error(f"Error in generate_idea_video_prompt_view: {str(e)}")
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_video_prompt_view(request):
+    """
+    Delete a video prompt.
+    
+    Accepts POST request with:
+    - prompt_type: 'idea' or 'extraction'
+    - prompt_id: ID of IdeaVideoPrompt (for idea prompts)
+    - extraction_id: ID of VideoIdeaExtraction (for extraction prompts)
+    
+    Returns JSON response with success/error status.
+    """
+    try:
+        prompt_type = request.POST.get('prompt_type')
+        
+        if prompt_type == 'idea':
+            # Delete IdeaVideoPrompt
+            prompt_id = request.POST.get('prompt_id')
+            if not prompt_id:
+                return JsonResponse({'error': 'Missing prompt_id'}, status=400)
+            
+            try:
+                prompt_id = int(prompt_id)
+            except ValueError:
+                return JsonResponse({'error': 'Invalid prompt_id. Must be an integer'}, status=400)
+            
+            # Get the prompt and verify ownership
+            idea_prompt = get_object_or_404(IdeaVideoPrompt, id=prompt_id)
+            
+            # Verify user owns the source post/tweet
+            if idea_prompt.source_type == 'instagram':
+                post = get_object_or_404(InstagramPost, id=idea_prompt.source_id, account__user=request.user)
+            else:  # twitter
+                tweet = get_object_or_404(TwitterTweet, id=idea_prompt.source_id, account__user=request.user)
+            
+            # Delete the prompt
+            idea_prompt.delete()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Prompt deleted successfully'
+            })
+            
+        elif prompt_type == 'extraction':
+            # Clear video_prompt from VideoIdeaExtraction
+            extraction_id = request.POST.get('extraction_id')
+            if not extraction_id:
+                return JsonResponse({'error': 'Missing extraction_id'}, status=400)
+            
+            try:
+                extraction_id = int(extraction_id)
+            except ValueError:
+                return JsonResponse({'error': 'Invalid extraction_id. Must be an integer'}, status=400)
+            
+            # Get the extraction and verify ownership
+            extraction = get_object_or_404(VideoIdeaExtraction, id=extraction_id)
+            
+            # Verify user owns the source post/tweet
+            if extraction.source_type == 'instagram':
+                post = get_object_or_404(InstagramPost, id=extraction.source_id, account__user=request.user)
+            else:  # twitter
+                tweet = get_object_or_404(TwitterTweet, id=extraction.source_id, account__user=request.user)
+            
+            # Clear the video_prompt field
+            extraction.video_prompt = None
+            extraction.save()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Prompt deleted successfully'
+            })
+        else:
+            return JsonResponse({'error': 'Invalid prompt_type. Must be "idea" or "extraction"'}, status=400)
+        
+    except Exception as e:
+        logger.error(f"Error in delete_video_prompt_view: {str(e)}")
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 
