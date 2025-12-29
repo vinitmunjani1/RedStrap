@@ -4238,3 +4238,78 @@ def delete_video_prompt_view(request):
         logger.error(f"Error in delete_video_prompt_view: {str(e)}")
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 
+
+@login_required
+@require_http_methods(["POST"])
+def edit_video_prompt_view(request):
+    """
+    Edit an existing video prompt.
+    
+    Accepts POST request with:
+    - prompt_type: 'idea' or 'extraction'
+    - prompt_id: ID of IdeaVideoPrompt (for idea prompts)
+    - extraction_id: ID of VideoIdeaExtraction (for extraction prompts)
+    - prompt: The main video prompt text
+    - negative_prompt: The negative prompt text
+    - shot_list: Newline-separated shot list
+    
+    Returns JSON response with success/error status.
+    """
+    try:
+        prompt_type = request.POST.get('prompt_type')
+        prompt_text = request.POST.get('prompt', '')
+        negative_prompt = request.POST.get('negative_prompt', '')
+        shot_list_raw = request.POST.get('shot_list', '')
+        
+        # Parse shot list from newline-separated text
+        shot_list = [shot.strip() for shot in shot_list_raw.split('\n') if shot.strip()]
+        
+        updated_data = {
+            'prompt': prompt_text,
+            'negative_prompt': negative_prompt,
+            'shot_list': shot_list
+        }
+        
+        if prompt_type == 'idea':
+            prompt_id = request.POST.get('prompt_id')
+            if not prompt_id:
+                return JsonResponse({'error': 'Missing prompt_id'}, status=400)
+            
+            idea_prompt = get_object_or_404(IdeaVideoPrompt, id=prompt_id)
+            
+            # Verify ownership
+            if idea_prompt.source_type == 'instagram':
+                get_object_or_404(InstagramPost, id=idea_prompt.source_id, account__user=request.user)
+            else:
+                get_object_or_404(TwitterTweet, id=idea_prompt.source_id, account__user=request.user)
+                
+            idea_prompt.video_prompt = updated_data
+            idea_prompt.save()
+            
+        elif prompt_type == 'extraction':
+            extraction_id = request.POST.get('extraction_id')
+            if not extraction_id:
+                return JsonResponse({'error': 'Missing extraction_id'}, status=400)
+                
+            extraction = get_object_or_404(VideoIdeaExtraction, id=extraction_id)
+            
+            # Verify ownership
+            if extraction.source_type == 'instagram':
+                get_object_or_404(InstagramPost, id=extraction.source_id, account__user=request.user)
+            else:
+                get_object_or_404(TwitterTweet, id=extraction.source_id, account__user=request.user)
+                
+            extraction.video_prompt = updated_data
+            extraction.save()
+        else:
+            return JsonResponse({'error': 'Invalid prompt_type'}, status=400)
+            
+        return JsonResponse({
+            'success': True,
+            'message': 'Prompt updated successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in edit_video_prompt_view: {str(e)}")
+        return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
+

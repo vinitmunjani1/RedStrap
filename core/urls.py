@@ -60,5 +60,6 @@ urlpatterns = [
     path('ai-ideas/generate-prompt/', views.generate_idea_video_prompt_view, name='generate_idea_video_prompt'),
     path('video-prompts/', views.video_prompts_view, name='video_prompts'),
     path('video-prompts/delete/', views.delete_video_prompt_view, name='delete_video_prompt'),
+    path('video-prompts/edit/', views.edit_video_prompt_view, name='edit_video_prompt'),
 ]
 
