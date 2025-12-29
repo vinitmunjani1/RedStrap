@@ -2,16 +2,33 @@
 
 {% block title %}Video Prompts - REDSTRAP{% endblock %}
 
+{% block extra_css %}
+<style>
+    .form-control:focus {
+        background-color: #161d31 !important;
+        border-color: #7367f0 !important;
+        color: #d0d2d6 !important;
+        box-shadow: none !important;
+    }
+
+    .char-counter {
+        font-size: 0.75rem;
+        transition: color 0.3s ease;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             {% if filtered_idea_info %}
-                <h1 class="mb-1"><i class="bi bi-camera-video text-info"></i> Prompt for "{{ filtered_idea_info.title }}"</h1>
-                <p class="text-muted mb-0">Video prompt generated for this specific idea</p>
+            <h1 class="mb-1"><i class="bi bi-camera-video text-info"></i> Prompt for "{{ filtered_idea_info.title }}"
+            </h1>
+            <p class="text-muted mb-0">Video prompt generated for this specific idea</p>
             {% else %}
-                <h1 class="mb-1"><i class="bi bi-camera-video text-info"></i> Video Prompts</h1>
-                <p class="text-muted mb-0">AI-generated video prompts for creating new social media content</p>
+            <h1 class="mb-1"><i class="bi bi-camera-video text-info"></i> Video Prompts</h1>
+            <p class="text-muted mb-0">AI-generated video prompts for creating new social media content</p>
             {% endif %}
         </div>
         {% if filtered_idea_info %}
@@ -22,208 +39,260 @@
     </div>
 
     {% if all_prompts %}
-        <div class="row g-4">
-            {% for item in all_prompts %}
-                <div class="col-12 col-lg-6">
-                    <div class="card h-100 bg-transparent border" style="border-color: var(--glass-border);">
-                        <div class="card-header d-flex justify-content-between align-items-center" style="background: var(--vuexy-dark-bg); border-bottom: 1px solid var(--vuexy-border);">
-                            <div class="d-flex align-items-center gap-2">
-                                {% if item.source_type == 'instagram' %}
-                                    <i class="bi bi-instagram text-danger"></i>
-                                {% else %}
-                                    <i class="bi bi-twitter text-info"></i>
-                                {% endif %}
-                                <span class="fw-semibold text-white">{{ item.source_type|title }}</span>
-                            </div>
-                            <small class="text-muted">{{ item.extracted_at|date:"M d, Y" }}</small>
+    <div class="row g-4">
+        {% for item in all_prompts %}
+        <div class="col-12 col-lg-6">
+            <div class="card h-100 bg-transparent border" style="border-color: var(--glass-border);">
+                <div class="card-header d-flex justify-content-between align-items-center"
+                    style="background: var(--vuexy-dark-bg); border-bottom: 1px solid var(--vuexy-border);">
+                    <div class="d-flex align-items-center gap-2">
+                        {% if item.source_type == 'instagram' %}<i class="bi bi-instagram text-danger"></i>{% else %}<i
+                            class="bi bi-twitter text-info"></i>{% endif %}
+                        <span class="fw-semibold text-white">{{ item.source_type|title }}</span>
+                    </div>
+                    <small class="text-muted">{{ item.extracted_at|date:"M d, Y" }}</small>
+                </div>
+
+                <div class="card-body">
+                    <div class="mb-3">
+                        <small class="text-muted">Source:</small>
+                        <a href="{{ item.source_url }}" target="_blank" class="text-info text-decoration-none">{{ item.source_name }}</a>
+                        <p class="small text-muted mb-0 mt-1">{{ item.source_caption|truncatewords:20 }}</p>
+                    </div>
+
+                    {% if item.best_idea.title or item.idea_title %}
+                    <div class="mb-3 p-3 rounded"
+                        style="background: rgba(115, 103, 240, 0.1); border-left: 3px solid var(--vuexy-primary);">
+                        <h6 class="text-white mb-2">
+                            <i class="bi bi-star-fill text-warning"></i>
+                            {% if item.prompt_type == 'idea' %}Idea: {{ item.idea_title }}{% else %}Best Idea: {{ item.best_idea.title }}{% endif %}
+                        </h6>
+                        {% if item.best_idea.concept %}<p class="small text-muted mb-0">{{ item.best_idea.concept }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Positive Prompt Section -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="text-white mb-0"><i class="bi bi-pencil-fill text-primary"></i> Positive Prompt
+                            </h6>
+                            <button type="button" class="btn btn-sm btn-link text-info p-0 copy-positive-btn"
+                                data-prompt-text="{{ item.prompt.prompt|default:'' }}"
+                                data-aperture="{{ item.prompt.camera_settings.aperture|default:'' }}"
+                                data-focus="{{ item.prompt.camera_settings.focus|default:'' }}"
+                                data-lighting="{{ item.prompt.camera_settings.lighting|default:'' }}"
+                                data-movement="{{ item.prompt.camera_settings.movement|default:'' }}"
+                                data-lens="{{ item.prompt.camera_settings.lens|default:'' }}"
+                                data-shot-list="{% if item.prompt.shot_list %}{% for shot in item.prompt.shot_list %}{{ shot }}{% if not forloop.last %}&#10;{% endif %}{% endfor %}{% endif %}"
+                                title="Copy positive prompt, camera settings, and shot list">
+                                <i class="bi bi-clipboard"></i> Copy Positive
+                            </button>
                         </div>
-                        
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <small class="text-muted">Source:</small>
-                                <a href="{{ item.source_url }}" target="_blank" class="text-info text-decoration-none">
-                                    {{ item.source_name }}
-                                </a>
-                                <p class="small text-muted mb-0 mt-1">{{ item.source_caption|truncatewords:20 }}</p>
-                            </div>
-                            
-                            {% if item.best_idea.title or item.idea_title %}
-                            <div class="mb-3 p-3 rounded" style="background: rgba(115, 103, 240, 0.1); border-left: 3px solid var(--vuexy-primary);">
-                                <h6 class="text-white mb-2">
-                                    <i class="bi bi-star-fill text-warning"></i> 
-                                    {% if item.prompt_type == 'idea' %}
-                                        Idea: {{ item.idea_title }}
-                                    {% else %}
-                                        Best Idea: {{ item.best_idea.title }}
-                                    {% endif %}
-                                </h6>
-                                {% if item.best_idea.concept %}
-                                <p class="small text-muted mb-0">{{ item.best_idea.concept }}</p>
-                                {% endif %}
+                        <div class="p-3 rounded"
+                            style="background: rgba(115, 103, 240, 0.05); border: 1px solid var(--vuexy-border);">
+                            <p class="text-white small mb-2">{{ item.prompt.prompt|default:"No prompt provided" }}</p>
+
+                            <!-- Camera Settings Badge/List -->
+                            {% if item.prompt.camera_settings %}
+                            <div class="d-flex flex-wrap gap-1 mt-2 mb-3">
+                                {% if item.prompt.camera_settings.aperture %}<span
+                                    class="badge bg-dark border border-secondary text-muted smaller">Aperture: {{ item.prompt.camera_settings.aperture|default:"None" }}</span>{% endif %}
+                                {% if item.prompt.camera_settings.focus %}<span
+                                    class="badge bg-dark border border-secondary text-muted smaller">Focus: {{ item.prompt.camera_settings.focus|default:"None" }}</span>{% endif %}
+                                {% if item.prompt.camera_settings.lighting %}<span
+                                    class="badge bg-dark border border-secondary text-muted smaller">Lighting: {{ item.prompt.camera_settings.lighting|default:"None" }}</span>{% endif %}
+                                {% if item.prompt.camera_settings.movement %}<span
+                                    class="badge bg-dark border border-secondary text-muted smaller">Movement: {{ item.prompt.camera_settings.movement|default:"None" }}</span>{% endif %}
+                                {% if item.prompt.camera_settings.lens %}<span
+                                    class="badge bg-dark border border-secondary text-muted smaller">Lens: {{ item.prompt.camera_settings.lens|default:"None" }}</span>{% endif %}
                             </div>
                             {% endif %}
-                            
-                            <div class="mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="text-white mb-0">
-                                        <i class="bi bi-pencil"></i> Video Prompt
-                                    </h6>
-                                    <div class="d-flex gap-2">
-                                        <button 
-                                            type="button" 
-                                            class="btn btn-sm btn-outline-primary copy-prompt-btn" 
-                                            data-prompt-text="{{ item.prompt.prompt|default:''|escapejs }}"
-                                            data-negative-prompt="{{ item.prompt.negative_prompt|default:''|escapejs }}"
-                                            {% if item.prompt.shot_list %}
-                                            data-shot-list="{% for shot in item.prompt.shot_list %}{{ shot|escapejs }}{% if not forloop.last %}|||{% endif %}{% endfor %}"
-                                            {% else %}
-                                            data-shot-list=""
-                                            {% endif %}
-                                            title="Copy full prompt to clipboard"
-                                        >
-                                            <i class="bi bi-clipboard"></i> Copy
-                                        </button>
-                                        <button 
-                                            type="button" 
-                                            class="btn btn-sm btn-outline-info edit-prompt-btn" 
-                                            data-prompt-type="{% if item.prompt_type == 'idea' %}idea{% else %}extraction{% endif %}"
-                                            data-prompt-id="{{ item.idea_prompt_id|default:'' }}"
-                                            data-extraction-id="{{ item.extraction.id|default:'' }}"
-                                            data-prompt-text="{{ item.prompt.prompt|default:'' }}"
-                                            data-negative-prompt="{{ item.prompt.negative_prompt|default:'' }}"
-                                            data-shot-list="{% if item.prompt.shot_list %}{% for shot in item.prompt.shot_list %}{{ shot }}{% if not forloop.last %}&#10;{% endif %}{% endfor %}{% endif %}"
-                                            title="Edit this prompt"
-                                        >
-                                            <i class="bi bi-pencil-square"></i> Edit
-                                        </button>
-                                        {% if item.prompt_type == 'idea' %}
-                                        <button 
-                                            type="button" 
-                                            class="btn btn-sm btn-outline-danger delete-prompt-btn" 
-                                            data-prompt-type="idea"
-                                            data-prompt-id="{{ item.idea_prompt_id|default:'' }}"
-                                            data-idea-title="{{ item.idea_title|default:'this prompt'|escapejs }}"
-                                            title="Delete this prompt"
-                                        >
-                                            <i class="bi bi-trash"></i> Delete
-                                        </button>
-                                        {% else %}
-                                        <button 
-                                            type="button" 
-                                            class="btn btn-sm btn-outline-danger delete-prompt-btn" 
-                                            data-prompt-type="extraction"
-                                            data-extraction-id="{{ item.extraction.id|default:'' }}"
-                                            title="Delete extraction prompt"
-                                        >
-                                            <i class="bi bi-trash"></i> Delete
-                                        </button>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                <div class="p-3 rounded" style="background: var(--vuexy-darker-bg); border: 1px solid var(--vuexy-border);">
-                                    <p class="text-white small mb-0" id="prompt-text-{{ forloop.counter }}">{{ item.prompt.prompt|default:"No prompt provided" }}</p>
-                                </div>
-                            </div>
-                            
-                            {% if item.prompt.negative_prompt %}
-                            <div class="mb-3">
-                                <h6 class="text-white mb-2">
-                                    <i class="bi bi-x-circle"></i> Negative Prompt
-                                </h6>
-                                <div class="p-3 rounded" style="background: rgba(234, 84, 85, 0.1); border: 1px solid rgba(234, 84, 85, 0.3);">
-                                    <p class="text-muted small mb-0">{{ item.prompt.negative_prompt }}</p>
-                                </div>
-                            </div>
-                            {% endif %}
-                            
+
+                            <!-- Shot List -->
                             {% if item.prompt.shot_list %}
-                            <div class="mb-3">
-                                <h6 class="text-white mb-2">
-                                    <i class="bi bi-list-ul"></i> Shot List
-                                </h6>
-                                <ul class="list-unstyled">
+                            <div class="mt-3 pt-3 border-top" style="border-color: rgba(255,255,255,0.05);">
+                                <h6 class="text-white small mb-2"><i class="bi bi-list-ul"></i> Shot List</h6>
+                                <ul class="list-unstyled mb-0">
                                     {% for shot in item.prompt.shot_list %}
-                                        <li class="mb-2">
-                                            <div class="d-flex align-items-start gap-2">
-                                                <span class="badge bg-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 24px; height: 24px; font-size: 0.7rem; flex-shrink: 0;">{{ forloop.counter }}</span>
-                                                <span class="text-muted small">{{ shot }}</span>
-                                            </div>
-                                        </li>
+                                    <li class="mb-1">
+                                        <div class="d-flex align-items-start gap-2">
+                                            <span
+                                                class="badge bg-primary rounded-circle d-flex align-items-center justify-content-center"
+                                                style="width: 18px; height: 18px; font-size: 0.6rem; flex-shrink: 0;">{{forloop.counter }}</span>
+                                            <span class="text-muted smaller">{{ shot }}</span>
+                                        </div>
+                                    </li>
                                     {% endfor %}
                                 </ul>
                             </div>
                             {% endif %}
-                            
-                            <div class="mt-auto pt-3 border-top" style="border-color: var(--vuexy-border);">
-                                <small class="text-muted">
-                                    <i class="bi bi-clock"></i> Extracted {{ item.extracted_at|timesince }} ago
-                                </small>
-                            </div>
                         </div>
                     </div>
+
+                    <!-- Negative Prompt Section -->
+                    {% if item.prompt.negative_prompt %}
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="text-white mb-0"><i class="bi bi-x-circle-fill text-danger"></i> Negative Prompt
+                            </h6>
+                            <button type="button" class="btn btn-sm btn-link text-info p-0 copy-negative-btn"
+                                data-negative-prompt="{{ item.prompt.negative_prompt|default:'' }}"
+                                title="Copy negative prompt">
+                                <i class="bi bi-clipboard"></i> Copy Negative
+                            </button>
+                        </div>
+                        <div class="p-3 rounded"
+                            style="background: rgba(234, 84, 85, 0.05); border: 1px solid rgba(234, 84, 85, 0.2);">
+                            <p class="text-muted small mb-0">{{ item.prompt.negative_prompt }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Action Buttons -->
+                    <div class="d-flex gap-2 mb-3 mt-auto">
+                        <button type="button" class="btn btn-sm btn-outline-info edit-prompt-btn flex-grow-1"
+                            data-prompt-type="{% if item.prompt_type == 'idea' %}idea{% else %}extraction{% endif %}"
+                            data-prompt-id="{{ item.idea_prompt_id|default:'' }}"
+                            data-extraction-id="{{ item.extraction.id|default:'' }}"
+                            data-prompt-text="{{ item.prompt.prompt|default:'' }}"
+                            data-negative-prompt="{{ item.prompt.negative_prompt|default:'' }}"
+                            data-aperture="{{ item.prompt.camera_settings.aperture|default:'' }}"
+                            data-focus="{{ item.prompt.camera_settings.focus|default:'' }}"
+                            data-lighting="{{ item.prompt.camera_settings.lighting|default:'' }}"
+                            data-movement="{{ item.prompt.camera_settings.movement|default:'' }}"
+                            data-lens="{{ item.prompt.camera_settings.lens|default:'' }}"
+                            data-shot-list="{% if item.prompt.shot_list %}{% for shot in item.prompt.shot_list %}{{ shot }}{% if not forloop.last %}&#10;{% endif %}{% endfor %}{% endif %}"
+                            title="Edit this prompt">
+                            <i class="bi bi-pencil-square"></i> Edit Prompt
+                        </button>
+
+                        {% if item.prompt_type == 'idea' %}
+                        <button type="button" class="btn btn-sm btn-outline-danger delete-prompt-btn"
+                            data-prompt-type="idea" data-prompt-id="{{ item.idea_prompt_id|default:'' }}"
+                            data-idea-title="{{ item.idea_title|default:'this prompt'|escapejs }}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        {% else %}
+                        <button type="button" class="btn btn-sm btn-outline-danger delete-prompt-btn"
+                            data-prompt-type="extraction" data-extraction-id="{{ item.extraction.id|default:'' }}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-auto pt-3 border-top" style="border-color: var(--vuexy-border);">
+                        <small class="text-muted"><i class="bi bi-clock"></i> Extracted {{ item.extracted_at|timesince }} ago</small>
+                    </div>
                 </div>
-            {% endfor %}
+            </div>
         </div>
+        {% endfor %}
+    </div>
     {% else %}
-        <div class="text-center py-5">
-            <i class="bi bi-inbox" style="font-size: 4rem; color: var(--text-muted); opacity: 0.5;"></i>
-            <h4 class="mt-3 text-muted">No video prompts yet</h4>
-            <p class="text-muted">Extract ideas from videos on the Ideas page to generate video prompts here.</p>
-            <a href="{% url 'ideas' %}" class="btn btn-primary mt-3">
-                <i class="bi bi-arrow-left"></i> Go to Ideas
-            </a>
-        </div>
+    <div class="text-center py-5">
+        <i class="bi bi-inbox" style="font-size: 4rem; color: var(--text-muted); opacity: 0.5;"></i>
+        <h4 class="mt-3 text-muted">No video prompts yet</h4>
+        <p class="text-muted">Extract ideas from videos on the Ideas page to generate video prompts here.</p>
+        <a href="{% url 'ideas' %}" class="btn btn-primary mt-3"><i class="bi bi-arrow-left"></i> Go to Ideas</a>
+    </div>
     {% endif %}
 </div>
 
 <!-- Edit Prompt Modal -->
 <div class="modal fade" id="editPromptModal" tabindex="-1" aria-labelledby="editPromptModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content border-0 shadow-lg" style="background: #283046; border: 1px solid rgba(255,255,255,0.1) !important;">
+        <div class="modal-content border-0 shadow-lg"
+            style="background: #283046; border: 1px solid rgba(255,255,255,0.1) !important;">
             <div class="modal-header border-bottom-0 pb-0">
                 <h5 class="modal-title text-white fw-bold" id="editPromptModalLabel">
                     <i class="bi bi-pencil-square text-info me-2"></i>Edit Video Prompt
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
             </div>
             <form id="editPromptForm">
                 <div class="modal-body py-4">
                     <input type="hidden" id="edit_prompt_type" name="prompt_type">
                     <input type="hidden" id="edit_prompt_id" name="prompt_id">
                     <input type="hidden" id="edit_extraction_id" name="extraction_id">
-                    
+
                     <div class="mb-4">
-                        <label for="edit_prompt_text" class="form-label text-light fw-semibold small text-uppercase mb-2">
-                            <i class="bi bi-pencil me-1"></i>Video Prompt
-                        </label>
-                        <textarea class="form-control" id="edit_prompt_text" name="prompt" rows="5" 
-                            style="background: #161d31; border: 1px solid rgba(255,255,255,0.1); color: #d0d2d6; focus: border-color: #7367f0;"></textarea>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label for="edit_negative_prompt" class="form-label text-light fw-semibold small text-uppercase mb-2">
-                            <i class="bi bi-x-circle me-1"></i>Negative Prompt
-                        </label>
-                        <textarea class="form-control" id="edit_negative_prompt" name="negative_prompt" rows="2" 
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label for="edit_prompt_text"
+                                class="form-label text-light fw-semibold small text-uppercase mb-0"><i
+                                    class="bi bi-pencil me-1"></i>Positive Prompt</label>
+                            <span class="badge bg-dark text-muted smaller char-counter" id="prompt_char_count">0 /
+                                2000</span>
+                        </div>
+                        <textarea class="form-control" id="edit_prompt_text" name="prompt" rows="5" maxlength="2000"
                             style="background: #161d31; border: 1px solid rgba(255,255,255,0.1); color: #d0d2d6;"></textarea>
                     </div>
-                    
-                    <div class="mb-0">
-                        <label for="edit_shot_list" class="form-label text-light fw-semibold small text-uppercase mb-2">
-                            <i class="bi bi-list-ul me-1"></i>Shot List (one per line)
-                        </label>
-                        <textarea class="form-control" id="edit_shot_list" name="shot_list" rows="8" 
-                            style="background: #161d31; border: 1px solid rgba(255,255,255,0.1); color: #d0d2d6; font-family: monospace;"></textarea>
-                        <div class="form-text text-muted smaller mt-2">
-                            Each line will be saved as a separate shot in the list.
+
+                    <div class="mb-4 p-3 rounded"
+                        style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
+                        <h6 class="text-info small text-uppercase fw-bold mb-3"><i
+                                class="bi bi-camera-reels me-1"></i>Camera Settings (Professional)</h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="edit_aperture" class="form-label text-muted smaller mb-1">Aperture</label>
+                                <input type="text" class="form-control form-control-sm" id="edit_aperture"
+                                    name="aperture" placeholder="e.g. f/1.8"
+                                    style="background: #161d31; border: 1px solid rgba(255,255,255,0.1); color: #d0d2d6;">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="edit_focus" class="form-label text-muted smaller mb-1">Focus</label>
+                                <input type="text" class="form-control form-control-sm" id="edit_focus" name="focus"
+                                    placeholder="e.g. Rack focus"
+                                    style="background: #161d31; border: 1px solid rgba(255,255,255,0.1); color: #d0d2d6;">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="edit_lighting" class="form-label text-muted smaller mb-1">Lighting</label>
+                                <input type="text" class="form-control form-control-sm" id="edit_lighting"
+                                    name="lighting" placeholder="e.g. Cinematic rim"
+                                    style="background: #161d31; border: 1px solid rgba(255,255,255,0.1); color: #d0d2d6;">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="edit_movement" class="form-label text-muted smaller mb-1">Camera
+                                    Movement</label>
+                                <input type="text" class="form-control form-control-sm" id="edit_movement"
+                                    name="movement" placeholder="e.g. Slow tracking"
+                                    style="background: #161d31; border: 1px solid rgba(255,255,255,0.1); color: #d0d2d6;">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="edit_lens" class="form-label text-muted smaller mb-1">Camera Lens</label>
+                                <input type="text" class="form-control form-control-sm" id="edit_lens" name="lens"
+                                    placeholder="e.g. 35mm Anamorphic"
+                                    style="background: #161d31; border: 1px solid rgba(255,255,255,0.1); color: #d0d2d6;">
+                            </div>
                         </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label for="edit_negative_prompt"
+                                class="form-label text-light fw-semibold small text-uppercase mb-0"><i
+                                    class="bi bi-x-circle me-1"></i>Negative Prompt</label>
+                            <span class="badge bg-dark text-muted smaller char-counter" id="negative_char_count">0 /
+                                2000</span>
+                        </div>
+                        <textarea class="form-control" id="edit_negative_prompt" name="negative_prompt" rows="3"
+                            maxlength="2000"
+                            style="background: #161d31; border: 1px solid rgba(255,255,255,0.1); color: #d0d2d6;"></textarea>
+                    </div>
+
+                    <div class="mb-0">
+                        <label for="edit_shot_list"
+                            class="form-label text-light fw-semibold small text-uppercase mb-2"><i
+                                class="bi bi-list-ul me-1"></i>Shot List (one per line)</label>
+                        <textarea class="form-control" id="edit_shot_list" name="shot_list" rows="8"
+                            style="background: #161d31; border: 1px solid rgba(255,255,255,0.1); color: #d0d2d6; font-family: monospace;"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer border-top-0 pt-0">
                     <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary px-4" id="savePromptBtn">
-                        <i class="bi bi-check-lg me-1"></i>Save Changes
-                    </button>
+                    <button type="submit" class="btn btn-primary px-4" id="savePromptBtn"><i
+                            class="bi bi-check-lg me-1"></i>Save Changes</button>
                 </div>
             </form>
         </div>
@@ -231,308 +300,213 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Helper function to get CSRF token
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
+    document.addEventListener('DOMContentLoaded', function () {
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const promptTextarea = document.getElementById('edit_prompt_text');
+        const negativeTextarea = document.getElementById('edit_negative_prompt');
+        const promptCounter = document.getElementById('prompt_char_count');
+        const negativeCounter = document.getElementById('negative_char_count');
+
+        function updateCounter(textarea, counter) {
+            if (textarea && counter) {
+                const count = textarea.value.length;
+                counter.textContent = `${count} / 2000`;
+                if (count > 1800) {
+                    counter.classList.remove('text-muted');
+                    counter.classList.add('text-warning');
+                } else {
+                    counter.classList.remove('text-warning');
+                    counter.classList.add('text-muted');
                 }
             }
         }
-        return cookieValue;
-    }
 
-    // Handle copy prompt button clicks
-    const copyButtons = document.querySelectorAll('.copy-prompt-btn');
-    
-    copyButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const promptText = this.getAttribute('data-prompt-text');
-            const negativePrompt = this.getAttribute('data-negative-prompt');
-            const shotListJson = this.getAttribute('data-shot-list');
-            const buttonElement = this;
-            const originalHTML = buttonElement.innerHTML;
-            
-            // Function to decode Unicode escape sequences
-            function decodeUnicodeEscapes(str) {
-                if (!str) return '';
-                // Replace \u002D with -, \u0027 with ', etc.
-                return str.replace(/\\u([0-9a-fA-F]{4})/g, function(match, hex) {
-                    return String.fromCharCode(parseInt(hex, 16));
+        if (promptTextarea) promptTextarea.addEventListener('input', () => updateCounter(promptTextarea, promptCounter));
+        if (negativeTextarea) negativeTextarea.addEventListener('input', () => updateCounter(negativeTextarea, negativeCounter));
+
+        document.querySelectorAll('.copy-positive-btn').forEach(button => {
+            button.addEventListener('click', function () {
+                const promptText = this.getAttribute('data-prompt-text');
+                const aperture = this.getAttribute('data-aperture');
+                const focus = this.getAttribute('data-focus');
+                const lighting = this.getAttribute('data-lighting');
+                const movement = this.getAttribute('data-movement');
+                const lens = this.getAttribute('data-lens');
+                const shotList = this.getAttribute('data-shot-list');
+
+                let fullText = promptText;
+                const settings = [];
+                if (aperture) settings.push(`Aperture: ${aperture}`);
+                if (focus) settings.push(`Focus: ${focus}`);
+                if (lighting) settings.push(`Lighting: ${lighting}`);
+                if (movement) settings.push(`Movement: ${movement}`);
+                if (lens) settings.push(`Lens: ${lens}`);
+
+                if (settings.length > 0) fullText += "\n\nCAMERA SETTINGS:\n" + settings.join("\n");
+                if (shotList) fullText += "\n\nSHOT LIST:\n" + shotList;
+
+                copyToClipboard(fullText, this, 'Positive Prompt Copied!');
+            });
+        });
+
+        document.querySelectorAll('.copy-negative-btn').forEach(button => {
+            button.addEventListener('click', function () {
+                const negativePrompt = this.getAttribute('data-negative-prompt');
+                copyToClipboard(negativePrompt, this, 'Negative Prompt Copied!');
+            });
+        });
+
+        function copyToClipboard(text, button, successMsg) {
+            if (!text) return;
+            const originalHTML = button.innerHTML;
+            navigator.clipboard.writeText(text).then(() => {
+                button.innerHTML = `<i class="bi bi-check-circle-fill text-success"></i> Copied!`;
+                showMessage(successMsg, 'success');
+                setTimeout(() => button.innerHTML = originalHTML, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                showMessage('Failed to copy to clipboard', 'error');
+            });
+        }
+
+        const editButtons = document.querySelectorAll('.edit-prompt-btn');
+        const editModal = new bootstrap.Modal(document.getElementById('editPromptModal'));
+        const editForm = document.getElementById('editPromptForm');
+
+        editButtons.forEach(button => {
+            button.addEventListener('click', function () {
+                const promptType = this.getAttribute('data-prompt-type');
+                const promptId = this.getAttribute('data-prompt-id');
+                const extractionId = this.getAttribute('data-extraction-id');
+                const promptText = this.getAttribute('data-prompt-text');
+                const negativePrompt = this.getAttribute('data-negative-prompt');
+                const shotList = this.getAttribute('data-shot-list');
+
+                document.getElementById('edit_prompt_type').value = promptType;
+                document.getElementById('edit_prompt_id').value = promptId;
+                document.getElementById('edit_extraction_id').value = extractionId;
+                document.getElementById('edit_prompt_text').value = promptText;
+                document.getElementById('edit_negative_prompt').value = negativePrompt;
+                document.getElementById('edit_shot_list').value = shotList;
+
+                document.getElementById('edit_aperture').value = this.getAttribute('data-aperture') || '';
+                document.getElementById('edit_focus').value = this.getAttribute('data-focus') || '';
+                document.getElementById('edit_lighting').value = this.getAttribute('data-lighting') || '';
+                document.getElementById('edit_movement').value = this.getAttribute('data-movement') || '';
+                document.getElementById('edit_lens').value = this.getAttribute('data-lens') || '';
+
+                updateCounter(promptTextarea, promptCounter);
+                updateCounter(negativeTextarea, negativeCounter);
+                editModal.show();
+            });
+        });
+
+        editForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const saveBtn = document.getElementById('savePromptBtn');
+            const originalBtnText = saveBtn.innerHTML;
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+
+            fetch('{% url "edit_video_prompt" %}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                body: new FormData(this)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showMessage('Prompt updated successfully!', 'success');
+                        editModal.hide();
+                        setTimeout(() => window.location.reload(), 800);
+                    } else {
+                        showMessage(data.error || 'Failed to update prompt', 'error');
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = originalBtnText;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating prompt:', error);
+                    showMessage('An error occurred while updating the prompt', 'error');
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = originalBtnText;
                 });
-            }
-            
-            // Build complete prompt text
-            let fullPromptText = '';
-            
-            // Add video prompt (decode Unicode escapes)
-            if (promptText && promptText.trim() !== '') {
-                fullPromptText += 'VIDEO PROMPT:\n';
-                fullPromptText += decodeUnicodeEscapes(promptText.trim()) + '\n\n';
-            }
-            
-            // Add negative prompt (decode Unicode escapes)
-            if (negativePrompt && negativePrompt.trim() !== '') {
-                fullPromptText += 'NEGATIVE PROMPT:\n';
-                fullPromptText += decodeUnicodeEscapes(negativePrompt.trim()) + '\n\n';
-            }
-            
-            // Add shot list (decode Unicode escapes) - NO bullet points or numbers
-            if (shotListJson && shotListJson.trim() !== '') {
-                // Split by ||| separator (used in template)
-                const shotList = shotListJson.split('|||').filter(shot => shot.trim() !== '');
-                if (shotList.length > 0) {
-                    fullPromptText += 'SHOT LIST:\n';
-                    shotList.forEach((shot) => {
-                        // Remove any existing bullet points or numbers from the shot text
-                        let cleanShot = decodeUnicodeEscapes(shot.trim());
-                        // Remove leading numbers with dots/dashes (e.g., "1.", "1-", "2.", etc.)
-                        cleanShot = cleanShot.replace(/^\d+[\.\-\s]+\s*/, '');
-                        // Remove common bullet markers (•, -, *, +, >, →, etc.)
-                        cleanShot = cleanShot.replace(/^[•\-\*\+\>\→\s]+\s*/, '');
-                        // Remove patterns like "- [timestamp]" or "• [timestamp]" or "1. [timestamp]"
-                        cleanShot = cleanShot.replace(/^[\d\-\•\*\+\>\→\s]*\[/, '[');
-                        // Remove any leading/trailing whitespace
-                        cleanShot = cleanShot.trim();
-                        if (cleanShot) {
-                            fullPromptText += `${cleanShot}\n`;
+        });
+
+        document.querySelectorAll('.delete-prompt-btn').forEach(button => {
+            button.addEventListener('click', function () {
+                const promptType = this.getAttribute('data-prompt-type');
+                const promptId = this.getAttribute('data-prompt-id');
+                const extractionId = this.getAttribute('data-extraction-id');
+                const ideaTitle = this.getAttribute('data-idea-title') || 'this prompt';
+                const cardElement = this.closest('.card');
+
+                if (!confirm(`Are you sure you want to delete this prompt?`)) return;
+
+                this.disabled = true;
+                const originalHTML = this.innerHTML;
+                this.innerHTML = '<i class="bi bi-hourglass-split"></i> Deleting...';
+
+                const formData = new FormData();
+                formData.append('prompt_type', promptType);
+                if (promptType === 'idea') formData.append('prompt_id', promptId);
+                else formData.append('extraction_id', extractionId);
+
+                fetch('{% url "delete_video_prompt" %}', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+                    body: formData
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showMessage('Prompt deleted successfully', 'success');
+                            if (cardElement) {
+                                cardElement.style.transition = 'opacity 0.3s ease-out';
+                                cardElement.style.opacity = '0';
+                                setTimeout(() => {
+                                    cardElement.remove();
+                                    if (document.querySelectorAll('.card').length === 0) window.location.reload();
+                                }, 300);
+                            } else window.location.reload();
+                        } else {
+                            showMessage(data.error || 'Failed to delete prompt', 'error');
+                            this.disabled = false;
+                            this.innerHTML = originalHTML;
                         }
                     });
-                }
-            }
-            
-            if (fullPromptText.trim() === '') {
-                showMessage('No prompt text to copy', 'error');
-                return;
-            }
-            
-            // Copy to clipboard
-            navigator.clipboard.writeText(fullPromptText.trim()).then(function() {
-                // Success feedback
-                buttonElement.innerHTML = '<i class="bi bi-check-circle"></i> Copied!';
-                buttonElement.classList.remove('btn-outline-primary');
-                buttonElement.classList.add('btn-success');
-                buttonElement.disabled = true;
-                
-                showMessage('Prompt copied to clipboard!', 'success');
-                
-                // Reset button after 2 seconds
-                setTimeout(function() {
-                    buttonElement.innerHTML = originalHTML;
-                    buttonElement.classList.remove('btn-success');
-                    buttonElement.classList.add('btn-outline-primary');
-                    buttonElement.disabled = false;
-                }, 2000);
-            }).catch(function(err) {
-                // Fallback for older browsers
-                try {
-                    const textArea = document.createElement('textarea');
-                    textArea.value = fullPromptText.trim();
-                    textArea.style.position = 'fixed';
-                    textArea.style.left = '-999999px';
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textArea);
-                    
-                    // Success feedback
-                    buttonElement.innerHTML = '<i class="bi bi-check-circle"></i> Copied!';
-                    buttonElement.classList.remove('btn-outline-primary');
-                    buttonElement.classList.add('btn-success');
-                    buttonElement.disabled = true;
-                    
-                    showMessage('Prompt copied to clipboard!', 'success');
-                    
-                    // Reset button after 2 seconds
-                    setTimeout(function() {
-                        buttonElement.innerHTML = originalHTML;
-                        buttonElement.classList.remove('btn-success');
-                        buttonElement.classList.add('btn-outline-primary');
-                        buttonElement.disabled = false;
-                    }, 2000);
-                } catch (fallbackErr) {
-                    console.error('Failed to copy:', fallbackErr);
-                    showMessage('Failed to copy prompt to clipboard', 'error');
-                }
             });
         });
+
+        function showMessage(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
+            alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);';
+            alertDiv.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+                    <div>${message}</div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            document.body.appendChild(alertDiv);
+            setTimeout(() => { if (alertDiv.parentNode) alertDiv.remove(); }, 3000);
+        }
     });
-
-    // Handle Edit Prompt
-    const editButtons = document.querySelectorAll('.edit-prompt-btn');
-    const editModal = new bootstrap.Modal(document.getElementById('editPromptModal'));
-    const editForm = document.getElementById('editPromptForm');
-
-    editButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const promptType = this.getAttribute('data-prompt-type');
-            const promptId = this.getAttribute('data-prompt-id');
-            const extractionId = this.getAttribute('data-extraction-id');
-            const promptText = this.getAttribute('data-prompt-text');
-            const negativePrompt = this.getAttribute('data-negative-prompt');
-            const shotList = this.getAttribute('data-shot-list');
-
-            document.getElementById('edit_prompt_type').value = promptType;
-            document.getElementById('edit_prompt_id').value = promptId;
-            document.getElementById('edit_extraction_id').value = extractionId;
-            document.getElementById('edit_prompt_text').value = promptText;
-            document.getElementById('edit_negative_prompt').value = negativePrompt;
-            document.getElementById('edit_shot_list').value = shotList;
-
-            editModal.show();
-        });
-    });
-
-    editForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        const saveBtn = document.getElementById('savePromptBtn');
-        const originalBtnText = saveBtn.innerHTML;
-        saveBtn.disabled = true;
-        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
-
-        const formData = new FormData(this);
-        const csrftoken = getCookie('csrftoken');
-
-        fetch('{% url "edit_video_prompt" %}', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': csrftoken
-            },
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showMessage('Prompt updated successfully!', 'success');
-                editModal.hide();
-                // Reload to show changes
-                setTimeout(() => window.location.reload(), 800);
-            } else {
-                showMessage(data.error || 'Failed to update prompt', 'error');
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = originalBtnText;
-            }
-        })
-        .catch(error => {
-            console.error('Error updating prompt:', error);
-            showMessage('An error occurred while updating the prompt', 'error');
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = originalBtnText;
-        });
-    });
-    
-    // Handle delete prompt button clicks
-    const deleteButtons = document.querySelectorAll('.delete-prompt-btn');
-    
-    deleteButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const promptType = this.getAttribute('data-prompt-type');
-            const promptId = this.getAttribute('data-prompt-id');
-            const extractionId = this.getAttribute('data-extraction-id');
-            const ideaTitle = this.getAttribute('data-idea-title') || 'this prompt';
-            const buttonElement = this;
-            const cardElement = this.closest('.card');
-            
-            // Confirm deletion
-            const confirmMessage = promptType === 'idea' 
-                ? `Are you sure you want to delete the prompt for "${ideaTitle}"? This action cannot be undone.`
-                : 'Are you sure you want to delete this extraction prompt? This action cannot be undone.';
-            
-            if (!confirm(confirmMessage)) {
-                return;
-            }
-            
-            // Disable button and show loading state
-            buttonElement.disabled = true;
-            const originalHTML = buttonElement.innerHTML;
-            buttonElement.innerHTML = '<i class="bi bi-hourglass-split"></i> Deleting...';
-            
-            // Prepare form data
-            const formData = new FormData();
-            formData.append('prompt_type', promptType);
-            if (promptType === 'idea' && promptId) {
-                formData.append('prompt_id', promptId);
-            } else if (promptType === 'extraction' && extractionId) {
-                formData.append('extraction_id', extractionId);
-            }
-            
-            const csrftoken = getCookie('csrftoken');
-            
-            // Send delete request
-            fetch('{% url "delete_video_prompt" %}', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrftoken
-                },
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Show success message
-                    showMessage('Prompt deleted successfully', 'success');
-                    
-                    // Remove the card with fade out animation
-                    if (cardElement) {
-                        cardElement.style.transition = 'opacity 0.3s ease-out';
-                        cardElement.style.opacity = '0';
-                        setTimeout(() => {
-                            cardElement.remove();
-                            
-                            // Check if no prompts left, show empty state
-                            const promptsContainer = document.querySelector('.row.g-4');
-                            if (promptsContainer && promptsContainer.children.length === 0) {
-                                window.location.reload();
-                            }
-                        }, 300);
-                    } else {
-                        // Fallback: reload page
-                        window.location.reload();
-                    }
-                } else {
-                    // Show error message
-                    showMessage(data.error || 'Failed to delete prompt', 'error');
-                    buttonElement.disabled = false;
-                    buttonElement.innerHTML = originalHTML;
-                }
-            })
-            .catch(error => {
-                console.error('Error deleting prompt:', error);
-                showMessage('An error occurred while deleting the prompt', 'error');
-                buttonElement.disabled = false;
-                buttonElement.innerHTML = originalHTML;
-            });
-        });
-    });
-    
-    // Function to show messages
-    function showMessage(message, type) {
-        // Create a temporary alert element
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
-        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        `;
-        
-        document.body.appendChild(alertDiv);
-        
-        // Auto-remove after 3 seconds
-        setTimeout(() => {
-            if (alertDiv.parentNode) {
-                alertDiv.remove();
-            }
-        }, 3000);
-    }
-});
 </script>
 {% endblock %}
 

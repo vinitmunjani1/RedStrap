@@ -4257,9 +4257,18 @@ def edit_video_prompt_view(request):
     """
     try:
         prompt_type = request.POST.get('prompt_type')
-        prompt_text = request.POST.get('prompt', '')
-        negative_prompt = request.POST.get('negative_prompt', '')
+        prompt_text = request.POST.get('prompt', '')[:2000]
+        negative_prompt = request.POST.get('negative_prompt', '')[:2000]
         shot_list_raw = request.POST.get('shot_list', '')
+        
+        # New camera settings
+        camera_settings = {
+            'aperture': request.POST.get('aperture', ''),
+            'focus': request.POST.get('focus', ''),
+            'lighting': request.POST.get('lighting', ''),
+            'movement': request.POST.get('movement', ''),
+            'lens': request.POST.get('lens', '')
+        }
         
         # Parse shot list from newline-separated text
         shot_list = [shot.strip() for shot in shot_list_raw.split('\n') if shot.strip()]
@@ -4267,7 +4276,8 @@ def edit_video_prompt_view(request):
         updated_data = {
             'prompt': prompt_text,
             'negative_prompt': negative_prompt,
-            'shot_list': shot_list
+            'shot_list': shot_list,
+            'camera_settings': camera_settings
         }
         
         if prompt_type == 'idea':
@@ -4313,3 +4323,4 @@ def edit_video_prompt_view(request):
         logger.error(f"Error in edit_video_prompt_view: {str(e)}")
         return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 
+  

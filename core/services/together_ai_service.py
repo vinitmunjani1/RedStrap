@@ -223,26 +223,30 @@ Intended Mood/Impact: {mood_impact}
 
 Generate a detailed video prompt following this exact JSON structure:
 {{
-  "prompt": "A detailed, positive and creative description for a video generator that tells a COMPLETE STORY with CLEAR MEANING. MUST START WITH A POWERFUL HOOK (first 1-2 seconds) that immediately grabs attention and creates curiosity, intrigue, or emotional connection. The hook should introduce a character, situation, or question that sets up the story. Then the video must progress through a clear narrative arc: establish a goal/challenge, show progression or transformation, and deliver a meaningful resolution or insight that the audience can understand and take away. The story must have visual continuity - the same subject/character throughout, consistent setting, and logical progression. Include: pacing (fast/slow/medium), visual style (cinematic/realistic/stylized), atmosphere (mood, lighting, colors), camera movements (tracking shots, close-ups, wide angles), and video timestamps (0-10 seconds). The story must be self-contained and meaningful - the audience should understand what happened and why it matters. Make it vivid, specific, and emotionally resonant.",
-  "negative_prompt": "Things to avoid: bad quality, blurry, off-topic elements, slow starts, boring openings, generic visuals, random disconnected shots, no story progression, confusing narrative, inconsistent characters/subjects, meaningless visuals, abstract concepts without context, etc. Be specific about what NOT to include.",
+  "prompt": "A detailed, positive and creative description for a video generator (max 2000 characters). MUST START WITH A POWERFUL HOOK (first 1-2 seconds) that immediately grabs attention. The video MUST tell a COMPLETE STORY with CLEAR MEANING, narrative arc, and RESOLUTION. Include pacing, visual style, atmosphere, and colors. Incorporate the camera settings provided below into the visual description.",
+  "camera_settings": {{
+    "aperture": "e.g., f/1.8 for shallow depth of field",
+    "focus": "e.g., rack focus from background to subject",
+    "lighting": "e.g., cinematic rim lighting with warm golden hour tones",
+    "movement": "e.g., slow glide forward, tracking shot",
+    "lens": "e.g., 35mm anamorphic lens"
+  }},
+  "negative_prompt": "Things to avoid (max 2000 characters): bad quality, blurry, off-topic elements, slow starts, boring openings, generic visuals, random disconnected shots, no story progression, confusing narrative, inconsistent characters/subjects, meaningless visuals, abstract concepts without context, etc.",
   "shot_list": [
-    "[0-2s]: HOOK - Introduce the main character/subject and the central question, challenge, or situation. Establish the story's starting point with specific visual details. Camera + lighting + mood.",
-    "[2-4s]: BUILD - Show the character/subject taking action, facing the challenge, or progressing toward a goal. Develop the story with clear visual progression. Camera + movement + mood.",
-    "[4-6s]: BUILD - Escalate the story - show transformation, revelation, or approaching resolution. Maintain visual continuity with the same subject. Camera + framing + motion.",
-    "[6-8s]: TRANSITION - Lead toward the resolution or reveal the outcome. Show the story reaching its climax or turning point. Camera + visual elements.",
-    "[8-10s]: PAYOFF - Deliver the resolution, insight, or meaningful conclusion. The audience should understand the story's message or takeaway. Camera + composition."
+    "[0-2s]: HOOK - Introduce subject and hook. Camera + lighting + mood.",
+    "[2-4s]: BUILD - Action and progression. Camera + movement + mood.",
+    "[4-6s]: BUILD - Escalation and transformation. Camera + framing + motion.",
+    "[6-8s]: TRANSITION - Leading toward resolution. Camera + visual elements.",
+    "[8-10s]: PAYOFF - Resolution and insight. Camera + composition."
   ]
 }}
 
 CRITICAL STORY REQUIREMENTS:
 - The video MUST tell a complete, coherent story with a clear beginning, middle, and end
-- The story must have MEANING - the audience should be able to understand what happened and derive value or insight from it
-- Visual continuity is essential - the same subject/character must appear throughout (or clearly connected elements)
-- Each shot must logically connect to the previous one, building a narrative arc
-- The story should have a clear message, transformation, or resolution that the audience can understand
-- Avoid random, disconnected visuals - every element should serve the story
-- The hook should set up a question or situation that the rest of the video answers or resolves
-- The payoff must deliver a clear conclusion, insight, or emotional resolution
+- Both 'prompt' and 'negative_prompt' must be detailed but stay under 2000 characters.
+- 'camera_settings' MUST include professional details: aperture, focus, lighting, camera movement, and lens.
+- The story must have MEANING and visual continuity.
+- The hook should set up a question or situation that the rest of the video answers or resolves.
 
 TECHNICAL REQUIREMENTS:
 - The prompt MUST start with an optimal hook (first 1-2 seconds) designed for maximum user retention - this is critical
