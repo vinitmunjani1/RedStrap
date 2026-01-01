@@ -4,6 +4,7 @@ Django views for Instagram and Reddit scraping application.
 import logging
 import json
 from collections import defaultdict, Counter
+from statistics import median
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
@@ -810,15 +811,89 @@ def account_analytics_view(request, account_id):
         posts_per_day_labels = []
         posts_per_day_counts = []
     
+    # Create helper function for performance calculation
+    def get_performance_percent(value, average):
+        if average <= 0:
+            return 0
+        diff = value - average
+        return (diff / average) * 100
+
     # Top posts by likes - get top 5 content (posts + reels) ordered by likes
-    top_posts_by_likes = all_content.order_by('-like_count', '-taken_at')[:5]
+    top_posts_by_likes_qs = all_content.order_by('-like_count', '-taken_at')[:5]
+    top_posts_by_likes_list = list(top_posts_by_likes_qs)
+    
+    # Add performance metrics to top posts by likes
+    for post in top_posts_by_likes_list:
+        post.like_performance = get_performance_percent(post.like_count, avg_likes)
     
     # Top posts by comments - get top 5 content (posts + reels) ordered by comments
-    top_posts_by_comments = all_content.order_by('-comment_count', '-taken_at')[:5]
+    top_posts_by_comments_qs = all_content.order_by('-comment_count', '-taken_at')[:5]
+    top_posts_by_comments_list = list(top_posts_by_comments_qs)
     
+    # Add performance metrics to top posts by comments
+    for post in top_posts_by_comments_list:
+        post.comment_performance = get_performance_percent(post.comment_count, avg_comments)
+    
+    # Calculate detailed stats for the "Video Stats" table (Recent 20 posts/reels)
+    recent_content_qs = all_content.order_by('-taken_at')[:20]
+    detailed_stats = []
+    
+    # Calculate separate averages for reels vs posts for more accurate performance multipliers
+    # We already have avg_likes, but we need avg_plays for reels specifically if possible
+    # Calculate avg plays for reels
+    avg_reels_plays = 0
+    if total_reels > 0:
+        avg_reels_plays = float(total_reel_plays) / total_reels
+        
+    for post in recent_content_qs:
+        # Calculate Engagement Rate: (Likes + Comments) / Plays (for reels) or Followers (not avail) -> Use Plays/Views if available, else fallback to simplified
+        # For this table, if it's a reel, use Plays. If it's a post, we don't have views usually, so use Likes as "Views" proxy or just show N/A for rate?
+        # Screenshot shows "Engagement Rate" and "Views".
+        # Let's try: (Likes + Comments) / Plays * 100 for Reels.
+        # For posts without plays, maybe (Likes + Comments) / (Avg Likes * 10) estimate? Or just 0.
+        
+        engagement_rate = 0.0
+        views_count = post.play_count if post.is_reel else 0
+        
+        # Determine "Views" for display - if not reel, maybe use Impressions if we had it, but we don't.
+        # We'll leave views as 0 or "-" for regular posts in template if is_reel is False.
+        
+        if post.is_reel and views_count > 0:
+            engagement_rate = ((post.like_count + post.comment_count) / views_count) * 100
+        
+        # Calculate "Performance" (Multiplier)
+        # "2472.3x more than usual"
+        # If Reel: Compare Plays to Avg Reel Plays
+        # If Post: Compare Likes to Avg Post Likes (since we compare apples to apples)
+        
+        performance_multiplier = 0.0
+        performance_label = "more" # or "less"
+        performance_metric = "views" # or "likes"
+        
+        if post.is_reel and avg_reels_plays > 0:
+            # Multiplier: e.g. 1000 plays vs 100 avg = 10x
+            performance_multiplier = float(post.play_count) / avg_reels_plays
+            performance_metric = "views"
+        elif not post.is_reel and avg_likes > 0:
+            performance_multiplier = float(post.like_count) / avg_likes
+            performance_metric = "engagement"
+            
+        # Adjust multiplier to be "more than" (e.g. 10x means 9x more? Screenshot says "2472x more" which likely means the total multiple is 2472x)
+        # We will pass the raw multiplier and handle text in template
+        
+        detailed_stats.append({
+            'post': post,
+            'engagement_rate': round(engagement_rate, 2),
+            'views_display': views_count if post.is_reel else None,
+            'performance_multiplier': round(performance_multiplier, 1),
+            'performance_metric': performance_metric,
+            'is_high_performance': performance_multiplier >= 1.0,
+        })
+
     # Ensure all values are properly formatted
     context = {
         'account': account,
+        'detailed_stats': detailed_stats,
         'total_posts': int(total_posts),  # Ensure integer
         'total_likes': int(total_likes),  # Ensure integer
         'total_comments': int(total_comments),  # Ensure integer
@@ -826,8 +901,8 @@ def account_analytics_view(request, account_id):
         'avg_comments': round(float(avg_comments), 2),  # Round to 2 decimals
         'avg_likes_per_hour': round(float(avg_likes_per_hour), 2),  # Round to 2 decimals
         'avg_comments_per_hour': round(float(avg_comments_per_hour), 2),  # Round to 2 decimals
-        'top_posts_by_likes': list(top_posts_by_likes),  # Top 5 by likes
-        'top_posts_by_comments': list(top_posts_by_comments),  # Top 5 by comments
+        'top_posts_by_likes': top_posts_by_likes_list,  # Top 5 by likes with insights
+        'top_posts_by_comments': top_posts_by_comments_list,  # Top 5 by comments with insights
         'is_reels': False,
         # Pass as Python lists - Django's json_script filter will handle JSON encoding safely
         'chart_labels': chart_labels if chart_labels else [],
@@ -3480,95 +3555,156 @@ def social_user_analytics_view(request, username):
     ig_month_counts = month_counts(ig_posts, lambda p: p.taken_at)
     tw_month_counts = month_counts(tw_tweets, lambda t: t.created_at)
 
-    # Phase 3: Top Performing Content
-    ig_top_by_likes = top_performers(ig_posts, lambda p: p.like_count, 5)
-    ig_top_by_comments = top_performers(ig_posts, lambda p: p.comment_count, 5)
-    ig_top_by_engagement = top_performers(ig_posts, lambda p: p.like_count + p.comment_count, 5)
+    # Phase 7: Detailed stats for table (from account_analytics_view logic)
+    ig_detailed_stats = []
     
-    tw_top_by_faves = top_performers(tw_tweets, lambda t: t.favorite_count, 5)
-    tw_top_by_retweets = top_performers(tw_tweets, lambda t: t.retweet_count, 5)
-    tw_top_by_views = top_performers(tw_tweets, lambda t: t.view_count, 5)
-    tw_top_by_engagement = top_performers(tw_tweets, lambda t: t.favorite_count + t.retweet_count + t.reply_count, 5)
+    # Calculate robust baselines (medians) to avoid outlier skew
+    # Filter for valid data (exclude 0s which likely indicate missing data)
+    reels_plays = [p.play_count for p in ig_posts if p.is_reel and p.play_count > 0]
+    median_reels_plays = median(reels_plays) if reels_plays else 0
+    
+    reels_likes = [p.like_count for p in ig_posts if p.is_reel and p.like_count > 0]
+    median_reels_likes = median(reels_likes) if reels_likes else 0
+    
+    regular_likes = [p.like_count for p in ig_posts if not p.is_reel and p.like_count > 0]
+    median_regular_likes = median(regular_likes) if regular_likes else 0
+    
+    # Process recent 20 posts from ig_posts (already sorted by taken_at desc)
+    recent_ig_content = ig_posts[:20]
+    
+    for post in recent_ig_content:
+        # Calculate Engagement Rate
+        # For reels with views: (likes + comments) / views * 100
+        # For others: Calculate engagement as (likes + comments) / avg_engagement * 100 (relative performance)
+        engagement_rate = None
+        views_count = post.play_count if post.is_reel else 0
+        total_engagement = post.like_count + post.comment_count
+        
+        if post.is_reel and views_count > 0:
+            # Traditional engagement rate for reels
+            engagement_rate = ((post.like_count + post.comment_count) / views_count) * 100
+        elif total_engagement > 0:
+            # For posts without views, calculate relative engagement
+            # Using a simple formula: (likes + comments) / (avg_likes + avg_comments) * 100
+            avg_total = ig_avg_likes + ig_avg_comments if (ig_avg_likes + ig_avg_comments) > 0 else 1
+            engagement_rate = (total_engagement / avg_total) * 100
+            
+        # Calculate Performance Multiplier
+        performance_multiplier = 0.0
+        performance_metric = "views" # or "likes" or "engagement"
+        
+        if post.is_reel:
+            if views_count > 0 and median_reels_plays > 0:
+                performance_multiplier = float(views_count) / median_reels_plays
+                performance_metric = "views"
+            elif median_reels_likes > 0:
+                # Fallback to likes for reels if view count missing
+                performance_multiplier = float(post.like_count) / median_reels_likes
+                performance_metric = "likes (est)"
+        else:
+            # Regular posts
+            if median_regular_likes > 0:
+                 performance_multiplier = float(post.like_count) / median_regular_likes
+                 performance_metric = "likes"
+            elif  ig_avg_likes > 0: # Fallback to mean if median fails
+                 performance_multiplier = float(post.like_count) / ig_avg_likes
+                 performance_metric = "likes"
+        
+        ig_detailed_stats.append({
+            'post': post,
+            'engagement_rate': round(engagement_rate, 2) if engagement_rate is not None else None,
+            'views_display': views_count if (post.is_reel and views_count > 0) else None,
+            'performance_multiplier': round(performance_multiplier, 1),
+            'performance_metric': performance_metric,
+            'is_high_performance': performance_multiplier >= 1.2,
+        })
 
-    # Phase 5: Enhanced Twitter Analytics
+    # Phase 3: Top performers
+    ig_top_by_likes = top_performers(ig_posts, lambda p: p.like_count)
+    ig_top_by_comments = top_performers(ig_posts, lambda p: p.comment_count)
+    ig_top_by_engagement = top_performers(ig_posts, lambda p: p.like_count + p.comment_count)
+    
+    tw_top_by_faves = top_performers(tw_tweets, lambda t: t.favorite_count)
+    tw_top_by_retweets = top_performers(tw_tweets, lambda t: t.retweet_count)
+    tw_top_by_views = top_performers(tw_tweets, lambda t: t.view_count)
+    tw_top_by_engagement = top_performers(tw_tweets, lambda t: t.favorite_count + t.retweet_count + t.reply_count)
+    
+    # Phase 5: Twitter analytics (Hashtags & Mentions)
     hashtag_counter = Counter()
-    hashtag_engagement = defaultdict(lambda: {'count': 0, 'total_engagement': 0})
     mention_counter = Counter()
-    mention_engagement = defaultdict(lambda: {'count': 0, 'total_engagement': 0})
-    url_counter = Counter()
-    url_engagement = defaultdict(lambda: {'count': 0, 'total_engagement': 0})
     lang_counter = Counter()
+    
+    # Track engagement by hashtag/mention/lang
+    hashtag_engagement = defaultdict(lambda: {'count': 0, 'total_engagement': 0})
+    mention_engagement = defaultdict(lambda: {'count': 0, 'total_engagement': 0})
     lang_engagement = defaultdict(lambda: {'count': 0, 'total_engagement': 0})
     
     for t in tw_tweets:
         engagement = t.favorite_count + t.retweet_count + t.reply_count
         
-        # Hashtags
-        for h in t.hashtags or []:
-            h_lower = h.lower()
-            hashtag_counter[h_lower] += 1
-            hashtag_engagement[h_lower]['count'] += 1
-            hashtag_engagement[h_lower]['total_engagement'] += engagement
+        if t.hashtags:
+            for tag in t.hashtags:
+                hashtag_counter[tag] += 1
+                hashtag_engagement[tag]['count'] += 1
+                hashtag_engagement[tag]['total_engagement'] += engagement
         
-        # Mentions
-        for m in t.mentions or []:
-            m_lower = m.lower()
-            mention_counter[m_lower] += 1
-            mention_engagement[m_lower]['count'] += 1
-            mention_engagement[m_lower]['total_engagement'] += engagement
-        
-        # URLs
-        for url in t.urls or []:
-            url_counter[url] += 1
-            url_engagement[url]['count'] += 1
-            url_engagement[url]['total_engagement'] += engagement
-        
-        # Language
+        if t.mentions:
+            for mention in t.mentions:
+                mention_counter[mention] += 1
+                mention_engagement[mention]['count'] += 1
+                mention_engagement[mention]['total_engagement'] += engagement
+                
         if t.lang:
             lang_counter[t.lang] += 1
             lang_engagement[t.lang]['count'] += 1
             lang_engagement[t.lang]['total_engagement'] += engagement
-
+            
     top_hashtags = hashtag_counter.most_common(10)
-    top_hashtags_by_engagement = sorted(
-        [(tag, hashtag_engagement[tag]['total_engagement'] / hashtag_engagement[tag]['count'] if hashtag_engagement[tag]['count'] > 0 else 0) 
-         for tag in hashtag_counter.keys()],
-        key=lambda x: x[1], reverse=True
-    )[:10]
-    
     top_mentions = mention_counter.most_common(10)
+    
+    # Sort hashtags/mentions by average engagement
+    top_hashtags_by_engagement = sorted(
+        [{'tag': tag, 'avg_engagement': data['total_engagement'] / data['count'] if data['count'] > 0 else 0} 
+         for tag, data in hashtag_engagement.items()],
+        key=lambda x: x['avg_engagement'], reverse=True
+    )
+    
     top_mentions_by_engagement = sorted(
-        [(mention, mention_engagement[mention]['total_engagement'] / mention_engagement[mention]['count'] if mention_engagement[mention]['count'] > 0 else 0)
-         for mention in mention_counter.keys()],
-        key=lambda x: x[1], reverse=True
-    )[:10]
-
-    # Phase 6: Instagram-Specific Analytics
+        [{'mention': mention, 'avg_engagement': data['total_engagement'] / data['count'] if data['count'] > 0 else 0} 
+         for mention, data in mention_engagement.items()],
+        key=lambda x: x['avg_engagement'], reverse=True
+    )
+    
+    # Phase 6: Instagram Content Analytics (Avg by Type)
     ig_reels_posts = [p for p in ig_posts if p.is_reel]
     ig_regular_posts_list = [p for p in ig_posts if not p.is_reel and not p.is_video and not p.is_carousel]
     ig_video_posts = [p for p in ig_posts if p.is_video and not p.is_reel]
     ig_image_posts = [p for p in ig_posts if not p.is_video and not p.is_reel and not p.is_carousel]
     ig_carousel_posts = [p for p in ig_posts if p.is_carousel]
-
-    # Reel performance
-    ig_reels_avg_likes = sum(p.like_count for p in ig_reels_posts) / len(ig_reels_posts) if ig_reels_posts else 0
-    ig_reels_avg_comments = sum(p.comment_count for p in ig_reels_posts) / len(ig_reels_posts) if ig_reels_posts else 0
-    ig_reels_avg_engagement = (sum(p.like_count + p.comment_count for p in ig_reels_posts) / len(ig_reels_posts)) if ig_reels_posts else 0
     
-    ig_regular_avg_engagement = (sum(p.like_count + p.comment_count for p in ig_regular_posts_list) / len(ig_regular_posts_list)) if ig_regular_posts_list else 0
-    
-    # Video vs Image
-    ig_video_avg_engagement = (sum(p.like_count + p.comment_count for p in ig_video_posts) / len(ig_video_posts)) if ig_video_posts else 0
-    ig_image_avg_engagement = (sum(p.like_count + p.comment_count for p in ig_image_posts) / len(ig_image_posts)) if ig_image_posts else 0
-    
-    # Carousel analysis
-    ig_carousel_avg_engagement = (sum(p.like_count + p.comment_count for p in ig_carousel_posts) / len(ig_carousel_posts)) if ig_carousel_posts else 0
-    ig_single_avg_engagement = (sum(p.like_count + p.comment_count for p in ig_image_posts) / len(ig_image_posts)) if ig_image_posts else 0
+    def calculate_avg_engagement(posts):
+        if not posts: return 0
+        total = sum(p.like_count + p.comment_count for p in posts)
+        return total / len(posts)
+        
+    def calculate_avg_likes(posts):
+        if not posts: return 0
+        return sum(p.like_count for p in posts) / len(posts)
+        
+    def calculate_avg_comments(posts):
+        if not posts: return 0
+        return sum(p.comment_count for p in posts) / len(posts)
 
-    # Content length analysis
-    ig_caption_lengths = [len(p.caption or '') for p in ig_posts]
-    tw_text_lengths = [len(t.text or '') for t in tw_tweets]
-
+    ig_reels_avg_likes = calculate_avg_likes(ig_reels_posts)
+    ig_reels_avg_comments = calculate_avg_comments(ig_reels_posts)
+    ig_reels_avg_engagement = calculate_avg_engagement(ig_reels_posts)
+    ig_regular_avg_engagement = calculate_avg_engagement(ig_regular_posts_list)
+    ig_video_avg_engagement = calculate_avg_engagement(ig_video_posts)
+    ig_image_avg_engagement = calculate_avg_engagement(ig_image_posts)
+    ig_carousel_avg_engagement = calculate_avg_engagement(ig_carousel_posts)
+    ig_single_avg_engagement = calculate_avg_engagement(ig_image_posts + ig_video_posts) # Single image/video
+    
+    # Prep context
     context = {
         'username_display': username_clean,
         'ig_accounts': ig_accounts,
@@ -3691,6 +3827,9 @@ def social_user_analytics_view(request, username):
         'ig_video_count': len(ig_video_posts),
         'ig_image_count': len(ig_image_posts),
         'ig_carousel_count': len(ig_carousel_posts),
+        
+        # Phase 7: Detailed stats for table
+        'ig_detailed_stats': ig_detailed_stats,
     }
     return render(request, 'core/social_user_analytics.html', context)
 

@@ -8,19 +8,24 @@
         position: relative;
         overflow: hidden;
     }
+
     .video-container video {
         transition: opacity 0.3s;
     }
+
     .video-container:hover .play-overlay {
         opacity: 0;
     }
+
     .video-container:hover video {
         opacity: 1;
     }
+
     .play-overlay {
         transition: opacity 0.3s;
         pointer-events: none;
     }
+
     /* 9:16 portrait container (1080x1920) */
     .ig-portrait {
         position: relative;
@@ -29,6 +34,7 @@
         overflow: hidden;
         border-radius: 8px;
     }
+
     .ig-portrait img,
     .ig-portrait video {
         position: absolute;
@@ -38,6 +44,7 @@
         height: 100%;
         object-fit: cover;
     }
+
     .ig-portrait .placeholder-icon {
         position: absolute;
         top: 50%;
@@ -46,24 +53,29 @@
         font-size: 3rem;
         color: var(--text-muted);
     }
+
     .cursor-pointer {
         cursor: pointer;
     }
+
     .cursor-pointer:hover {
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
+
     .hover-scale {
         transition: transform 0.2s;
     }
+
     .hover-scale:hover {
         transform: scale(1.02);
     }
+
     /* Constrain top performer cards */
     .top-performer-card {
         max-width: 360px;
         margin: 0 auto;
     }
-    
+
     /* Dark theme boxes for content type distribution */
     .content-type-box {
         background: rgba(30, 41, 59, 0.4);
@@ -72,16 +84,18 @@
         color: var(--text-primary);
         transition: all 0.2s ease;
     }
+
     .content-type-box:hover {
         background: rgba(30, 41, 59, 0.6);
         border-color: rgba(129, 140, 248, 0.3);
         transform: translateY(-2px);
     }
+
     .content-type-box strong {
         color: var(--accent-primary);
         font-size: 1.25rem;
     }
-    
+
     /* Dark theme boxes for performance comparison */
     .performance-box {
         background: rgba(30, 41, 59, 0.4);
@@ -90,23 +104,25 @@
         color: var(--text-primary);
         transition: all 0.2s ease;
     }
+
     .performance-box:hover {
         background: rgba(30, 41, 59, 0.6);
         border-color: rgba(129, 140, 248, 0.3);
         transform: translateY(-2px);
     }
+
     .performance-box strong {
         color: var(--accent-primary);
         font-size: 1.1rem;
     }
-    
+
     /* No media placeholder */
     .no-media-placeholder {
         background: rgba(30, 41, 59, 0.3);
         border: 1px dashed rgba(255, 255, 255, 0.1);
         border-radius: 8px;
     }
-    
+
     /* Modal dark theme */
     .modal-content {
         background: var(--glass-bg);
@@ -115,80 +131,90 @@
         color: var(--text-primary);
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     }
+
     .modal-header {
         border-bottom: 1px solid var(--glass-border);
         background: rgba(30, 41, 59, 0.5);
     }
+
     .modal-footer {
         border-top: 1px solid var(--glass-border);
     }
+
     .btn-close {
         filter: invert(1);
         opacity: 0.8;
     }
+
     .btn-close:hover {
         opacity: 1;
     }
+
     .modal-backdrop {
         background-color: rgba(0, 0, 0, 0.7);
         backdrop-filter: blur(5px);
     }
-    
+
     /* List group items dark theme */
     .list-group-item {
         background: rgba(30, 41, 59, 0.3);
         border: 1px solid rgba(255, 255, 255, 0.1);
         color: var(--text-primary);
     }
+
     .list-group-item:hover {
         background: rgba(30, 41, 59, 0.5);
         border-color: rgba(129, 140, 248, 0.3);
     }
-    
+
     /* Border bottom for top performers */
     .border-bottom {
         border-color: rgba(255, 255, 255, 0.1) !important;
     }
-    
+
     /* Nav tabs dark theme with white/light active state */
     .nav-tabs {
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
+
     .nav-tabs .nav-link {
         color: var(--text-secondary);
         border: 1px solid transparent;
         border-radius: 8px 8px 0 0;
         background: transparent;
     }
+
     .nav-tabs .nav-link:hover {
         border-color: rgba(255, 255, 255, 0.2);
         color: var(--text-primary);
         background: rgba(255, 255, 255, 0.05);
     }
+
     .nav-tabs .nav-link.active {
         background: rgba(255, 255, 255, 0.15);
         border-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.2) transparent;
         color: var(--text-primary);
         font-weight: 600;
     }
-    
+
     /* Tab content */
     .tab-content {
         padding-top: 1rem;
     }
-    
+
     /* Top performer items */
     .top-performer-item {
         background: rgba(30, 41, 59, 0.3);
         border: 1px solid rgba(255, 255, 255, 0.1);
         transition: all 0.2s ease;
     }
+
     .top-performer-item:hover {
         background: rgba(30, 41, 59, 0.5);
         border-color: rgba(129, 140, 248, 0.3);
         transform: translateX(4px);
     }
-    
+
     /* Top performer cards */
     .top-performer-card {
         background: rgba(30, 41, 59, 0.3);
@@ -196,58 +222,262 @@
         transition: all 0.3s ease;
         overflow: hidden;
     }
+
     .top-performer-card:hover {
         background: rgba(30, 41, 59, 0.5);
         border-color: rgba(129, 140, 248, 0.4);
         box-shadow: 0 8px 24px rgba(129, 140, 248, 0.2);
     }
+
     .top-performer-card .card-body {
         display: flex;
         flex-direction: column;
     }
-    
+
     /* Card improvements for dark theme */
     .card {
         background: rgba(30, 41, 59, 0.3);
         border: 1px solid rgba(255, 255, 255, 0.1);
     }
-    
+
     /* Ensure text is visible and styled nicely */
     .text-truncate {
         color: var(--text-secondary);
     }
-    
+
     /* Better text styling for posts and tweets */
-    p, .card-text, .text-muted {
+    p,
+    .card-text,
+    .text-muted {
         line-height: 1.6;
         color: var(--text-secondary);
     }
-    
+
     .card-body p {
         color: var(--text-primary);
-        font-size: 0.  95rem;
+        font-size: 0. 95rem;
     }
-    
+
     .card-body .text-muted {
         color: var(--text-muted) !important;
     }
-    
+
     /* Better caption styling */
     .caption-text {
         color: var(--text-primary);
         line-height: 1.7;
         font-size: 0.95rem;
     }
-    
+
     /* Modal text styling */
     .modal-body p {
         color: var(--text-primary);
         line-height: 1.8;
         font-size: 1rem;
     }
-    
+
     .modal-body .text-muted {
         color: var(--text-muted);
+    }
+
+    /* ============================================
+       Content Stats Table Styles
+       ============================================ */
+    .content-stats-card {
+        overflow: hidden;
+    }
+
+    .content-stats-card .card-header {
+        background: linear-gradient(135deg, rgba(115, 103, 240, 0.1), rgba(156, 136, 255, 0.05));
+        border-bottom: 1px solid var(--vuexy-border);
+        padding: 1rem 1.5rem;
+    }
+
+    .content-stats-card .card-header h6 {
+        color: var(--vuexy-text-primary);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+    }
+
+
+
+    /* Thumbnail Styles */
+    .content-stats-thumbnail {
+        position: relative;
+        width: 56px;
+        height: 72px;
+        flex-shrink: 0;
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        background: var(--vuexy-darker-bg);
+        border: 1px solid var(--vuexy-border);
+    }
+
+    .content-stats-thumbnail img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .content-stats-thumbnail .thumbnail-placeholder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        width: 100%;
+        background: linear-gradient(135deg, rgba(115, 103, 240, 0.1), rgba(156, 136, 255, 0.05));
+    }
+
+    .content-stats-thumbnail .thumbnail-placeholder i {
+        font-size: 1.25rem;
+        color: var(--vuexy-primary);
+    }
+
+    .content-stats-thumbnail .reel-indicator {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 4px;
+        padding: 2px 4px;
+    }
+
+    .content-stats-thumbnail .reel-indicator i {
+        font-size: 0.65rem;
+        color: white;
+    }
+
+    /* Details Styles */
+    .content-stats-details {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .content-stats-username {
+        color: var(--vuexy-text-primary);
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .content-stats-caption {
+        font-size: 0.8rem;
+        color: var(--vuexy-text-muted);
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        max-width: 220px;
+    }
+
+    .content-stats-date {
+        font-size: 0.7rem;
+        color: var(--vuexy-text-muted);
+    }
+
+    /* Metric Badges */
+    .metric-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.375rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .metric-views {
+        background: rgba(139, 92, 246, 0.15);
+        color: #a78bfa;
+        border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
+    .metric-engagement {
+        background: rgba(40, 199, 111, 0.15);
+        color: var(--vuexy-success);
+        border: 1px solid rgba(40, 199, 111, 0.3);
+    }
+
+    .metric-value {
+        display: inline-flex;
+        align-items: center;
+        font-weight: 500;
+        color: var(--vuexy-text-primary);
+    }
+
+    .metric-value i {
+        font-size: 0.9rem;
+    }
+
+    /* Performance Badge */
+    .performance-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.4em 0.85em;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, rgba(192, 132, 252, 0.15), rgba(139, 92, 246, 0.1));
+        color: #c084fc;
+        border: 1px solid rgba(192, 132, 252, 0.35);
+        box-shadow: 0 0 12px rgba(192, 132, 252, 0.15);
+        white-space: nowrap;
+    }
+
+    .performance-badge i {
+        font-size: 0.7rem;
+    }
+
+    /* Date Badge */
+    .date-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.35rem 0.7rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.75rem;
+        font-weight: 500;
+        background: rgba(55, 65, 81, 0.5);
+        color: var(--vuexy-text-muted);
+        border: 1px solid var(--vuexy-border);
+    }
+
+    .date-badge i {
+        font-size: 0.7rem;
+    }
+
+    /* Content Stats Table - Force Dark Theme */
+    .content-stats-card .card-body {
+        background-color: #283046 !important;
+    }
+
+    #contentStatsTable,
+    #contentStatsTable.table,
+    #contentStatsTable.table tr,
+    #contentStatsTable.table td,
+    #contentStatsTable.table th {
+        background-color: #283046 !important;
+        color: #D0D2D6 !important;
+        border-color: #3B4253 !important;
+    }
+
+    #contentStatsTable thead th {
+        background-color: #161D31 !important;
+        color: #B4B7BD !important;
+        font-size: 0.75rem !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.08em !important;
+        padding: 1rem !important;
+    }
+
+    #contentStatsTable tbody tr:hover td {
+        background-color: #343d55 !important;
+    }
+
+    #contentStatsTable tbody td {
+        padding: 1rem !important;
+        vertical-align: middle !important;
+        border-top: none !important;
     }
 </style>
 {% endblock %}
@@ -269,13 +499,16 @@
         <div class="d-flex flex-wrap align-items-center gap-3">
             <div class="flex-grow-1">
                 <strong>Missing accounts detected.</strong>
-                <div class="small text-muted">Add the absent platform(s) to see combined analytics and recent content.</div>
+                <div class="small text-muted">Add the absent platform(s) to see combined analytics and recent content.
+                </div>
             </div>
             {% if not has_ig_accounts %}
-            <a href="{% url 'add_instagram_with_username' username_display %}" class="btn btn-primary btn-sm"><i class="bi bi-instagram"></i> Add Instagram</a>
+            <a href="{% url 'add_instagram_with_username' username_display %}" class="btn btn-primary btn-sm"><i
+                    class="bi bi-instagram"></i> Add Instagram</a>
             {% endif %}
             {% if not has_tw_accounts %}
-            <a href="{% url 'add_twitter_with_username' username_display %}" class="btn btn-info btn-sm"><i class="bi bi-twitter"></i> Add Twitter</a>
+            <a href="{% url 'add_twitter_with_username' username_display %}" class="btn btn-info btn-sm"><i
+                    class="bi bi-twitter"></i> Add Twitter</a>
             {% endif %}
         </div>
     </div>
@@ -304,7 +537,8 @@
                         <h4 class="mb-0"><i class="bi bi-instagram"></i> Instagram</h4>
                         <div class="d-flex align-items-center gap-2">
                             <div class="text-muted small">Accounts: <span id="igAccountCount">{{ ig_accounts|length }}</span></div>
-                            <button id="fetchIgPostsBtn" class="btn btn-sm btn-primary" type="button" style="display: none;">
+                            <button id="fetchIgPostsBtn" class="btn btn-sm btn-primary" type="button"
+                                style="display: none;">
                                 <i class="bi bi-download"></i> Fetch Posts
                             </button>
                             <div id="igFetchStatus" class="d-none"></div>
@@ -350,7 +584,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Phase 1.2: Content Type Distribution -->
                             {% if ig_total_posts > 0 %}
                             <div class="row g-3 mb-3">
@@ -403,7 +637,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="row g-3 mb-3">
                                 <div class="col-12">
                                     <div class="glass-card">
@@ -445,9 +679,11 @@
                                                         <strong>Reels</strong>
                                                         <div class="mt-2">
                                                             <div>Avg Likes: {{ ig_reels_avg_likes|floatformat:0 }}</div>
-                                                            <div>Avg Comments: {{ ig_reels_avg_comments|floatformat:0 }}</div>
+                                                            <div>Avg Comments: {{ ig_reels_avg_comments|floatformat:0 }}
+                                                            </div>
                                                             <div>Avg Engagement: {{ ig_reels_avg_engagement|floatformat:0 }}</div>
-                                                            <div class="small text-muted">({{ ig_reels_count }} reels)</div>
+                                                            <div class="small text-muted">({{ ig_reels_count }} reels)
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -458,7 +694,8 @@
                                                         <strong>Regular Posts</strong>
                                                         <div class="mt-2">
                                                             <div>Avg Engagement: {{ ig_regular_avg_engagement|floatformat:0 }}</div>
-                                                            <div class="small text-muted">({{ ig_regular_count }} posts)</div>
+                                                            <div class="small text-muted">({{ ig_regular_count }} posts)
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -483,7 +720,8 @@
                                                         <strong>Videos</strong>
                                                         <div class="mt-2">
                                                             <div>Avg Engagement: {{ ig_video_avg_engagement|floatformat:0 }}</div>
-                                                            <div class="small text-muted">({{ ig_video_count }} videos)</div>
+                                                            <div class="small text-muted">({{ ig_video_count }} videos)
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -494,7 +732,8 @@
                                                         <strong>Images</strong>
                                                         <div class="mt-2">
                                                             <div>Avg Engagement: {{ ig_image_avg_engagement|floatformat:0 }}</div>
-                                                            <div class="small text-muted">({{ ig_image_count }} images)</div>
+                                                            <div class="small text-muted">({{ ig_image_count }} images)
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -515,39 +754,55 @@
                                             <h6 class="mb-3">Top Performing Posts</h6>
                                             <ul class="nav nav-tabs mb-2" role="tablist">
                                                 <li class="nav-item">
-                                                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#ig-top-likes">Top by Likes</button>
+                                                    <button class="nav-link active" data-bs-toggle="tab"
+                                                        data-bs-target="#ig-top-likes">Top by Likes</button>
                                                 </li>
                                                 <li class="nav-item">
-                                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#ig-top-comments">Top by Comments</button>
+                                                    <button class="nav-link" data-bs-toggle="tab"
+                                                        data-bs-target="#ig-top-comments">Top by Comments</button>
                                                 </li>
                                                 <li class="nav-item">
-                                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#ig-top-engagement">Top by Engagement</button>
+                                                    <button class="nav-link" data-bs-toggle="tab"
+                                                        data-bs-target="#ig-top-engagement">Top by Engagement</button>
                                                 </li>
                                             </ul>
                                             <div class="tab-content">
                                                 <div class="tab-pane fade show active" id="ig-top-likes">
                                                     {% for post in ig_top_by_likes %}
-                                                    <div class="card mb-2 cursor-pointer top-performer-item" onclick="showPostModal({{ post.id }}, 'ig')">
+                                                    <div class="card mb-2 cursor-pointer top-performer-item"
+                                                        onclick="showPostModal({{ post.id }}, 'ig')">
                                                         <div class="card-body p-3">
                                                             <div class="d-flex gap-3">
                                                                 {% if post.image_url %}
-                                                                <div class="flex-shrink-0" style="width: 120px; height: 120px;">
-                                                                    <img src="{{ post.image_url }}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" alt="Post image">
+                                                                <div class="flex-shrink-0"
+                                                                    style="width: 120px; height: 120px;">
+                                                                    <img src="{{ post.image_url }}"
+                                                                        class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        alt="Post image">
                                                                 </div>
                                                                 {% elif post.video_url %}
-                                                                <div class="flex-shrink-0 video-container" style="width: 120px; height: 120px; position: relative;">
-                                                                    <video class="rounded" style="width: 100%; height: 100%; object-fit: cover;" muted loop playsinline>
-                                                                        <source src="{{ post.video_url }}" type="video/mp4">
+                                                                <div class="flex-shrink-0 video-container"
+                                                                    style="width: 120px; height: 120px; position: relative;">
+                                                                    <video class="rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        muted loop playsinline>
+                                                                        <source src="{{ post.video_url }}"
+                                                                            type="video/mp4">
                                                                     </video>
-                                                                    <div class="position-absolute top-50 start-50 translate-middle play-overlay">
-                                                                        <i class="bi bi-play-circle-fill text-white" style="font-size: 2rem; opacity: 0.8;"></i>
+                                                                    <div
+                                                                        class="position-absolute top-50 start-50 translate-middle play-overlay">
+                                                                        <i class="bi bi-play-circle-fill text-white"
+                                                                            style="font-size: 2rem; opacity: 0.8;"></i>
                                                                     </div>
                                                                 </div>
                                                                 {% endif %}
                                                                 <div class="flex-grow-1">
-                                                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                                                    <div
+                                                                        class="d-flex justify-content-between align-items-start mb-1">
                                                                         <div class="small text-muted">@{{ post.account.username }} · {{ post.taken_at|date:"M d, Y" }}</div>
-                                                                        <strong class="text-primary">{{ post.like_count|floatformat:0 }} likes</strong>
+                                                                        <strong class="text-primary">{{ post.like_count|floatformat:0 }}
+                                                                            likes</strong>
                                                                     </div>
                                                                     <div class="text-truncate">{{ post.caption|truncatewords:20|default:"No caption" }}</div>
                                                                 </div>
@@ -558,27 +813,40 @@
                                                 </div>
                                                 <div class="tab-pane fade" id="ig-top-comments">
                                                     {% for post in ig_top_by_comments %}
-                                                    <div class="card mb-2 cursor-pointer top-performer-item" onclick="showPostModal({{ post.id }}, 'ig')">
+                                                    <div class="card mb-2 cursor-pointer top-performer-item"
+                                                        onclick="showPostModal({{ post.id }}, 'ig')">
                                                         <div class="card-body p-3">
                                                             <div class="d-flex gap-3">
                                                                 {% if post.image_url %}
-                                                                <div class="flex-shrink-0" style="width: 120px; height: 120px;">
-                                                                    <img src="{{ post.image_url }}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" alt="Post image">
+                                                                <div class="flex-shrink-0"
+                                                                    style="width: 120px; height: 120px;">
+                                                                    <img src="{{ post.image_url }}"
+                                                                        class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        alt="Post image">
                                                                 </div>
                                                                 {% elif post.video_url %}
-                                                                <div class="flex-shrink-0 video-container" style="width: 120px; height: 120px; position: relative;">
-                                                                    <video class="rounded" style="width: 100%; height: 100%; object-fit: cover;" muted loop playsinline>
-                                                                        <source src="{{ post.video_url }}" type="video/mp4">
+                                                                <div class="flex-shrink-0 video-container"
+                                                                    style="width: 120px; height: 120px; position: relative;">
+                                                                    <video class="rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        muted loop playsinline>
+                                                                        <source src="{{ post.video_url }}"
+                                                                            type="video/mp4">
                                                                     </video>
-                                                                    <div class="position-absolute top-50 start-50 translate-middle play-overlay">
-                                                                        <i class="bi bi-play-circle-fill text-white" style="font-size: 2rem; opacity: 0.8;"></i>
+                                                                    <div
+                                                                        class="position-absolute top-50 start-50 translate-middle play-overlay">
+                                                                        <i class="bi bi-play-circle-fill text-white"
+                                                                            style="font-size: 2rem; opacity: 0.8;"></i>
                                                                     </div>
                                                                 </div>
                                                                 {% endif %}
                                                                 <div class="flex-grow-1">
-                                                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                                                    <div
+                                                                        class="d-flex justify-content-between align-items-start mb-1">
                                                                         <div class="small text-muted">@{{ post.account.username }} · {{ post.taken_at|date:"M d, Y" }}</div>
-                                                                        <strong class="text-primary">{{ post.comment_count|floatformat:0 }} comments</strong>
+                                                                        <strong class="text-primary">{{ post.comment_count|floatformat:0 }}
+                                                                            comments</strong>
                                                                     </div>
                                                                     <div class="text-truncate">{{ post.caption|truncatewords:20|default:"No caption" }}</div>
                                                                 </div>
@@ -589,25 +857,37 @@
                                                 </div>
                                                 <div class="tab-pane fade" id="ig-top-engagement">
                                                     {% for post in ig_top_by_engagement %}
-                                                    <div class="card mb-2 cursor-pointer top-performer-item" onclick="showPostModal({{ post.id }}, 'ig')">
+                                                    <div class="card mb-2 cursor-pointer top-performer-item"
+                                                        onclick="showPostModal({{ post.id }}, 'ig')">
                                                         <div class="card-body p-3">
                                                             <div class="d-flex gap-3">
                                                                 {% if post.image_url %}
-                                                                <div class="flex-shrink-0" style="width: 120px; height: 120px;">
-                                                                    <img src="{{ post.image_url }}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" alt="Post image">
+                                                                <div class="flex-shrink-0"
+                                                                    style="width: 120px; height: 120px;">
+                                                                    <img src="{{ post.image_url }}"
+                                                                        class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        alt="Post image">
                                                                 </div>
                                                                 {% elif post.video_url %}
-                                                                <div class="flex-shrink-0 video-container" style="width: 120px; height: 120px; position: relative;">
-                                                                    <video class="rounded" style="width: 100%; height: 100%; object-fit: cover;" muted loop playsinline>
-                                                                        <source src="{{ post.video_url }}" type="video/mp4">
+                                                                <div class="flex-shrink-0 video-container"
+                                                                    style="width: 120px; height: 120px; position: relative;">
+                                                                    <video class="rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        muted loop playsinline>
+                                                                        <source src="{{ post.video_url }}"
+                                                                            type="video/mp4">
                                                                     </video>
-                                                                    <div class="position-absolute top-50 start-50 translate-middle play-overlay">
-                                                                        <i class="bi bi-play-circle-fill text-white" style="font-size: 2rem; opacity: 0.8;"></i>
+                                                                    <div
+                                                                        class="position-absolute top-50 start-50 translate-middle play-overlay">
+                                                                        <i class="bi bi-play-circle-fill text-white"
+                                                                            style="font-size: 2rem; opacity: 0.8;"></i>
                                                                     </div>
                                                                 </div>
                                                                 {% endif %}
                                                                 <div class="flex-grow-1">
-                                                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                                                    <div
+                                                                        class="d-flex justify-content-between align-items-start mb-1">
                                                                         <div class="small text-muted">@{{ post.account.username }} · {{ post.taken_at|date:"M d, Y" }}</div>
                                                                         <strong class="text-primary">{{ post.like_count|add:post.comment_count|floatformat:0 }} engagement</strong>
                                                                     </div>
@@ -624,55 +904,185 @@
                                 </div>
                             </div>
                             {% endif %}
+
+                            <!-- Phase 7: Detailed Stats Table -->
+                            {% if ig_detailed_stats %}
+                            <div class="row g-3 mb-3">
+                                <div class="col-12">
+                                    <div class="glass-card content-stats-card">
+                                        <div class="card-header d-flex align-items-center justify-content-between">
+                                            <h6 class="mb-0"><i class="bi bi-bar-chart-line me-2"></i>Content Stats</h6>
+                                            <span class="badge bg-primary">{{ ig_detailed_stats|length }} posts</span>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <div class="table-responsive">
+                                                <table id="contentStatsTable"
+                                                    class="table table-dark table-hover content-stats-table mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th class="ps-4">POST</th>
+                                                            <th class="text-center">VIEWS</th>
+                                                            <th class="text-center">LIKES</th>
+                                                            <th class="text-center">COMMENTS</th>
+                                                            <th class="text-center">ENGAGEMENT RATE</th>
+                                                            <th class="text-center">PERFORMANCE</th>
+                                                            <th class="text-end pe-4">UPLOADED</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for item in ig_detailed_stats %}
+                                                        <tr class="content-stats-row">
+                                                            <!-- Post Column -->
+                                                            <td class="ps-4" style="min-width: 320px;">
+                                                                <div class="d-flex align-items-center">
+                                                                    <!-- Thumbnail -->
+                                                                    <div class="content-stats-thumbnail me-3">
+                                                                        {% if item.post.image_url %}
+                                                                        <img src="{{ item.post.image_url }}"
+                                                                            alt="Thumbnail">
+                                                                        {% elif item.post.video_url %}
+                                                                        <div class="thumbnail-placeholder">
+                                                                            <i class="bi bi-play-circle"></i>
+                                                                        </div>
+                                                                        {% else %}
+                                                                        <div class="thumbnail-placeholder">
+                                                                            <i class="bi bi-image"></i>
+                                                                        </div>
+                                                                        {% endif %}
+                                                                        {% if item.post.is_reel %}
+                                                                        <div class="reel-indicator">
+                                                                            <i class="bi bi-camera-reels"></i>
+                                                                        </div>
+                                                                        {% endif %}
+                                                                    </div>
+                                                                    <!-- Details -->
+                                                                    <div class="content-stats-details">
+                                                                        <div class="d-flex align-items-center mb-1">
+                                                                            <i
+                                                                                class="bi bi-instagram me-2 text-muted"></i>
+                                                                            <span class="content-stats-username">{{ item.post.account.username }}</span>
+                                                                        </div>
+                                                                        <p class="content-stats-caption mb-1">{{ item.post.caption|default:"No caption"|truncatechars:60 }}</p>
+                                                                        <small class="content-stats-date">Uploaded On:
+                                                                            {{ item.post.taken_at|date:"m/d/Y" }}</small>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+
+                                                            <!-- Views -->
+                                                            <td class="text-center align-middle">
+                                                                {% if item.views_display %}
+                                                                <span class="metric-badge metric-views">
+                                                                    <i class="bi bi-eye me-1"></i>{{ item.views_display|default:0|floatformat:0 }}
+                                                                </span>
+                                                                {% else %}
+                                                                <span class="text-muted">—</span>
+                                                                {% endif %}
+                                                            </td>
+
+                                                            <!-- Likes -->
+                                                            <td class="text-center align-middle">
+                                                                <span class="metric-value">
+                                                                    <i class="bi bi-heart text-danger me-1"></i>{{ item.post.like_count|floatformat:0 }}
+                                                                </span>
+                                                            </td>
+
+                                                            <!-- Comments -->
+                                                            <td class="text-center align-middle">
+                                                                <span class="metric-value">
+                                                                    <i class="bi bi-chat text-info me-1"></i>{{ item.post.comment_count|floatformat:0 }}
+                                                                </span>
+                                                            </td>
+
+                                                            <!-- Engagement Rate -->
+                                                            <td class="text-center align-middle">
+                                                                {% if item.engagement_rate is not None %}
+                                                                <span class="metric-badge metric-engagement">
+                                                                    {{ item.engagement_rate }}%
+                                                                </span>
+                                                                {% else %}
+                                                                <span class="text-muted">—</span>
+                                                                {% endif %}
+                                                            </td>
+
+                                                            <!-- Performance -->
+                                                            <td class="text-center align-middle">
+                                                                <span class="performance-badge">
+                                                                    <i class="bi bi-graph-up-arrow me-1"></i>{{ item.performance_multiplier }}x more than usual
+                                                                </span>
+                                                            </td>
+
+                                                            <!-- Uploaded -->
+                                                            <td class="text-end align-middle pe-4">
+                                                                <span class="date-badge">
+                                                                    <i class="bi bi-calendar3 me-1"></i>{{ item.post.taken_at|date:"m/d/Y" }}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
                         </div>
                         <div class="tab-pane" id="ig-posts">
                             {% if ig_posts %}
-                                <div class="row g-3">
-                                    {% for post in ig_posts %}
-                                        <div class="col-md-6 col-lg-4">
-                                            <div class="card h-100 cursor-pointer" onclick="showPostModal({{ post.id }}, 'ig')" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                                                <div class="card-body p-0">
-                                                    {% if post.is_reel or post.is_video %}
-                                                        <div class="media-portrait">
-                                                            {% if post.video_url %}
-                                                                <video muted loop playsinline preload="metadata">
-                                                                    <source src="{{ post.video_url }}" type="video/mp4">
-                                                                </video>
-                                                            {% else %}
-                                                                <div>
-                                                                    <i class="bi bi-play-circle text-primary" style="font-size: 3rem;"></i>
-                                                                </div>
-                                                            {% endif %}
-                                                        </div>
-                                                    {% elif post.image_url %}
-                                                        <div class="media-square">
-                                                            <img src="{{ post.image_url }}" alt="Post image">
-                                                        </div>
-                                                    {% else %}
-                                                        <div class="media-square">
-                                                            <div>
-                                                                <i class="bi bi-image text-muted" style="font-size: 3rem;"></i>
-                                                            </div>
-                                                        </div>
-                                                    {% endif %}
-                                                    <div class="p-3">
-                                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                                            <span class="text-muted small">@{{ post.account.username }}</span>
-                                                            <span class="text-muted small">{{ post.taken_at|date:"M d, Y" }}</span>
-                                                        </div>
-                                                        <p class="caption-text small mb-2" style="display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;">{{ post.caption|default:"No caption" }}</p>
-                                                        <div class="d-flex gap-3 text-muted small">
-                                                            <span><i class="bi bi-heart"></i> {{ post.like_count }}</span>
-                                                            <span><i class="bi bi-chat"></i> {{ post.comment_count }}</span>
-                                                        </div>
-                                                    </div>
+                            <div class="row g-3">
+                                {% for post in ig_posts %}
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="card h-100 cursor-pointer" onclick="showPostModal({{ post.id }}, 'ig')"
+                                        style="cursor: pointer; transition: transform 0.2s;"
+                                        onmouseover="this.style.transform='scale(1.02)'"
+                                        onmouseout="this.style.transform='scale(1)'">
+                                        <div class="card-body p-0">
+                                            {% if post.is_reel or post.is_video %}
+                                            <div class="media-portrait">
+                                                {% if post.video_url %}
+                                                <video muted loop playsinline preload="metadata">
+                                                    <source src="{{ post.video_url }}" type="video/mp4">
+                                                </video>
+                                                {% else %}
+                                                <div>
+                                                    <i class="bi bi-play-circle text-primary"
+                                                        style="font-size: 3rem;"></i>
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                            {% elif post.image_url %}
+                                            <div class="media-square">
+                                                <img src="{{ post.image_url }}" alt="Post image">
+                                            </div>
+                                            {% else %}
+                                            <div class="media-square">
+                                                <div>
+                                                    <i class="bi bi-image text-muted" style="font-size: 3rem;"></i>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                            <div class="p-3">
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <span class="text-muted small">@{{ post.account.username }}</span>
+                                                    <span class="text-muted small">{{ post.taken_at|date:"M d, Y" }}</span>
+                                                </div>
+                                                <p class="caption-text small mb-2"
+                                                    style="display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;">
+                                                    {{ post.caption|default:"No caption" }}</p>
+                                                <div class="d-flex gap-3 text-muted small">
+                                                    <span><i class="bi bi-heart"></i> {{ post.like_count }}</span>
+                                                    <span><i class="bi bi-chat"></i> {{ post.comment_count }}</span>
                                                 </div>
                                             </div>
                                         </div>
-                                    {% endfor %}
+                                    </div>
                                 </div>
+                                {% endfor %}
+                            </div>
                             {% else %}
-                                <p class="text-muted mb-0">No Instagram posts found for @{{ username_display }}.</p>
+                            <p class="text-muted mb-0">No Instagram posts found for @{{ username_display }}.</p>
                             {% endif %}
                         </div>
                     </div>
@@ -688,7 +1098,8 @@
                         <h4 class="mb-0"><i class="bi bi-twitter"></i> Twitter</h4>
                         <div class="d-flex align-items-center gap-2">
                             <div class="text-muted small">Accounts: <span id="twAccountCount">{{ tw_accounts|length }}</span></div>
-                            <button id="fetchTwTweetsBtn" class="btn btn-sm btn-primary" type="button" style="display: none;">
+                            <button id="fetchTwTweetsBtn" class="btn btn-sm btn-primary" type="button"
+                                style="display: none;">
                                 <i class="bi bi-download"></i> Fetch Tweets
                             </button>
                             <div id="twFetchStatus" class="d-none"></div>
@@ -733,7 +1144,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="row g-3 mb-3">
                                 <div class="col-4">
                                     <div class="stat-card">
@@ -804,7 +1215,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="row g-3 mb-3">
                                 <div class="col-12">
                                     <div class="glass-card">
@@ -841,10 +1252,13 @@
                                             <h6 class="mb-3">Hashtag Performance</h6>
                                             <ul class="nav nav-tabs mb-2" role="tablist">
                                                 <li class="nav-item">
-                                                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tw-hashtags-count">Most Used</button>
+                                                    <button class="nav-link active" data-bs-toggle="tab"
+                                                        data-bs-target="#tw-hashtags-count">Most Used</button>
                                                 </li>
                                                 <li class="nav-item">
-                                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tw-hashtags-engagement">Best Engagement</button>
+                                                    <button class="nav-link" data-bs-toggle="tab"
+                                                        data-bs-target="#tw-hashtags-engagement">Best
+                                                        Engagement</button>
                                                 </li>
                                             </ul>
                                             <div class="tab-content">
@@ -873,10 +1287,13 @@
                                             <h6 class="mb-3">Mention Performance</h6>
                                             <ul class="nav nav-tabs mb-2" role="tablist">
                                                 <li class="nav-item">
-                                                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tw-mentions-count">Most Mentioned</button>
+                                                    <button class="nav-link active" data-bs-toggle="tab"
+                                                        data-bs-target="#tw-mentions-count">Most Mentioned</button>
                                                 </li>
                                                 <li class="nav-item">
-                                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tw-mentions-engagement">Best Engagement</button>
+                                                    <button class="nav-link" data-bs-toggle="tab"
+                                                        data-bs-target="#tw-mentions-engagement">Best
+                                                        Engagement</button>
                                                 </li>
                                             </ul>
                                             <div class="tab-content">
@@ -906,50 +1323,71 @@
                                             <h6 class="mb-3">Top Performing Tweets</h6>
                                             <ul class="nav nav-tabs mb-2" role="tablist">
                                                 <li class="nav-item">
-                                                    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tw-top-faves">Top by Favorites</button>
+                                                    <button class="nav-link active" data-bs-toggle="tab"
+                                                        data-bs-target="#tw-top-faves">Top by Favorites</button>
                                                 </li>
                                                 <li class="nav-item">
-                                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tw-top-retweets">Top by Retweets</button>
+                                                    <button class="nav-link" data-bs-toggle="tab"
+                                                        data-bs-target="#tw-top-retweets">Top by Retweets</button>
                                                 </li>
                                                 <li class="nav-item">
-                                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tw-top-views">Top by Views</button>
+                                                    <button class="nav-link" data-bs-toggle="tab"
+                                                        data-bs-target="#tw-top-views">Top by Views</button>
                                                 </li>
                                                 <li class="nav-item">
-                                                    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tw-top-engagement">Top by Engagement</button>
+                                                    <button class="nav-link" data-bs-toggle="tab"
+                                                        data-bs-target="#tw-top-engagement">Top by Engagement</button>
                                                 </li>
                                             </ul>
                                             <div class="tab-content">
                                                 <div class="tab-pane fade show active" id="tw-top-faves">
                                                     {% for tweet in tw_top_by_faves %}
-                                                    <div class="card mb-2 cursor-pointer top-performer-item" onclick="showTweetModal({{ tweet.id }})" style="cursor: pointer;">
+                                                    <div class="card mb-2 cursor-pointer top-performer-item"
+                                                        onclick="showTweetModal({{ tweet.id }})"
+                                                        style="cursor: pointer;">
                                                         <div class="card-body p-3">
                                                             <div class="d-flex gap-3">
                                                                 {% if tweet.media %}
-                                                                    {% for media_item in tweet.media|slice:":1" %}
-                                                                        {% if media_item.type == "photo" %}
-                                                                        <div class="flex-shrink-0" style="width: 120px; height: 120px;">
-                                                                            <img src="{{ media_item.url }}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" alt="Tweet media">
-                                                                        </div>
-                                                                        {% elif media_item.type == "video" %}
-                                                                        <div class="flex-shrink-0 video-container" style="width: 120px; height: 120px; position: relative;">
-                                                                            {% if media_item.video_url %}
-                                                                            <video class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" muted loop playsinline>
-                                                                                <source src="{{ media_item.video_url }}" type="video/mp4">
-                                                                            </video>
-                                                                            {% else %}
-                                                                            <img src="{{ media_item.url }}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" alt="Video thumbnail">
-                                                                            {% endif %}
-                                                                            <div class="position-absolute top-50 start-50 translate-middle play-overlay">
-                                                                                <i class="bi bi-play-circle-fill text-white" style="font-size: 2rem; opacity: 0.8;"></i>
-                                                                            </div>
-                                                                        </div>
-                                                                        {% endif %}
-                                                                    {% endfor %}
+                                                                {% for media_item in tweet.media|slice:":1" %}
+                                                                {% if media_item.type == "photo" %}
+                                                                <div class="flex-shrink-0"
+                                                                    style="width: 120px; height: 120px;">
+                                                                    <img src="{{ media_item.url }}"
+                                                                        class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        alt="Tweet media">
+                                                                </div>
+                                                                {% elif media_item.type == "video" %}
+                                                                <div class="flex-shrink-0 video-container"
+                                                                    style="width: 120px; height: 120px; position: relative;">
+                                                                    {% if media_item.video_url %}
+                                                                    <video class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        muted loop playsinline>
+                                                                        <source src="{{ media_item.video_url }}"
+                                                                            type="video/mp4">
+                                                                    </video>
+                                                                    {% else %}
+                                                                    <img src="{{ media_item.url }}"
+                                                                        class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        alt="Video thumbnail">
+                                                                    {% endif %}
+                                                                    <div
+                                                                        class="position-absolute top-50 start-50 translate-middle play-overlay">
+                                                                        <i class="bi bi-play-circle-fill text-white"
+                                                                            style="font-size: 2rem; opacity: 0.8;"></i>
+                                                                    </div>
+                                                                </div>
+                                                                {% endif %}
+                                                                {% endfor %}
                                                                 {% endif %}
                                                                 <div class="flex-grow-1">
-                                                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                                                    <div
+                                                                        class="d-flex justify-content-between align-items-start mb-1">
                                                                         <div class="small text-muted">{{ tweet.created_at|date:"M d, Y" }}</div>
-                                                                        <strong class="text-primary">{{ tweet.favorite_count|floatformat:0 }} favs</strong>
+                                                                        <strong class="text-primary">{{ tweet.favorite_count|floatformat:0 }}
+                                                                            favs</strong>
                                                                     </div>
                                                                     <div class="text-truncate">{{ tweet.text|truncatewords:20 }}</div>
                                                                 </div>
@@ -960,35 +1398,52 @@
                                                 </div>
                                                 <div class="tab-pane fade" id="tw-top-retweets">
                                                     {% for tweet in tw_top_by_retweets %}
-                                                    <div class="card mb-2 cursor-pointer" onclick="showTweetModal({{ tweet.id }})" style="cursor: pointer;">
+                                                    <div class="card mb-2 cursor-pointer"
+                                                        onclick="showTweetModal({{ tweet.id }})"
+                                                        style="cursor: pointer;">
                                                         <div class="card-body p-3">
                                                             <div class="d-flex gap-3">
                                                                 {% if tweet.media %}
-                                                                    {% for media_item in tweet.media|slice:":1" %}
-                                                                        {% if media_item.type == "photo" %}
-                                                                        <div class="flex-shrink-0" style="width: 120px; height: 120px;">
-                                                                            <img src="{{ media_item.url }}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" alt="Tweet media">
-                                                                        </div>
-                                                                        {% elif media_item.type == "video" %}
-                                                                        <div class="flex-shrink-0 video-container" style="width: 120px; height: 120px; position: relative;">
-                                                                            {% if media_item.video_url %}
-                                                                            <video class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" muted loop playsinline>
-                                                                                <source src="{{ media_item.video_url }}" type="video/mp4">
-                                                                            </video>
-                                                                            {% else %}
-                                                                            <img src="{{ media_item.url }}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" alt="Video thumbnail">
-                                                                            {% endif %}
-                                                                            <div class="position-absolute top-50 start-50 translate-middle play-overlay">
-                                                                                <i class="bi bi-play-circle-fill text-white" style="font-size: 2rem; opacity: 0.8;"></i>
-                                                                            </div>
-                                                                        </div>
-                                                                        {% endif %}
-                                                                    {% endfor %}
+                                                                {% for media_item in tweet.media|slice:":1" %}
+                                                                {% if media_item.type == "photo" %}
+                                                                <div class="flex-shrink-0"
+                                                                    style="width: 120px; height: 120px;">
+                                                                    <img src="{{ media_item.url }}"
+                                                                        class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        alt="Tweet media">
+                                                                </div>
+                                                                {% elif media_item.type == "video" %}
+                                                                <div class="flex-shrink-0 video-container"
+                                                                    style="width: 120px; height: 120px; position: relative;">
+                                                                    {% if media_item.video_url %}
+                                                                    <video class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        muted loop playsinline>
+                                                                        <source src="{{ media_item.video_url }}"
+                                                                            type="video/mp4">
+                                                                    </video>
+                                                                    {% else %}
+                                                                    <img src="{{ media_item.url }}"
+                                                                        class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        alt="Video thumbnail">
+                                                                    {% endif %}
+                                                                    <div
+                                                                        class="position-absolute top-50 start-50 translate-middle play-overlay">
+                                                                        <i class="bi bi-play-circle-fill text-white"
+                                                                            style="font-size: 2rem; opacity: 0.8;"></i>
+                                                                    </div>
+                                                                </div>
+                                                                {% endif %}
+                                                                {% endfor %}
                                                                 {% endif %}
                                                                 <div class="flex-grow-1">
-                                                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                                                    <div
+                                                                        class="d-flex justify-content-between align-items-start mb-1">
                                                                         <div class="small text-muted">{{ tweet.created_at|date:"M d, Y" }}</div>
-                                                                        <strong class="text-primary">{{ tweet.retweet_count|floatformat:0 }} RTs</strong>
+                                                                        <strong class="text-primary">{{ tweet.retweet_count|floatformat:0 }}
+                                                                            RTs</strong>
                                                                     </div>
                                                                     <div class="text-truncate">{{ tweet.text|truncatewords:20 }}</div>
                                                                 </div>
@@ -999,35 +1454,52 @@
                                                 </div>
                                                 <div class="tab-pane fade" id="tw-top-views">
                                                     {% for tweet in tw_top_by_views %}
-                                                    <div class="card mb-2 cursor-pointer" onclick="showTweetModal({{ tweet.id }})" style="cursor: pointer;">
+                                                    <div class="card mb-2 cursor-pointer"
+                                                        onclick="showTweetModal({{ tweet.id }})"
+                                                        style="cursor: pointer;">
                                                         <div class="card-body p-3">
                                                             <div class="d-flex gap-3">
                                                                 {% if tweet.media %}
-                                                                    {% for media_item in tweet.media|slice:":1" %}
-                                                                        {% if media_item.type == "photo" %}
-                                                                        <div class="flex-shrink-0" style="width: 120px; height: 120px;">
-                                                                            <img src="{{ media_item.url }}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" alt="Tweet media">
-                                                                        </div>
-                                                                        {% elif media_item.type == "video" %}
-                                                                        <div class="flex-shrink-0 video-container" style="width: 120px; height: 120px; position: relative;">
-                                                                            {% if media_item.video_url %}
-                                                                            <video class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" muted loop playsinline>
-                                                                                <source src="{{ media_item.video_url }}" type="video/mp4">
-                                                                            </video>
-                                                                            {% else %}
-                                                                            <img src="{{ media_item.url }}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" alt="Video thumbnail">
-                                                                            {% endif %}
-                                                                            <div class="position-absolute top-50 start-50 translate-middle play-overlay">
-                                                                                <i class="bi bi-play-circle-fill text-white" style="font-size: 2rem; opacity: 0.8;"></i>
-                                                                            </div>
-                                                                        </div>
-                                                                        {% endif %}
-                                                                    {% endfor %}
+                                                                {% for media_item in tweet.media|slice:":1" %}
+                                                                {% if media_item.type == "photo" %}
+                                                                <div class="flex-shrink-0"
+                                                                    style="width: 120px; height: 120px;">
+                                                                    <img src="{{ media_item.url }}"
+                                                                        class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        alt="Tweet media">
+                                                                </div>
+                                                                {% elif media_item.type == "video" %}
+                                                                <div class="flex-shrink-0 video-container"
+                                                                    style="width: 120px; height: 120px; position: relative;">
+                                                                    {% if media_item.video_url %}
+                                                                    <video class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        muted loop playsinline>
+                                                                        <source src="{{ media_item.video_url }}"
+                                                                            type="video/mp4">
+                                                                    </video>
+                                                                    {% else %}
+                                                                    <img src="{{ media_item.url }}"
+                                                                        class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        alt="Video thumbnail">
+                                                                    {% endif %}
+                                                                    <div
+                                                                        class="position-absolute top-50 start-50 translate-middle play-overlay">
+                                                                        <i class="bi bi-play-circle-fill text-white"
+                                                                            style="font-size: 2rem; opacity: 0.8;"></i>
+                                                                    </div>
+                                                                </div>
+                                                                {% endif %}
+                                                                {% endfor %}
                                                                 {% endif %}
                                                                 <div class="flex-grow-1">
-                                                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                                                    <div
+                                                                        class="d-flex justify-content-between align-items-start mb-1">
                                                                         <div class="small text-muted">{{ tweet.created_at|date:"M d, Y" }}</div>
-                                                                        <strong class="text-primary">{{ tweet.view_count|floatformat:0 }} views</strong>
+                                                                        <strong class="text-primary">{{ tweet.view_count|floatformat:0 }}
+                                                                            views</strong>
                                                                     </div>
                                                                     <div class="text-truncate">{{ tweet.text|truncatewords:20 }}</div>
                                                                 </div>
@@ -1038,33 +1510,49 @@
                                                 </div>
                                                 <div class="tab-pane fade" id="tw-top-engagement">
                                                     {% for tweet in tw_top_by_engagement %}
-                                                    <div class="card mb-2 cursor-pointer" onclick="showTweetModal({{ tweet.id }})" style="cursor: pointer;">
+                                                    <div class="card mb-2 cursor-pointer"
+                                                        onclick="showTweetModal({{ tweet.id }})"
+                                                        style="cursor: pointer;">
                                                         <div class="card-body p-3">
                                                             <div class="d-flex gap-3">
                                                                 {% if tweet.media %}
-                                                                    {% for media_item in tweet.media|slice:":1" %}
-                                                                        {% if media_item.type == "photo" %}
-                                                                        <div class="flex-shrink-0" style="width: 120px; height: 120px;">
-                                                                            <img src="{{ media_item.url }}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" alt="Tweet media">
-                                                                        </div>
-                                                                        {% elif media_item.type == "video" %}
-                                                                        <div class="flex-shrink-0 video-container" style="width: 120px; height: 120px; position: relative;">
-                                                                            {% if media_item.video_url %}
-                                                                            <video class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" muted loop playsinline>
-                                                                                <source src="{{ media_item.video_url }}" type="video/mp4">
-                                                                            </video>
-                                                                            {% else %}
-                                                                            <img src="{{ media_item.url }}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" alt="Video thumbnail">
-                                                                            {% endif %}
-                                                                            <div class="position-absolute top-50 start-50 translate-middle play-overlay">
-                                                                                <i class="bi bi-play-circle-fill text-white" style="font-size: 2rem; opacity: 0.8;"></i>
-                                                                            </div>
-                                                                        </div>
-                                                                        {% endif %}
-                                                                    {% endfor %}
+                                                                {% for media_item in tweet.media|slice:":1" %}
+                                                                {% if media_item.type == "photo" %}
+                                                                <div class="flex-shrink-0"
+                                                                    style="width: 120px; height: 120px;">
+                                                                    <img src="{{ media_item.url }}"
+                                                                        class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        alt="Tweet media">
+                                                                </div>
+                                                                {% elif media_item.type == "video" %}
+                                                                <div class="flex-shrink-0 video-container"
+                                                                    style="width: 120px; height: 120px; position: relative;">
+                                                                    {% if media_item.video_url %}
+                                                                    <video class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        muted loop playsinline>
+                                                                        <source src="{{ media_item.video_url }}"
+                                                                            type="video/mp4">
+                                                                    </video>
+                                                                    {% else %}
+                                                                    <img src="{{ media_item.url }}"
+                                                                        class="img-fluid rounded"
+                                                                        style="width: 100%; height: 100%; object-fit: cover;"
+                                                                        alt="Video thumbnail">
+                                                                    {% endif %}
+                                                                    <div
+                                                                        class="position-absolute top-50 start-50 translate-middle play-overlay">
+                                                                        <i class="bi bi-play-circle-fill text-white"
+                                                                            style="font-size: 2rem; opacity: 0.8;"></i>
+                                                                    </div>
+                                                                </div>
+                                                                {% endif %}
+                                                                {% endfor %}
                                                                 {% endif %}
                                                                 <div class="flex-grow-1">
-                                                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                                                    <div
+                                                                        class="d-flex justify-content-between align-items-start mb-1">
                                                                         <div class="small text-muted">{{ tweet.created_at|date:"M d, Y" }}</div>
                                                                         <strong class="text-primary">{{ tweet.favorite_count|add:tweet.retweet_count|add:tweet.reply_count|floatformat:0 }} engagement</strong>
                                                                     </div>
@@ -1085,59 +1573,75 @@
 
                         <div class="tab-pane" id="tw-tweets">
                             {% if tw_tweets %}
-                                <div class="row g-3">
-                                    {% for tweet in tw_tweets %}
-                                        <div class="col-12">
-                                            <div class="card cursor-pointer" onclick="showTweetModal({{ tweet.id }})" style="cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-                                                <div class="card-body">
-                                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                                        <span class="text-muted small">@{{ tweet.account.username }}</span>
-                                                        <span class="text-muted small">{{ tweet.created_at|date:"M d, Y g:i A" }}</span>
-                                                    </div>
-                                                    <div class="d-flex gap-3">
-                                                        <div class="flex-grow-1">
-                                                            <p class="mb-2" style="white-space: pre-wrap; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;">{{ tweet.text }}</p>
-                                                            {% if tweet.media %}
-                                                                <div class="d-flex gap-2 flex-wrap mb-2">
-                                                                    {% for media_item in tweet.media|slice:":4" %}
-                                                                        {% if media_item.type == "photo" %}
-                                                                            <div class="position-relative" style="width: 150px; height: 150px; flex-shrink: 0;">
-                                                                                <img src="{{ media_item.url }}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" alt="Tweet media">
-                                                                            </div>
-                                                                        {% elif media_item.type == "video" %}
-                                                                            <div class="position-relative video-container" style="width: 150px; height: 150px; flex-shrink: 0;">
-                                                                                {% if media_item.video_url %}
-                                                                                <video class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" muted loop playsinline>
-                                                                                    <source src="{{ media_item.video_url }}" type="video/mp4">
-                                                                                </video>
-                                                                                {% else %}
-                                                                                <img src="{{ media_item.url }}" class="img-fluid rounded" style="width: 100%; height: 100%; object-fit: cover;" alt="Video thumbnail">
-                                                                                {% endif %}
-                                                                                <div class="position-absolute top-50 start-50 translate-middle play-overlay">
-                                                                                    <i class="bi bi-play-circle-fill text-white" style="font-size: 2rem; opacity: 0.8;"></i>
-                                                                                </div>
-                                                                            </div>
-                                                                        {% endif %}
-                                                                    {% endfor %}
-                                                                </div>
+                            <div class="row g-3">
+                                {% for tweet in tw_tweets %}
+                                <div class="col-12">
+                                    <div class="card cursor-pointer" onclick="showTweetModal({{ tweet.id }})"
+                                        style="cursor: pointer; transition: transform 0.2s;"
+                                        onmouseover="this.style.transform='translateY(-2px)'"
+                                        onmouseout="this.style.transform='translateY(0)'">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <span class="text-muted small">@{{ tweet.account.username }}</span>
+                                                <span class="text-muted small">{{ tweet.created_at|date:"M d, Y g:i A" }}</span>
+                                            </div>
+                                            <div class="d-flex gap-3">
+                                                <div class="flex-grow-1">
+                                                    <p class="mb-2"
+                                                        style="white-space: pre-wrap; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;">
+                                                        {{ tweet.text }}</p>
+                                                    {% if tweet.media %}
+                                                    <div class="d-flex gap-2 flex-wrap mb-2">
+                                                        {% for media_item in tweet.media|slice:":4" %}
+                                                        {% if media_item.type == "photo" %}
+                                                        <div class="position-relative"
+                                                            style="width: 150px; height: 150px; flex-shrink: 0;">
+                                                            <img src="{{ media_item.url }}" class="img-fluid rounded"
+                                                                style="width: 100%; height: 100%; object-fit: cover;"
+                                                                alt="Tweet media">
+                                                        </div>
+                                                        {% elif media_item.type == "video" %}
+                                                        <div class="position-relative video-container"
+                                                            style="width: 150px; height: 150px; flex-shrink: 0;">
+                                                            {% if media_item.video_url %}
+                                                            <video class="img-fluid rounded"
+                                                                style="width: 100%; height: 100%; object-fit: cover;"
+                                                                muted loop playsinline>
+                                                                <source src="{{ media_item.video_url }}"
+                                                                    type="video/mp4">
+                                                            </video>
+                                                            {% else %}
+                                                            <img src="{{ media_item.url }}" class="img-fluid rounded"
+                                                                style="width: 100%; height: 100%; object-fit: cover;"
+                                                                alt="Video thumbnail">
                                                             {% endif %}
-                                                            <div class="d-flex gap-3 text-muted small">
-                                                                <span><i class="bi bi-heart"></i> {{ tweet.favorite_count }}</span>
-                                                                <span><i class="bi bi-arrow-repeat"></i> {{ tweet.retweet_count }}</span>
-                                                                <span><i class="bi bi-chat"></i> {{ tweet.reply_count }}</span>
-                                                                {% if tweet.view_count > 0 %}
-                                                                    <span><i class="bi bi-eye"></i> {{ tweet.view_count }}</span>
-                                                                {% endif %}
+                                                            <div
+                                                                class="position-absolute top-50 start-50 translate-middle play-overlay">
+                                                                <i class="bi bi-play-circle-fill text-white"
+                                                                    style="font-size: 2rem; opacity: 0.8;"></i>
                                                             </div>
                                                         </div>
+                                                        {% endif %}
+                                                        {% endfor %}
+                                                    </div>
+                                                    {% endif %}
+                                                    <div class="d-flex gap-3 text-muted small">
+                                                        <span><i class="bi bi-heart"></i> {{ tweet.favorite_count }}</span>
+                                                        <span><i class="bi bi-arrow-repeat"></i> {{ tweet.retweet_count }}</span>
+                                                        <span><i class="bi bi-chat"></i> {{ tweet.reply_count }}</span>
+                                                        {% if tweet.view_count > 0 %}
+                                                        <span><i class="bi bi-eye"></i> {{ tweet.view_count }}</span>
+                                                        {% endif %}
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    {% endfor %}
+                                    </div>
                                 </div>
+                                {% endfor %}
+                            </div>
                             {% else %}
-                                <p class="text-muted mb-0">No tweets found for @{{ username_display }}.</p>
+                            <p class="text-muted mb-0">No tweets found for @{{ username_display }}.</p>
                             {% endif %}
                         </div>
                     </div>
@@ -1159,86 +1663,86 @@
 {{ tw_tweets_json|json_script:"twTweetsData" }}
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    const tabs = document.querySelectorAll('#analyticsTabs .nav-link');
-    const panes = document.querySelectorAll('.tab-pane');
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            panes.forEach(p => p.classList.remove('active'));
-            tab.classList.add('active');
-            const target = document.getElementById(tab.dataset.target);
-            if (target) target.classList.add('active');
-        });
-    });
-
-    // Function to update button visibility
-    function updateButtonVisibility() {
-        // Instagram button
-        if (igAccountIds && igAccountIds.length > 0) {
-            if (fetchIgPostsBtn) {
-                fetchIgPostsBtn.style.display = 'inline-block';
-            }
-            if (igAccountCountEl) {
-                igAccountCountEl.textContent = igAccountIds.length;
-            }
-        } else {
-            if (fetchIgPostsBtn) {
-                fetchIgPostsBtn.style.display = 'none';
-            }
-            if (igAccountCountEl) {
-                igAccountCountEl.textContent = '0';
-            }
-        }
-        
-        // Twitter button
-        if (twAccountIds && twAccountIds.length > 0) {
-            if (fetchTwTweetsBtn) {
-                fetchTwTweetsBtn.style.display = 'inline-block';
-            }
-            if (twAccountCountEl) {
-                twAccountCountEl.textContent = twAccountIds.length;
-            }
-        } else {
-            if (fetchTwTweetsBtn) {
-                fetchTwTweetsBtn.style.display = 'none';
-            }
-            if (twAccountCountEl) {
-                twAccountCountEl.textContent = '0';
-            }
-        }
-    }
-
-    // Sub-tabs for IG/TW sections
-    const subGroups = document.querySelectorAll('.sub-tab-group');
-    subGroups.forEach(group => {
-        const tabs = group.querySelectorAll('.nav-link');
+    document.addEventListener('DOMContentLoaded', () => {
+        const tabs = document.querySelectorAll('#analyticsTabs .nav-link');
+        const panes = document.querySelectorAll('.tab-pane');
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 tabs.forEach(t => t.classList.remove('active'));
+                panes.forEach(p => p.classList.remove('active'));
                 tab.classList.add('active');
-                const targetId = tab.dataset.target;
-                const pane = document.getElementById(targetId);
-                const allPanes = group.parentElement.querySelectorAll('.tab-pane');
-                allPanes.forEach(p => p.classList.remove('active'));
-                if (pane) pane.classList.add('active');
-                // Re-setup video autoplay after tab switch
+                const target = document.getElementById(tab.dataset.target);
+                if (target) target.classList.add('active');
+            });
+        });
+
+        // Function to update button visibility
+        function updateButtonVisibility() {
+            // Instagram button
+            if (igAccountIds && igAccountIds.length > 0) {
+                if (fetchIgPostsBtn) {
+                    fetchIgPostsBtn.style.display = 'inline-block';
+                }
+                if (igAccountCountEl) {
+                    igAccountCountEl.textContent = igAccountIds.length;
+                }
+            } else {
+                if (fetchIgPostsBtn) {
+                    fetchIgPostsBtn.style.display = 'none';
+                }
+                if (igAccountCountEl) {
+                    igAccountCountEl.textContent = '0';
+                }
+            }
+
+            // Twitter button
+            if (twAccountIds && twAccountIds.length > 0) {
+                if (fetchTwTweetsBtn) {
+                    fetchTwTweetsBtn.style.display = 'inline-block';
+                }
+                if (twAccountCountEl) {
+                    twAccountCountEl.textContent = twAccountIds.length;
+                }
+            } else {
+                if (fetchTwTweetsBtn) {
+                    fetchTwTweetsBtn.style.display = 'none';
+                }
+                if (twAccountCountEl) {
+                    twAccountCountEl.textContent = '0';
+                }
+            }
+        }
+
+        // Sub-tabs for IG/TW sections
+        const subGroups = document.querySelectorAll('.sub-tab-group');
+        subGroups.forEach(group => {
+            const tabs = group.querySelectorAll('.nav-link');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    const targetId = tab.dataset.target;
+                    const pane = document.getElementById(targetId);
+                    const allPanes = group.parentElement.querySelectorAll('.tab-pane');
+                    allPanes.forEach(p => p.classList.remove('active'));
+                    if (pane) pane.classList.add('active');
+                    // Re-setup video autoplay after tab switch
+                    setTimeout(setupVideoAutoplay, 100);
+                });
+            });
+        });
+
+        // Also handle Bootstrap tab switches (for top performer tabs)
+        document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
+            tab.addEventListener('shown.bs.tab', () => {
                 setTimeout(setupVideoAutoplay, 100);
             });
         });
-    });
-    
-    // Also handle Bootstrap tab switches (for top performer tabs)
-    document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
-        tab.addEventListener('shown.bs.tab', () => {
-            setTimeout(setupVideoAutoplay, 100);
-        });
-    });
 
-    const igWeekdayData = {{ ig_weekday_counts|default:"[]"|safe }};
+        const igWeekdayData = {{ ig_weekday_counts|default:"[]"|safe }};
     const twWeekdayData = {{ tw_weekday_counts|default:"[]"|safe }};
     const weekdayLabels = {{ weekday_labels|default:"[]"|safe }};
-    
+
     const igHourEngagementEl = document.getElementById('igHourEngagement');
     const twHourEngagementEl = document.getElementById('twHourEngagement');
     const hourLabelsEl = document.getElementById('hourLabels');
@@ -1268,7 +1772,7 @@ document.addEventListener('DOMContentLoaded', () => {
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
-                plugins: { 
+                plugins: {
                     legend: { display: false }
                 },
                 scales: {
@@ -1279,7 +1783,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     y: {
                         beginAtZero: true,
                         max: maxVal,
-                        ticks: { 
+                        ticks: {
                             precision: 0,
                             color: '#cbd5e1'
                         },
@@ -1314,7 +1818,7 @@ document.addEventListener('DOMContentLoaded', () => {
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
-                plugins: { 
+                plugins: {
                     legend: { display: false }
                 },
                 scales: {
@@ -1325,7 +1829,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     y: {
                         beginAtZero: true,
                         max: maxVal,
-                        ticks: { 
+                        ticks: {
                             precision: 0,
                             color: '#cbd5e1'
                         },
@@ -1338,7 +1842,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderBarChart('igWeekdayChart', 'Posts per Weekday', igWeekdayData, weekdayLabels);
     renderBarChart('twWeekdayChart', 'Tweets per Weekday', twWeekdayData, weekdayLabels);
-    
+
     // Hour of day engagement charts
     if (hourLabels && hourLabels.length > 0) {
         renderLineChart('igHourChart', 'Avg Engagement', igHourEngagement, hourLabels);
@@ -1354,7 +1858,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderMonthChart(canvasId, monthData, label) {
         const ctx = document.getElementById(canvasId);
         if (!ctx || !monthData || Object.keys(monthData).length === 0) return;
-        
+
         // Sort months chronologically
         const sortedMonths = Object.keys(monthData).sort();
         const monthLabels = sortedMonths.map(m => {
@@ -1363,7 +1867,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
         });
         const monthValues = sortedMonths.map(m => monthData[m]);
-        
+
         const maxVal = Math.max(...monthValues, 1);
         new Chart(ctx, {
             type: 'line',
@@ -1382,7 +1886,7 @@ document.addEventListener('DOMContentLoaded', () => {
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
-                plugins: { 
+                plugins: {
                     legend: { display: false }
                 },
                 scales: {
@@ -1393,7 +1897,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     y: {
                         beginAtZero: true,
                         max: maxVal,
-                        ticks: { 
+                        ticks: {
                             precision: 0,
                             color: '#cbd5e1'
                         },
@@ -1412,7 +1916,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const igFetchStatus = document.getElementById('igFetchStatus');
     const igAccountIdsEl = document.getElementById('igAccountIds');
     let igAccountIds = [];
-    
+
     if (igAccountIdsEl && igAccountIdsEl.textContent) {
         try {
             const parsed = JSON.parse(igAccountIdsEl.textContent);
@@ -1422,16 +1926,16 @@ document.addEventListener('DOMContentLoaded', () => {
             igAccountIds = [];
         }
     }
-    
+
     const igAccountCountEl = document.getElementById('igAccountCount');
 
     if (fetchIgPostsBtn && igAccountIds && igAccountIds.length > 0) {
-        fetchIgPostsBtn.addEventListener('click', async function() {
+        fetchIgPostsBtn.addEventListener('click', async function () {
             const btn = this;
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Fetching...';
-            
+
             if (igFetchStatus) {
                 igFetchStatus.className = 'text-info small ms-2';
                 igFetchStatus.textContent = 'Starting fetch...';
@@ -1488,7 +1992,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const twFetchStatus = document.getElementById('twFetchStatus');
     const twAccountIdsEl = document.getElementById('twAccountIds');
     let twAccountIds = [];
-    
+
     if (twAccountIdsEl && twAccountIdsEl.textContent) {
         try {
             const parsed = JSON.parse(twAccountIdsEl.textContent);
@@ -1498,7 +2002,7 @@ document.addEventListener('DOMContentLoaded', () => {
             twAccountIds = [];
         }
     }
-    
+
     const twAccountCountEl = document.getElementById('twAccountCount');
 
     // Update button visibility function (defined after variables are declared)
@@ -1519,7 +2023,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 igAccountCountEl.textContent = '0';
             }
         }
-        
+
         // Twitter button
         if (twAccountIds && twAccountIds.length > 0) {
             if (fetchTwTweetsBtn) {
@@ -1540,18 +2044,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Update button visibility on page load
     updateButtonVisibility();
-    
+
     // Debug logging
     console.log('Instagram Account IDs:', igAccountIds, 'Length:', igAccountIds.length);
     console.log('Twitter Account IDs:', twAccountIds, 'Length:', twAccountIds.length);
 
     if (fetchTwTweetsBtn && twAccountIds && twAccountIds.length > 0) {
-        fetchTwTweetsBtn.addEventListener('click', async function() {
+        fetchTwTweetsBtn.addEventListener('click', async function () {
             const btn = this;
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Fetching...';
-            
+
             if (twFetchStatus) {
                 twFetchStatus.className = 'text-info small ms-2';
                 twFetchStatus.textContent = 'Starting fetch...';
@@ -1609,7 +2113,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = type === 'ig' ? fetchIgPostsBtn : fetchTwTweetsBtn;
         const originalHtml = btn ? btn.innerHTML : '';
 
-        const progressUrl = type === 'ig' 
+        const progressUrl = type === 'ig'
             ? `/instagram/fetch-progress/${taskId}/`
             : null; // Twitter doesn't have a progress endpoint yet
 
@@ -1633,7 +2137,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const response = await fetch(progressUrl);
                 const data = await response.json();
-                
+
                 if (statusEl && data.message) {
                     statusEl.textContent = data.message;
                 }
@@ -1641,8 +2145,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.status === 'completed' || data.status === 'error') {
                     clearInterval(pollInterval);
                     if (statusEl) {
-                        statusEl.className = data.status === 'completed' 
-                            ? 'text-success small ms-2' 
+                        statusEl.className = data.status === 'completed'
+                            ? 'text-success small ms-2'
                             : 'text-danger small ms-2';
                         statusEl.textContent = data.message || (data.status === 'completed' ? 'Fetch completed!' : 'Fetch failed');
                     }
@@ -1690,43 +2194,43 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.video-container').forEach(container => {
             // Skip if already set up
             if (container.dataset.autoplaySetup === 'true') return;
-            
+
             const video = container.querySelector('video');
             if (!video) return;
-            
+
             // Set video attributes for autoplay
             video.muted = true;
             video.loop = true;
             video.playsInline = true;
             video.preload = 'metadata';
-            
+
             // Mark as set up
             container.dataset.autoplaySetup = 'true';
-            
+
             container.addEventListener('mouseenter', () => {
                 video.play().catch(e => console.log('Video autoplay failed:', e));
             });
-            
+
             container.addEventListener('mouseleave', () => {
                 video.pause();
                 video.currentTime = 0;
             });
         });
     }
-    
+
     // Setup video autoplay on page load
     setupVideoAutoplay();
-    
+
     // Re-setup after tab switches (in case new content is loaded)
     const observer = new MutationObserver(() => {
         setTimeout(setupVideoAutoplay, 100);
     });
-    
+
     const tabContent = document.querySelector('.tab-content');
     if (tabContent) {
         observer.observe(tabContent, { childList: true, subtree: true });
     }
-    
+
     // Also setup when tabs are clicked
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', () => {
@@ -1741,7 +2245,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const twTweetsData = twTweetsDataEl ? JSON.parse(twTweetsDataEl.textContent) : {};
 
     // Show Instagram post modal - make it globally accessible
-    window.showPostModal = function(postId, type) {
+    window.showPostModal = function (postId, type) {
         const post = igPostsData[String(postId)];
         if (!post) {
             console.error('Post not found:', postId, 'Available posts:', Object.keys(igPostsData));
@@ -1750,12 +2254,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const modal = document.getElementById('postModal');
         const modalBody = document.getElementById('postModalBody');
-        
+
         if (!modal || !modalBody) {
             console.error('Modal elements not found');
             return;
         }
-        
+
         let mediaHtml = '';
         if (post.is_reel || post.is_video) {
             if (post.video_url) {
@@ -1828,7 +2332,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Show Twitter tweet modal - make it globally accessible
-    window.showTweetModal = function(tweetId) {
+    window.showTweetModal = function (tweetId) {
         const tweet = twTweetsData[String(tweetId)];
         if (!tweet) {
             console.error('Tweet not found:', tweetId);
@@ -1837,7 +2341,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const modal = document.getElementById('tweetModal');
         const modalBody = document.getElementById('tweetModalBody');
-        
+
         let mediaHtml = '';
         if (tweet.media && Array.isArray(tweet.media) && tweet.media.length > 0) {
             mediaHtml = '<div class="d-flex gap-2 flex-wrap mb-3">';
@@ -1954,4 +2458,3 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
 </div>
 {% endblock %}
-

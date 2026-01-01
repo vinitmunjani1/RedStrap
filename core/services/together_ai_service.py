@@ -227,7 +227,7 @@ Generate a detailed video prompt following this exact JSON structure:
   "camera_settings": {{
     "aperture": "e.g., f/1.8 for shallow depth of field",
     "focus": "e.g., rack focus from background to subject",
-    "lighting": "e.g., cinematic rim lighting with warm golden hour tones",
+    "lighting": "Describe the distinct lighting setup that perfectly matches the video's mood (e.g., bold neon, soft overcast, high contrast noir, studio bright). AVOID generic 'golden hour' unless specifically called for by the concept.",
     "movement": "e.g., slow glide forward, tracking shot",
     "lens": "e.g., 35mm anamorphic lens"
   }},
@@ -245,6 +245,7 @@ CRITICAL STORY REQUIREMENTS:
 - The video MUST tell a complete, coherent story with a clear beginning, middle, and end
 - Both 'prompt' and 'negative_prompt' must be detailed but stay under 2000 characters.
 - 'camera_settings' MUST include professional details: aperture, focus, lighting, camera movement, and lens.
+- LIGHTING MUST BE SPECIFIC and unique to the video's mood/theme. Do NOT use generic 'cinematic' or 'golden hour' lighting unless it perfectly fits the specific narrative.
 - The story must have MEANING and visual continuity.
 - The hook should set up a question or situation that the rest of the video answers or resolves.
 
